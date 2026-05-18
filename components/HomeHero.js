@@ -51,7 +51,7 @@ export default function HomeHero() {
       <div className="nz-hero-photo">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="https://unsplash.com/photos/a-body-of-water-with-a-cave-eAoiLZgn-zU"
+          src="https://unsplash.com/photos/a-view-of-a-city-with-a-body-of-water-in-the-background-qWnXdPEvmms"
           alt="Algeria"
         />
       </div>
