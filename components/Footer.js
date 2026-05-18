@@ -57,21 +57,25 @@ export default function Footer() {
           padding-bottom: 44px; border-bottom: 1px solid var(--gray-100);
         }
         .nz-footer-logo { display: flex; align-items: center; gap: 11px; margin-bottom: 16px; }
-        .nz-fmark { width: 30px; height: 30px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
+        .nz-fmark { width: 30px; height: 30px; border-radius: 50%; background: var(--red); flex-shrink: 0; position: relative; }
+        .nz-fmark::after {
+          content: ''; position: absolute; inset: 0; border-radius: 50%;
+          background: var(--red); animation: ping 3s cubic-bezier(0,0,0.2,1) infinite;
+        }
         .nz-fname { display: block; font-size: 21px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); }
-        .nz-fsub { display: block; font-size: 9px; letter-spacing: 0.07em; text-transform: uppercase; font-weight: 700; color: var(--gray-400); margin-top: 2px; }
-        .nz-footer-brand p { font-size: 13.5px; color: var(--gray-400); line-height: 1.7; max-width: 300px; margin-bottom: 18px; }
+        .nz-fsub { display: block; font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; font-weight: 700; color: var(--gray-400); margin-top: 2px; }
+        .nz-footer-brand p { font-size: 14px; color: var(--gray-400); line-height: 1.7; max-width: 300px; margin-bottom: 18px; }
         .nz-pay { display: flex; gap: 8px; flex-wrap: wrap; }
         .nz-pay span {
           background: var(--cream); border: 1px solid var(--gray-200);
-          padding: 7px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; color: var(--ink-2);
+          padding: 8px 13px; border-radius: 8px; font-size: 12px; font-weight: 700; color: var(--ink-2);
         }
         .nz-fcol h5 {
-          font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+          font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
           color: var(--gray-400); margin-bottom: 16px;
         }
         .nz-fcol :global(a) {
-          display: block; color: var(--ink-2); font-size: 14px; font-weight: 500;
+          display: block; color: var(--ink-2); font-size: 14.5px; font-weight: 500;
           margin-bottom: 11px; transition: color .2s;
         }
         .nz-fcol :global(a:hover) { color: var(--red); }
@@ -79,7 +83,7 @@ export default function Footer() {
           display: flex; align-items: center; justify-content: space-between;
           padding-top: 26px; padding-bottom: 32px; flex-wrap: wrap; gap: 12px;
         }
-        .nz-footer-bottom span { font-size: 12.5px; color: var(--gray-400); font-weight: 500; }
+        .nz-footer-bottom span { font-size: 13px; color: var(--gray-400); font-weight: 500; }
         @media (max-width: 860px) {
           .nz-footer-top { grid-template-columns: 1fr 1fr; gap: 32px; }
         }

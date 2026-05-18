@@ -7,10 +7,15 @@ import Icon from "./Icon";
 export default function HomeHero() {
   const router = useRouter();
   const [dest, setDest] = useState("");
+  const [guests, setGuests] = useState(2);
 
   function search() {
+    const params = new URLSearchParams();
     const q = dest.trim();
-    router.push(q ? `/hotels?q=${encodeURIComponent(q)}` : "/hotels");
+    if (q) params.set("q", q);
+    if (guests) params.set("guests", String(guests));
+    const qs = params.toString();
+    router.push(qs ? `/hotels?${qs}` : "/hotels");
   }
 
   return (
@@ -57,6 +62,14 @@ export default function HomeHero() {
             <label>Check out</label>
             <input type="date" />
           </div>
+          <div className="hsf">
+            <label>Guests</label>
+            <select value={guests} onChange={(e) => setGuests(Number(e.target.value))}>
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <option key={n} value={n}>{n} {n === 1 ? "guest" : "guests"}</option>
+              ))}
+            </select>
+          </div>
           <button className="hs-submit" onClick={search}>
             Search <Icon name="arrow" size={17} strokeWidth={2.5} />
           </button>
@@ -99,7 +112,7 @@ export default function HomeHero() {
           opacity: 0; animation: rise .9s cubic-bezier(0.16,1,0.3,1) 0.15s forwards;
         }
         .nz-hero-badge .pin {
-          width: 7px; height: 7px; border-radius: 50%; background: #3ED598;
+          width: 7px; height: 7px; border-radius: 50%; background: #1B8A5A;
           animation: pinpulse 2s infinite;
         }
         .nz-hero h1 {
@@ -138,6 +151,12 @@ export default function HomeHero() {
           border: none; background: transparent; outline: none; width: 100%;
           font-size: 14px; font-weight: 600; color: #fff;
         }
+        .hsf select {
+          border: none; background: transparent; outline: none; width: 100%;
+          font-size: 14px; font-weight: 600; color: #fff; cursor: pointer;
+          -webkit-appearance: none; appearance: none;
+        }
+        .hsf select option { color: var(--ink); }
         .hsf input::placeholder { color: rgba(255,255,255,0.6); font-weight: 500; }
         .hsf input[type="date"] { color-scheme: dark; }
         .hs-submit {
@@ -160,9 +179,24 @@ export default function HomeHero() {
         }
         @media (max-width: 860px) {
           .nz-hero-inner { padding: 0 22px; }
-          .nz-hero-search { flex-direction: column; }
+          .nz-hero-search { flex-direction: column; gap: 2px; }
           .nz-hero-foot { left: 22px; right: 22px; }
           .nz-hero-foot-trust { display: none; }
+        }
+        @media (max-width: 560px) {
+          .nz-hero { height: auto; min-height: 100svh; padding: 96px 0 130px; }
+          .nz-hero-photo img { animation: none; }
+          .nz-hero-inner { position: relative; padding: 0 20px; }
+          .nz-hero-badge { font-size: 11px; padding: 8px 14px; margin-bottom: 20px; }
+          .nz-hero h1 { font-size: 40px; line-height: 1.02; margin-bottom: 18px; }
+          .nz-hero h1 .accent { white-space: normal; }
+          .nz-hero p { font-size: 15px; margin-bottom: 26px; }
+          .nz-hero-search { padding: 7px; }
+          .hsf { padding: 11px 16px; }
+          .hsf:not(:last-of-type) { border-bottom: 1px solid rgba(255,255,255,0.14); }
+          .hs-submit { padding: 14px; margin-top: 4px; justify-content: center; }
+          .nz-hero-foot { bottom: 22px; }
+          .nz-hero-credit { font-size: 10px; }
         }
       `}</style>
     </header>

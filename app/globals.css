@@ -17,8 +17,8 @@
   --gray-100: #F0F0F2;
   --cream: #FAF8F4;
   --white: #FFFFFF;
-  --teal: #0F9D8F;
-  --teal-soft: #E6F5F3;
+  --teal: #1B8A5A;
+  --teal-soft: #E7F4EC;
   --r-sm: 10px;
   --r-md: 16px;
   --r-lg: 22px;
@@ -58,9 +58,9 @@ input, select, textarea { font-family: inherit; }
 @keyframes ping { 0% { transform: scale(1); opacity: 0.5; } 75%,100% { transform: scale(2.4); opacity: 0; } }
 @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
 @keyframes pinpulse {
-  0% { box-shadow: 0 0 0 0 rgba(15,157,143,0.5); }
-  70% { box-shadow: 0 0 0 8px rgba(15,157,143,0); }
-  100% { box-shadow: 0 0 0 0 rgba(15,157,143,0); }
+  0% { box-shadow: 0 0 0 0 rgba(27,138,90,0.5); }
+  70% { box-shadow: 0 0 0 8px rgba(27,138,90,0); }
+  100% { box-shadow: 0 0 0 0 rgba(27,138,90,0); }
 }
 
 /* ---- shared layout helpers ---- */
@@ -172,6 +172,23 @@ input, select, textarea { font-family: inherit; }
   .nz-section { padding-top: 64px; padding-bottom: 64px; }
   .nz-why { padding: 64px 0; }
 }
+@media (max-width: 560px) {
+  .nz-section { padding-top: 48px; padding-bottom: 48px; }
+  .nz-why { padding: 48px 0; }
+  .nz-section-head { flex-direction: column; align-items: flex-start; gap: 18px; margin-bottom: 32px; }
+  .nz-section-head h2 { font-size: 30px; }
+  .nz-trustbar { padding: 18px 0; }
+  .nz-trustbar-inner { gap: 18px 28px; }
+  .nz-tstat { flex: 0 0 calc(50% - 14px); }
+  .nz-tstat .big { font-size: 22px; }
+  .nz-bento-card { padding: 24px; min-height: 180px; }
+  .nz-bento-card.feature h3 { font-size: 25px; }
+  .nz-bento-stat { font-size: 44px; }
+  .nz-allouni-seal { width: 56px; height: 56px; }
+  .nz-allouni-left { gap: 16px; }
+  .nz-allouni-left h4 { font-size: 19px; }
+  .nz-viewall { width: 100%; justify-content: center; }
+}
 
 /* =============================================================================
    Admin dashboard — shared
@@ -210,4 +227,18 @@ input, select, textarea { font-family: inherit; }
 .ad-btn-mini-danger {
   background: transparent; color: var(--red-deep); border: none;
   font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+
+/* =============================================================================
+   Admin dashboard — mobile
+   ============================================================================= */
+@media (max-width: 720px) {
+  /* tables scroll horizontally instead of breaking layout */
+  .ad-table { display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+  .ad-panel { padding: 16px; }
+  .ad-editor-actions { flex-direction: column; }
+  .ad-editor-actions .ad-btn-primary,
+  .ad-editor-actions .ad-btn-ghost,
+  .ad-editor-actions .ad-btn-danger { width: 100%; text-align: center; }
+  .ad-pagehead { flex-direction: column; align-items: stretch; }
 }

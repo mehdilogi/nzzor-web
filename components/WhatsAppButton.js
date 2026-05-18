@@ -36,6 +36,13 @@ export default function WhatsAppButton() {
           max-width: 0; opacity: 0; transition: all .35s cubic-bezier(0.16,1,0.3,1);
         }
         .nz-wa:hover .nz-wa-label { max-width: 160px; opacity: 1; margin-right: 4px; }
+        @media (max-width: 1080px) {
+          .nz-wa { bottom: 84px; right: 16px; }
+        }
+        @media (max-width: 560px) {
+          .nz-wa { width: 52px; height: 52px; }
+          .nz-wa-icon { width: 52px; height: 52px; }
+        }
       `}</style>
     </a>
   );

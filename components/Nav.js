@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 export default function Nav({ overHero = false }) {
   const [scrolled, setScrolled] = useState(!overHero);
   const [lang, setLang] = useState("en");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!overHero) return;
@@ -17,7 +18,13 @@ export default function Nav({ overHero = false }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, [overHero]);
 
-  const solid = scrolled;
+  // lock body scroll when mobile menu is open
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [menuOpen]);
+
+  const solid = scrolled || menuOpen;
 
   return (
     <nav className={`nz-nav ${solid ? "solid" : "transparent"} ${overHero ? "fixed" : "sticky"}`}>
@@ -49,6 +56,24 @@ export default function Nav({ overHero = false }) {
           ))}
         </div>
         <button className="nz-nav-cta">Sign in</button>
+        <button
+          className="nz-burger"
+          onClick={() => setMenuOpen((o) => !o)}
+          aria-label="Menu"
+        >
+          <span className={menuOpen ? "x" : ""} />
+          <span className={menuOpen ? "x" : ""} />
+          <span className={menuOpen ? "x" : ""} />
+        </button>
+      </div>
+
+      {/* mobile drawer */}
+      <div className={`nz-drawer ${menuOpen ? "open" : ""}`}>
+        <Link href="/hotels" onClick={() => setMenuOpen(false)}>Hotels</Link>
+        <Link href="/hotels" onClick={() => setMenuOpen(false)}>Destinations</Link>
+        <Link href="/#how" onClick={() => setMenuOpen(false)}>How it works</Link>
+        <Link href="/#allouni" onClick={() => setMenuOpen(false)}>About Allouni</Link>
+        <button className="nz-drawer-cta">Sign in</button>
       </div>
 
       <style jsx>{`
@@ -113,9 +138,47 @@ export default function Nav({ overHero = false }) {
           font-size: 13px; font-weight: 700; transition: transform .2s;
         }
         .nz-nav-cta:hover { transform: translateY(-1px); }
+
+        /* burger — hidden on desktop */
+        .nz-burger {
+          display: none; flex-direction: column; gap: 4px; justify-content: center;
+          width: 38px; height: 38px; border: none; background: transparent; padding: 0;
+        }
+        .nz-burger span {
+          display: block; width: 20px; height: 2px; border-radius: 2px;
+          background: ${solid ? "var(--ink)" : "#fff"};
+          transition: transform .25s, opacity .2s; margin: 0 auto;
+        }
+        .nz-burger span.x:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+        .nz-burger span.x:nth-child(2) { opacity: 0; }
+        .nz-burger span.x:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+        /* mobile drawer */
+        .nz-drawer {
+          position: fixed; top: 64px; left: 0; right: 0; bottom: 0; z-index: 99;
+          background: #fff; padding: 20px;
+          display: flex; flex-direction: column; gap: 4px;
+          transform: translateX(100%); transition: transform .3s cubic-bezier(0.16,1,0.3,1);
+        }
+        .nz-drawer.open { transform: translateX(0); }
+        .nz-drawer :global(a) {
+          padding: 16px 12px; font-size: 17px; font-weight: 700; color: var(--ink);
+          border-bottom: 1px solid var(--gray-100);
+        }
+        .nz-drawer-cta {
+          margin-top: 16px; padding: 15px; background: var(--red); color: #fff;
+          border: none; border-radius: var(--r-sm); font-size: 15px; font-weight: 700;
+        }
+
         @media (max-width: 860px) {
           .nz-nav, .nz-nav.solid { padding: 14px 20px; }
           .nz-nav-links { display: none; }
+          .nz-burger { display: flex; }
+          .nz-nav-cta { display: none; }
+          .nz-lang { display: none; }
+        }
+        @media (min-width: 861px) {
+          .nz-drawer { display: none; }
         }
       `}</style>
     </nav>

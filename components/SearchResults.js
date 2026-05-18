@@ -104,6 +104,14 @@ export default function SearchResults({ initialHotels, cities, initialFilters })
           .nz-sr-grid { grid-template-columns: 1fr; }
           .nz-sr-sort { margin-left: 0; }
         }
+        @media (max-width: 560px) {
+          .nz-sr-head { padding: 32px 0; }
+          .nz-sr-head h1 { font-size: 26px; }
+          .nz-sr-filters { flex-direction: column; align-items: stretch; gap: 10px; }
+          .nz-sr-filters select { width: 100%; }
+          .nz-sr-stars { justify-content: space-between; }
+          .nz-sr-stars button { flex: 1; text-align: center; }
+        }
       `}</style>
     </>
   );

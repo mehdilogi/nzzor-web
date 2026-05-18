@@ -237,6 +237,15 @@ export default function HotelDetail({ hotel }) {
         </aside>
       </div>
 
+      {/* sticky mobile reserve bar */}
+      <div className="nz-mobile-reserve">
+        <div className="nz-mr-price">
+          <span className="amt display">{selectedRoom ? formatPriceShort(selectedRoom.price) : "—"}</span>
+          <span className="unit">DZD / night</span>
+        </div>
+        <button className="nz-mr-btn" onClick={reserve}>Reserve now</button>
+      </div>
+
       <DetailStyles />
     </div>
   );
@@ -408,6 +417,43 @@ function DetailStyles() {
         .nz-room-photo { height: 180px; }
         .nz-room-action { text-align: left; align-items: flex-start; }
         .nz-amenities { grid-template-columns: 1fr 1fr; }
+      }
+      @media (max-width: 560px) {
+        .nz-bc { flex-wrap: wrap; row-gap: 4px; font-size: 12px; }
+        .nz-gallery { height: 240px; gap: 5px; }
+        .nz-detail-layout { padding-top: 24px; gap: 0; padding-bottom: 90px; }
+        .nz-hotel-head h1 { font-size: 28px; }
+        .nz-hotel-sub { gap: 12px; }
+        .nz-dsection { margin-bottom: 32px; }
+        .nz-dsection h2 { font-size: 21px; }
+        .nz-about { font-size: 14.5px; }
+        .nz-room { padding: 14px; }
+        .nz-room-action {
+          flex-direction: row; align-items: center; justify-content: space-between;
+          width: 100%; margin-top: 4px;
+        }
+        .nz-amenities { grid-template-columns: 1fr; }
+        .nz-policy-row { padding: 14px 16px; }
+        .nz-widget { border-radius: var(--r-md); }
+        .nz-room-perks { gap: 10px; }
+      }
+
+      /* sticky mobile reserve bar — hidden on desktop */
+      .nz-mobile-reserve { display: none; }
+      @media (max-width: 1080px) {
+        .nz-mobile-reserve {
+          display: flex; align-items: center; justify-content: space-between; gap: 14px;
+          position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
+          background: #fff; border-top: 1px solid var(--gray-200);
+          padding: 12px 20px; box-shadow: 0 -8px 24px -12px rgba(20,20,30,0.2);
+        }
+        .nz-mr-price .amt { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+        .nz-mr-price .unit { font-size: 11px; color: var(--gray-400); font-weight: 600; margin-left: 4px; }
+        .nz-mr-btn {
+          flex: 1; max-width: 200px; padding: 14px; background: var(--red); color: #fff;
+          border: none; border-radius: var(--r-sm);
+          font-family: 'Clash Display', sans-serif; font-size: 15px; font-weight: 600;
+        }
       }
     `}</style>
   );

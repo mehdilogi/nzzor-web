@@ -115,7 +115,11 @@ function Login({ onLogin }) {
           border-radius: var(--r-lg); padding: 36px;
         }
         .ad-login-brand { display: flex; align-items: center; gap: 11px; margin-bottom: 28px; }
-        .ad-logo-mark { width: 34px; height: 34px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
+        .ad-logo-mark { width: 34px; height: 34px; border-radius: 50%; background: var(--red); flex-shrink: 0; position: relative; }
+        .ad-logo-mark::after {
+          content: ''; position: absolute; inset: 0; border-radius: 50%;
+          background: var(--red); animation: ping 3s cubic-bezier(0,0,0.2,1) infinite;
+        }
         .ad-login-name { font-size: 21px; font-weight: 600; letter-spacing: -0.02em; }
         .ad-login-sub { font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; font-weight: 700; color: var(--gray-400); }
         .ad-login-card h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
@@ -190,7 +194,11 @@ function Dashboard({ user, onLogout }) {
           display: flex; flex-direction: column; padding: 24px 16px;
         }
         .ad-side-brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 28px; }
-        .ad-logo-mark { width: 32px; height: 32px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
+        .ad-logo-mark { width: 32px; height: 32px; border-radius: 50%; background: var(--red); flex-shrink: 0; position: relative; }
+        .ad-logo-mark::after {
+          content: ''; position: absolute; inset: 0; border-radius: 50%;
+          background: var(--red); animation: ping 3s cubic-bezier(0,0,0.2,1) infinite;
+        }
         .ad-side-name { font-size: 19px; font-weight: 600; letter-spacing: -0.02em; }
         .ad-side-sub { font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; color: rgba(255,255,255,0.5); }
         .ad-sidebar nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
