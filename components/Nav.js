@@ -28,9 +28,13 @@ export default function Nav({ overHero = false }) {
   return (
     <>
       <nav className={`nzn ${solid ? "solid" : "clear"} ${overHero ? "fixed" : "sticky"}`}>
-        <Link href="/" className="nzn-logo">
+        <Link
+          href="/"
+          className="nzn-logo"
+          style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 10 }}
+        >
           <LogoMark size={28} />
-          <span className="nzn-words">
+          <span className="nzn-words" style={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
             <span className="nzn-name display">Nzzor</span>
             <span className="nzn-sub">By Allouni Travel Agency</span>
           </span>
@@ -59,7 +63,12 @@ export default function Nav({ overHero = false }) {
       {menuOpen && (
         <div className="nzn-menu">
           <div className="nzn-menu-top">
-            <Link href="/" onClick={() => setMenuOpen(false)} className="nzn-menu-logo">
+            <Link
+              href="/"
+              onClick={() => setMenuOpen(false)}
+              className="nzn-menu-logo"
+              style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 10 }}
+            >
               <LogoMark size={28} />
               <span className="nzn-name display">Nzzor</span>
             </Link>

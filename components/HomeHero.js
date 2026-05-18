@@ -245,15 +245,21 @@ export default function HomeHero() {
         }
         .nzs-submit:hover { background: var(--red-deep); }
 
-        .nzs-panel {
-          position: absolute; top: calc(100% + 10px); left: 0; right: 0;
-          background: #fff; border-radius: var(--r-lg); padding: 20px;
-          box-shadow: 0 32px 64px -20px rgba(0,0,0,0.4);
-          z-index: 60;
-          max-height: min(420px, 56vh); overflow-y: auto;
+        /* panel: a centered modal anchored to the VIEWPORT, so it can never
+           hang off-screen regardless of where the search bar sits */
+        .nzs-backdrop {
+          display: block; position: fixed; inset: 0;
+          background: rgba(12,12,16,0.45); z-index: 240;
         }
-        .nzs-backdrop { display: none; }
-        .nzs-panel-title { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 14px; }
+        .nzs-panel {
+          position: fixed; z-index: 250;
+          top: 50%; left: 50%; transform: translate(-50%, -50%);
+          width: min(520px, calc(100vw - 40px));
+          background: #fff; border-radius: var(--r-lg); padding: 24px;
+          box-shadow: 0 40px 80px -20px rgba(0,0,0,0.5);
+          max-height: 80vh; overflow-y: auto;
+        }
+        .nzs-panel-title { font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 16px; }
         .nzs-cities { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
         .nzs-city {
           display: flex; align-items: center; gap: 10px; padding: 11px 12px;
@@ -319,6 +325,7 @@ export default function HomeHero() {
           }
           .nzs-panel {
             position: fixed; top: auto; left: 0; right: 0; bottom: 0;
+            transform: none; width: auto;
             border-radius: var(--r-lg) var(--r-lg) 0 0;
             padding: 22px 20px 28px;
             max-height: 80vh; overflow-y: auto;

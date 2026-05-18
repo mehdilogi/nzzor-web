@@ -25,24 +25,24 @@ export default function Footer() {
 
         <div className="nz-fcol">
           <h5>Company</h5>
-          <Link className="nz-flink" href="/#allouni">About us</Link>
-          <Link className="nz-flink" href="/#allouni">Allouni Travel Agency</Link>
-          <Link className="nz-flink" href="/hotels">Our hotels</Link>
-          <Link className="nz-flink" href="/">Careers</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/#allouni">About us</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/#allouni">Allouni Travel Agency</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/hotels">Our hotels</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/">Careers</Link>
         </div>
         <div className="nz-fcol">
           <h5>Support</h5>
-          <Link className="nz-flink" href="/">Help center</Link>
-          <Link className="nz-flink" href="/">Contact us</Link>
-          <Link className="nz-flink" href="/">WhatsApp support</Link>
-          <Link className="nz-flink" href="/">FAQ</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/">Help center</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/">Contact us</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/">WhatsApp support</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/">FAQ</Link>
         </div>
         <div className="nz-fcol">
           <h5>Legal</h5>
-          <Link className="nz-flink" href="/">Terms &amp; conditions</Link>
-          <Link className="nz-flink" href="/">Privacy policy</Link>
-          <Link className="nz-flink" href="/">Cancellation policy</Link>
-          <Link className="nz-flink" href="/">Ministry agrément</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/">Terms &amp; conditions</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/">Privacy policy</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/">Cancellation policy</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/">Ministry agrément</Link>
         </div>
       </div>
 
