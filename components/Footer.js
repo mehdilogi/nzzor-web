@@ -25,24 +25,24 @@ export default function Footer() {
 
         <div className="nz-fcol">
           <h5>Company</h5>
-          <Link href="/#allouni">About us</Link>
-          <Link href="/#allouni">Allouni Travel Agency</Link>
-          <Link href="/hotels">Our hotels</Link>
-          <Link href="/">Careers</Link>
+          <Link className="nz-flink" href="/#allouni">About us</Link>
+          <Link className="nz-flink" href="/#allouni">Allouni Travel Agency</Link>
+          <Link className="nz-flink" href="/hotels">Our hotels</Link>
+          <Link className="nz-flink" href="/">Careers</Link>
         </div>
         <div className="nz-fcol">
           <h5>Support</h5>
-          <Link href="/">Help center</Link>
-          <Link href="/">Contact us</Link>
-          <Link href="/">WhatsApp support</Link>
-          <Link href="/">FAQ</Link>
+          <Link className="nz-flink" href="/">Help center</Link>
+          <Link className="nz-flink" href="/">Contact us</Link>
+          <Link className="nz-flink" href="/">WhatsApp support</Link>
+          <Link className="nz-flink" href="/">FAQ</Link>
         </div>
         <div className="nz-fcol">
           <h5>Legal</h5>
-          <Link href="/">Terms &amp; conditions</Link>
-          <Link href="/">Privacy policy</Link>
-          <Link href="/">Cancellation policy</Link>
-          <Link href="/">Ministry agrément</Link>
+          <Link className="nz-flink" href="/">Terms &amp; conditions</Link>
+          <Link className="nz-flink" href="/">Privacy policy</Link>
+          <Link className="nz-flink" href="/">Cancellation policy</Link>
+          <Link className="nz-flink" href="/">Ministry agrément</Link>
         </div>
       </div>
 
@@ -67,14 +67,14 @@ export default function Footer() {
           padding: 8px 13px; border-radius: 8px; font-size: 12px; font-weight: 700; color: var(--ink-2);
         }
         .nz-fcol h5 {
-          font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-          color: var(--gray-400); margin-bottom: 16px;
+          font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+          color: var(--gray-400); margin-bottom: 14px;
         }
-        .nz-fcol :global(a) {
-          display: block; color: var(--ink-2); font-size: 14.5px; font-weight: 500;
-          margin-bottom: 11px; transition: color .2s;
+        .nz-footer :global(.nz-flink) {
+          display: block; color: var(--ink-2); font-size: 13.5px; font-weight: 500;
+          margin-bottom: 10px; transition: color .2s; text-decoration: none;
         }
-        .nz-fcol :global(a:hover) { color: var(--red); }
+        .nz-footer :global(.nz-flink:hover) { color: var(--red); }
         .nz-footer-bottom {
           display: flex; align-items: center; justify-content: space-between;
           padding-top: 26px; padding-bottom: 32px; flex-wrap: wrap; gap: 12px;

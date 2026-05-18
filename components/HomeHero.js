@@ -250,6 +250,7 @@ export default function HomeHero() {
           background: #fff; border-radius: var(--r-lg); padding: 20px;
           box-shadow: 0 32px 64px -20px rgba(0,0,0,0.4);
           z-index: 60;
+          max-height: min(420px, 56vh); overflow-y: auto;
         }
         .nzs-backdrop { display: none; }
         .nzs-panel-title { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 14px; }

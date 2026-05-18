@@ -40,10 +40,14 @@ export default function HotelCard({ hotel }) {
       <style jsx>{`
         .nz-hcard {
           display: block; background: var(--white); border-radius: var(--r-lg);
-          overflow: hidden; border: 1px solid var(--gray-100);
-          transition: transform .35s cubic-bezier(0.16,1,0.3,1), box-shadow .35s;
+          overflow: hidden; border: 1px solid var(--gray-200);
+          box-shadow: 0 4px 16px -4px rgba(20,20,30,0.1);
+          transition: transform .35s cubic-bezier(0.16,1,0.3,1), box-shadow .35s, border-color .35s;
         }
-        .nz-hcard:hover { transform: translateY(-6px); box-shadow: var(--shadow-lg); }
+        .nz-hcard:hover {
+          transform: translateY(-6px); box-shadow: var(--shadow-lg);
+          border-color: var(--gray-300);
+        }
         .nz-hcard-media { position: relative; height: 280px; overflow: hidden; }
         .nz-hcard-media img {
           width: 100%; height: 100%; object-fit: cover;
@@ -106,7 +110,7 @@ export default function HotelCard({ hotel }) {
           .nz-hcard-price .amt { font-size: 19px; }
           .nz-hcard-book { padding: 10px 18px; }
           /* on touch, hover lift never fires — keep a subtle resting shadow instead */
-          .nz-hcard { box-shadow: var(--shadow-sm); }
+          .nz-hcard { box-shadow: 0 4px 16px -4px rgba(20,20,30,0.1); }
         }
       `}</style>
     </Link>
