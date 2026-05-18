@@ -97,6 +97,17 @@ export default function HotelCard({ hotel }) {
           font-size: 13px; font-weight: 700; transition: background .2s, transform .15s;
         }
         .nz-hcard:hover .nz-hcard-book { background: var(--red); }
+
+        @media (max-width: 560px) {
+          .nz-hcard-media { height: 210px; }
+          .nz-hcard-info { padding: 16px; }
+          .nz-hcard-name { font-size: 19px; margin-bottom: 14px; }
+          .nz-hcard-foot { padding-top: 14px; }
+          .nz-hcard-price .amt { font-size: 19px; }
+          .nz-hcard-book { padding: 10px 18px; }
+          /* on touch, hover lift never fires — keep a subtle resting shadow instead */
+          .nz-hcard { box-shadow: var(--shadow-sm); }
+        }
       `}</style>
     </Link>
   );

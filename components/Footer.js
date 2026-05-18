@@ -1,4 +1,5 @@
 import Link from "next/link";
+import LogoMark from "./LogoMark";
 
 export default function Footer() {
   return (
@@ -6,7 +7,7 @@ export default function Footer() {
       <div className="wrap nz-footer-top">
         <div className="nz-footer-brand">
           <div className="nz-footer-logo">
-            <span className="nz-fmark" />
+            <LogoMark size={30} />
             <span>
               <span className="display nz-fname">Nzzor</span>
               <span className="nz-fsub">By Allouni Travel Agency</span>
@@ -57,11 +58,6 @@ export default function Footer() {
           padding-bottom: 44px; border-bottom: 1px solid var(--gray-100);
         }
         .nz-footer-logo { display: flex; align-items: center; gap: 11px; margin-bottom: 16px; }
-        .nz-fmark { width: 30px; height: 30px; border-radius: 50%; background: var(--red); flex-shrink: 0; position: relative; }
-        .nz-fmark::after {
-          content: ''; position: absolute; inset: 0; border-radius: 50%;
-          background: var(--red); animation: ping 3s cubic-bezier(0,0,0.2,1) infinite;
-        }
         .nz-fname { display: block; font-size: 21px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); }
         .nz-fsub { display: block; font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; font-weight: 700; color: var(--gray-400); margin-top: 2px; }
         .nz-footer-brand p { font-size: 14px; color: var(--gray-400); line-height: 1.7; max-width: 300px; margin-bottom: 18px; }

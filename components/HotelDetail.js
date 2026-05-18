@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Icon, { AMENITY_ICON } from "./Icon";
+import Lightbox from "./Lightbox";
 import { formatPrice, formatPriceShort, ratingLabel } from "../lib/format";
 
 export default function HotelDetail({ hotel }) {
@@ -12,6 +13,7 @@ export default function HotelDetail({ hotel }) {
   const [selectedRoom, setSelectedRoom] = useState(rooms[0] || null);
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
+  const [lightboxIndex, setLightboxIndex] = useState(null);
 
   // nights — default to 3 for preview if dates not set
   let nights = 3;
@@ -49,7 +51,12 @@ export default function HotelDetail({ hotel }) {
       <div className="wrap">
         <div className="nz-gallery">
           {photos.slice(0, 5).map((p, i) => (
-            <div className={`nz-gal-item ${i === 4 && photos.length > 5 ? "more" : ""}`} key={p.id || i}>
+            <button
+              className={`nz-gal-item ${i === 4 && photos.length > 5 ? "more" : ""}`}
+              key={p.id || i}
+              onClick={() => setLightboxIndex(i)}
+              aria-label="View photo"
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={p.url} alt={hotel.name} loading={i === 0 ? "eager" : "lazy"} />
               {i === 4 && photos.length > 5 && (
@@ -58,10 +65,18 @@ export default function HotelDetail({ hotel }) {
                   +{photos.length - 5} photos
                 </div>
               )}
-            </div>
+            </button>
           ))}
         </div>
       </div>
+
+      {lightboxIndex !== null && (
+        <Lightbox
+          photos={photos}
+          startIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
+      )}
 
       {/* layout */}
       <div className="wrap nz-detail-layout">
@@ -277,7 +292,7 @@ function DetailStyles() {
         display: grid; grid-template-columns: 2fr 1fr 1fr; grid-template-rows: 1fr 1fr;
         gap: 8px; height: 480px; border-radius: var(--r-lg); overflow: hidden; margin-top: 20px;
       }
-      .nz-gal-item { position: relative; overflow: hidden; background: var(--gray-100); }
+      .nz-gal-item { position: relative; overflow: hidden; background: var(--gray-100); border: none; padding: 0; cursor: pointer; }
       .nz-gal-item:nth-child(1) { grid-row: span 2; }
       .nz-gal-item img { width: 100%; height: 100%; object-fit: cover; transition: transform .8s cubic-bezier(0.16,1,0.3,1); }
       .nz-gal-item:hover img { transform: scale(1.06); }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import LogoMark from "./LogoMark";
 
 // Nzzor top navigation. Transparent over hero, solid white on scroll.
 // `overHero` = render in transparent mode initially (homepage only).
@@ -29,7 +30,7 @@ export default function Nav({ overHero = false }) {
   return (
     <nav className={`nz-nav ${solid ? "solid" : "transparent"} ${overHero ? "fixed" : "sticky"}`}>
       <Link href="/" className="nz-nav-logo">
-        <span className="nz-logo-mark" />
+        <LogoMark size={30} />
         <span className="nz-logo-words">
           <span className="nz-logo-name display">Nzzor</span>
           <span className="nz-logo-sub">By Allouni Travel Agency</span>
@@ -92,14 +93,6 @@ export default function Nav({ overHero = false }) {
         }
         .nz-nav.transparent { background: transparent; }
         .nz-nav-logo { display: flex; align-items: center; gap: 11px; }
-        .nz-logo-mark {
-          width: 30px; height: 30px; border-radius: 50%; background: var(--red);
-          position: relative; flex-shrink: 0;
-        }
-        .nz-logo-mark::after {
-          content: ''; position: absolute; inset: 0; border-radius: 50%;
-          background: var(--red); animation: ping 3s cubic-bezier(0,0,0.2,1) infinite;
-        }
         .nz-logo-words { line-height: 1; }
         .nz-logo-name {
           display: block; font-size: 21px; font-weight: 600; letter-spacing: -0.02em;

@@ -1,22 +1,50 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Icon from "./Icon";
+import DateRangePicker from "./DateRangePicker";
+import { MOCK_CITIES } from "../lib/mockData";
 
+// search bar steps: city -> dates -> guests, with auto-advance
 export default function HomeHero() {
   const router = useRouter();
-  const [dest, setDest] = useState("");
+  const [city, setCity] = useState("");
+  const [checkIn, setCheckIn] = useState("");
+  const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState(2);
+  const [open, setOpen] = useState(null); // 'city' | 'dates' | 'guests' | null
+  const barRef = useRef(null);
+
+  useEffect(() => {
+    function onDoc(e) {
+      if (barRef.current && !barRef.current.contains(e.target)) setOpen(null);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
 
   function search() {
     const params = new URLSearchParams();
-    const q = dest.trim();
-    if (q) params.set("q", q);
+    if (city) params.set("city", city);
+    if (checkIn) params.set("checkIn", checkIn);
+    if (checkOut) params.set("checkOut", checkOut);
     if (guests) params.set("guests", String(guests));
     const qs = params.toString();
     router.push(qs ? `/hotels?${qs}` : "/hotels");
   }
+
+  function pickCity(c) {
+    setCity(c);
+    setOpen("dates"); // auto-advance
+  }
+
+  const dateLabel =
+    checkIn && checkOut
+      ? `${fmtDate(checkIn)} — ${fmtDate(checkOut)}`
+      : checkIn
+      ? `${fmtDate(checkIn)} — …`
+      : "Add dates";
 
   return (
     <header className="nz-hero">
@@ -35,44 +63,93 @@ export default function HomeHero() {
         </div>
         <h1 className="display">
           <span className="l1">Discover Algeria.</span>
-          <span className="l2">
-            <span className="accent">Booked in seconds.</span>
-          </span>
+          <span className="l2"><span className="accent">Booked in seconds.</span></span>
         </h1>
         <p>
           Ten verified hotels, from the dunes of Djanet to the Mediterranean coast —
           with instant confirmation and Algerian payments.
         </p>
 
-        <div className="nz-hero-search">
-          <div className="hsf">
-            <label>Destination</label>
-            <input
-              value={dest}
-              onChange={(e) => setDest(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && search()}
-              placeholder="Algiers, Oran, Djanet…"
-            />
+        {/* SEARCH BAR */}
+        <div className="nz-search" ref={barRef}>
+          <div className="nz-search-bar">
+            <button
+              className={`nzs-field ${open === "city" ? "active" : ""}`}
+              onClick={() => setOpen(open === "city" ? null : "city")}
+            >
+              <span className="nzs-label">Destination</span>
+              <span className={`nzs-value ${city ? "" : "ph"}`}>{city || "Where to?"}</span>
+            </button>
+
+            <button
+              className={`nzs-field ${open === "dates" ? "active" : ""}`}
+              onClick={() => setOpen(open === "dates" ? null : "dates")}
+            >
+              <span className="nzs-label">Dates</span>
+              <span className={`nzs-value ${checkIn ? "" : "ph"}`}>{dateLabel}</span>
+            </button>
+
+            <button
+              className={`nzs-field ${open === "guests" ? "active" : ""}`}
+              onClick={() => setOpen(open === "guests" ? null : "guests")}
+            >
+              <span className="nzs-label">Guests</span>
+              <span className="nzs-value">{guests} {guests === 1 ? "guest" : "guests"}</span>
+            </button>
+
+            <button className="nzs-submit" onClick={search}>
+              <Icon name="search" size={18} strokeWidth={2.4} />
+              <span>Search</span>
+            </button>
           </div>
-          <div className="hsf">
-            <label>Check in</label>
-            <input type="date" />
-          </div>
-          <div className="hsf">
-            <label>Check out</label>
-            <input type="date" />
-          </div>
-          <div className="hsf">
-            <label>Guests</label>
-            <select value={guests} onChange={(e) => setGuests(Number(e.target.value))}>
-              {[1, 2, 3, 4, 5, 6].map((n) => (
-                <option key={n} value={n}>{n} {n === 1 ? "guest" : "guests"}</option>
-              ))}
-            </select>
-          </div>
-          <button className="hs-submit" onClick={search}>
-            Search <Icon name="arrow" size={17} strokeWidth={2.5} />
-          </button>
+
+          {open === "city" && (
+            <div className="nzs-panel">
+              <div className="nzs-panel-title">Choose a destination</div>
+              <div className="nzs-cities">
+                {MOCK_CITIES.map((c) => (
+                  <button key={c.key} className="nzs-city" onClick={() => pickCity(c.name)}>
+                    <Icon name="pin" size={16} style={{ color: "var(--red)" }} />
+                    <span>
+                      <strong>{c.name}</strong>
+                      <em>{c.hotelCount} hotel{c.hotelCount === 1 ? "" : "s"}</em>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {open === "dates" && (
+            <div className="nzs-panel">
+              <DateRangePicker
+                checkIn={checkIn}
+                checkOut={checkOut}
+                onChange={({ checkIn: ci, checkOut: co }) => {
+                  setCheckIn(ci);
+                  setCheckOut(co);
+                }}
+                onComplete={() => setOpen("guests")}
+              />
+            </div>
+          )}
+
+          {open === "guests" && (
+            <div className="nzs-panel">
+              <div className="nzs-panel-title">How many guests?</div>
+              <div className="nzs-guests">
+                <span>Travelers</span>
+                <div className="nzs-stepper">
+                  <button onClick={() => setGuests((g) => Math.max(1, g - 1))} disabled={guests <= 1}>−</button>
+                  <strong>{guests}</strong>
+                  <button onClick={() => setGuests((g) => Math.min(10, g + 1))} disabled={guests >= 10}>+</button>
+                </div>
+              </div>
+              <button className="nzs-done" onClick={() => { setOpen(null); search(); }}>
+                Search hotels
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -133,41 +210,76 @@ export default function HomeHero() {
           font-weight: 500; margin-bottom: 40px; text-shadow: 0 1px 20px rgba(0,0,0,0.3);
           opacity: 0; animation: rise 1s cubic-bezier(0.16,1,0.3,1) 0.55s forwards;
         }
-        .nz-hero-search {
-          background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.32);
-          backdrop-filter: blur(28px) saturate(1.4);
-          border-radius: var(--r-lg); padding: 9px;
-          display: flex; gap: 6px; max-width: 860px;
-          box-shadow: 0 32px 64px -24px rgba(0,0,0,0.5);
+
+        .nz-search {
+          position: relative; max-width: 820px;
           opacity: 0; animation: rise 1s cubic-bezier(0.16,1,0.3,1) 0.7s forwards;
         }
-        .hsf { flex: 1; padding: 12px 20px; border-radius: 13px; transition: background .2s; }
-        .hsf:hover { background: rgba(255,255,255,0.16); }
-        .hsf label {
+        .nz-search-bar {
+          background: rgba(255,255,255,0.97); border-radius: var(--r-lg);
+          padding: 8px; display: flex; gap: 4px;
+          box-shadow: 0 32px 64px -24px rgba(0,0,0,0.5);
+        }
+        .nzs-field {
+          flex: 1; text-align: left; border: none; background: transparent;
+          padding: 12px 18px; border-radius: 14px; cursor: pointer; transition: background .15s;
+          display: flex; flex-direction: column; gap: 3px; min-width: 0;
+        }
+        .nzs-field:hover { background: var(--gray-100); }
+        .nzs-field.active { background: var(--gray-100); }
+        .nzs-label {
           font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
-          color: rgba(255,255,255,0.7); display: block; margin-bottom: 5px;
+          color: var(--gray-400);
         }
-        .hsf input {
-          border: none; background: transparent; outline: none; width: 100%;
-          font-size: 14px; font-weight: 600; color: #fff;
+        .nzs-value {
+          font-size: 14px; font-weight: 700; color: var(--ink);
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-        .hsf select {
-          border: none; background: transparent; outline: none; width: 100%;
-          font-size: 14px; font-weight: 600; color: #fff; cursor: pointer;
-          -webkit-appearance: none; appearance: none;
-        }
-        .hsf select option { color: var(--ink); }
-        .hsf input::placeholder { color: rgba(255,255,255,0.6); font-weight: 500; }
-        .hsf input[type="date"] { color-scheme: dark; }
-        .hs-submit {
-          background: var(--red); color: #fff; border: none; border-radius: 13px;
-          padding: 0 32px; font-family: 'Clash Display', sans-serif; font-size: 16px; font-weight: 600;
-          display: flex; align-items: center; gap: 9px; transition: background .2s, transform .15s;
+        .nzs-value.ph { color: var(--gray-300); font-weight: 500; }
+        .nzs-submit {
+          background: var(--red); color: #fff; border: none; border-radius: 14px;
+          padding: 0 28px; font-family: 'Clash Display', sans-serif; font-size: 15px; font-weight: 600;
+          display: flex; align-items: center; gap: 9px; transition: background .2s;
           white-space: nowrap;
         }
-        .hs-submit:hover { background: var(--red-deep); transform: scale(1.02); }
+        .nzs-submit:hover { background: var(--red-deep); }
+
+        .nzs-panel {
+          position: absolute; top: calc(100% + 10px); left: 0; right: 0;
+          background: #fff; border-radius: var(--r-lg); padding: 20px;
+          box-shadow: 0 32px 64px -20px rgba(0,0,0,0.4);
+          z-index: 20;
+        }
+        .nzs-panel-title { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 14px; }
+        .nzs-cities { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .nzs-city {
+          display: flex; align-items: center; gap: 10px; padding: 11px 12px;
+          border: none; background: transparent; border-radius: var(--r-sm);
+          cursor: pointer; text-align: left; transition: background .15s;
+        }
+        .nzs-city:hover { background: var(--cream); }
+        .nzs-city strong { display: block; font-size: 14px; font-weight: 700; color: var(--ink); }
+        .nzs-city em { font-size: 12px; color: var(--gray-400); font-style: normal; }
+        .nzs-guests {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 8px 0 16px;
+        }
+        .nzs-guests > span { font-size: 14px; font-weight: 700; }
+        .nzs-stepper { display: flex; align-items: center; gap: 16px; }
+        .nzs-stepper button {
+          width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--gray-300);
+          background: #fff; font-size: 18px; color: var(--ink); cursor: pointer; line-height: 1;
+        }
+        .nzs-stepper button:disabled { opacity: 0.3; cursor: default; }
+        .nzs-stepper strong { font-size: 16px; min-width: 20px; text-align: center; }
+        .nzs-done {
+          width: 100%; padding: 13px; background: var(--red); color: #fff; border: none;
+          border-radius: var(--r-sm); font-size: 15px; font-weight: 700; cursor: pointer;
+        }
+        .nzs-done:hover { background: var(--red-deep); }
+
         .nz-hero-foot {
-          position: absolute; left: 52px; right: 52px; bottom: 32px; z-index: 10;
+          position: absolute; left: 52px; right: 52px; bottom: 32px; z-index: 5;
           display: flex; justify-content: space-between; align-items: center;
           opacity: 0; animation: fade 1.2s ease 1s forwards;
         }
@@ -177,28 +289,35 @@ export default function HomeHero() {
           font-size: 11px; color: rgba(255,255,255,0.65); letter-spacing: 0.06em;
           text-transform: uppercase; font-weight: 600;
         }
+
         @media (max-width: 860px) {
           .nz-hero-inner { padding: 0 22px; }
-          .nz-hero-search { flex-direction: column; gap: 2px; }
           .nz-hero-foot { left: 22px; right: 22px; }
           .nz-hero-foot-trust { display: none; }
         }
         @media (max-width: 560px) {
-          .nz-hero { height: auto; min-height: 100svh; padding: 96px 0 130px; }
+          .nz-hero { height: auto; min-height: 100svh; padding: 92px 0 120px; }
           .nz-hero-photo img { animation: none; }
           .nz-hero-inner { position: relative; padding: 0 20px; }
           .nz-hero-badge { font-size: 11px; padding: 8px 14px; margin-bottom: 20px; }
-          .nz-hero h1 { font-size: 40px; line-height: 1.02; margin-bottom: 18px; }
+          .nz-hero h1 { font-size: 38px; line-height: 1.03; margin-bottom: 18px; }
           .nz-hero h1 .accent { white-space: normal; }
-          .nz-hero p { font-size: 15px; margin-bottom: 26px; }
-          .nz-hero-search { padding: 7px; }
-          .hsf { padding: 11px 16px; }
-          .hsf:not(:last-of-type) { border-bottom: 1px solid rgba(255,255,255,0.14); }
-          .hs-submit { padding: 14px; margin-top: 4px; justify-content: center; }
-          .nz-hero-foot { bottom: 22px; }
-          .nz-hero-credit { font-size: 10px; }
+          .nz-hero p { font-size: 15px; margin-bottom: 24px; }
+          .nz-search-bar { flex-direction: column; padding: 6px; gap: 2px; }
+          .nzs-field { padding: 13px 16px; }
+          .nzs-field:not(:last-of-type) { border-bottom: 1px solid var(--gray-100); }
+          .nzs-submit { padding: 15px; justify-content: center; margin-top: 4px; }
+          .nzs-panel { left: -14px; right: -14px; padding: 16px; }
+          .nzs-cities { grid-template-columns: 1fr; }
+          .nz-hero-foot { bottom: 20px; }
         }
       `}</style>
     </header>
   );
+}
+
+function fmtDate(s) {
+  if (!s) return "";
+  const d = new Date(s);
+  return d.toLocaleDateString("en", { day: "numeric", month: "short" });
 }
