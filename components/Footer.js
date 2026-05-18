@@ -1,7 +1,11 @@
+"use client";
+
 import Link from "next/link";
 import LogoMark from "./LogoMark";
+import { useLang } from "../lib/LangContext";
 
 export default function Footer() {
+  const { t } = useLang();
   return (
     <footer className="nz-footer">
       <div className="wrap nz-footer-top">
@@ -13,10 +17,7 @@ export default function Footer() {
               <span className="nz-fsub">By Allouni Travel Agency</span>
             </span>
           </div>
-          <p>
-            Algeria&apos;s modern hotel booking platform. Built on the trust of a
-            licensed travel agency, designed for the way Algerians travel today.
-          </p>
+          <p>{t("footer.tagline")}</p>
           <div className="nz-pay">
             <span>CIB</span><span>Eddahabia</span><span>Bank transfer</span>
             <span>WhatsApp</span><span>Cash</span>
@@ -24,31 +25,31 @@ export default function Footer() {
         </div>
 
         <div className="nz-fcol">
-          <h5>Company</h5>
-          <Link className="nz-flink" style={{ display: "block" }} href="/#allouni">About us</Link>
-          <Link className="nz-flink" style={{ display: "block" }} href="/#allouni">Allouni Travel Agency</Link>
-          <Link className="nz-flink" style={{ display: "block" }} href="/hotels">Our hotels</Link>
-          <Link className="nz-flink" style={{ display: "block" }} href="/">Careers</Link>
+          <h5>{t("footer.company")}</h5>
+          <Link className="nz-flink" style={{ display: "block" }} href="/#allouni">{t("footer.about")}</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/#allouni">{t("footer.agency")}</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/hotels">{t("footer.ourhotels")}</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.careers")}</Link>
         </div>
         <div className="nz-fcol">
-          <h5>Support</h5>
-          <Link className="nz-flink" style={{ display: "block" }} href="/">Help center</Link>
-          <Link className="nz-flink" style={{ display: "block" }} href="/">Contact us</Link>
-          <Link className="nz-flink" style={{ display: "block" }} href="/">WhatsApp support</Link>
-          <Link className="nz-flink" style={{ display: "block" }} href="/">FAQ</Link>
+          <h5>{t("footer.support")}</h5>
+          <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.help")}</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.contact")}</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.whatsapp")}</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.faq")}</Link>
         </div>
         <div className="nz-fcol">
-          <h5>Legal</h5>
-          <Link className="nz-flink" style={{ display: "block" }} href="/">Terms &amp; conditions</Link>
-          <Link className="nz-flink" style={{ display: "block" }} href="/">Privacy policy</Link>
-          <Link className="nz-flink" style={{ display: "block" }} href="/">Cancellation policy</Link>
-          <Link className="nz-flink" style={{ display: "block" }} href="/">Ministry agrément</Link>
+          <h5>{t("footer.legal")}</h5>
+          <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.terms")}</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.privacy")}</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.cancellation")}</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.agrement")}</Link>
         </div>
       </div>
 
       <div className="wrap nz-footer-bottom">
-        <span>© 2026 Allouni Travel Agency. All rights reserved.</span>
-        <span>Licensed by the Algerian Ministry of Tourism · Made in Algeria</span>
+        <span>{t("footer.rights")}</span>
+        <span>{t("footer.madein")}</span>
       </div>
 
       <style>{`

@@ -5,9 +5,11 @@ import { useState, useRef, useEffect } from "react";
 import Icon from "./Icon";
 import DateRangePicker from "./DateRangePicker";
 import { MOCK_CITIES } from "../lib/mockData";
+import { useLang } from "../lib/LangContext";
 
 // search bar steps: city -> dates -> guests, with auto-advance
 export default function HomeHero() {
+  const { t } = useLang();
   const router = useRouter();
   const [city, setCity] = useState("");
   const [checkIn, setCheckIn] = useState("");
@@ -59,15 +61,14 @@ export default function HomeHero() {
       <div className="nz-hero-inner">
         <div className="nz-hero-badge">
           <span className="pin" />
-          Licensed by the Algerian Ministry of Tourism
+          {t("hero.badge")}
         </div>
         <h1 className="display">
-          <span className="l1">Discover Algeria.</span>
-          <span className="l2"><span className="accent">Booked in seconds.</span></span>
+          <span className="l1">{t("hero.title1")}</span>
+          <span className="l2"><span className="accent">{t("hero.title2")}</span></span>
         </h1>
         <p>
-          Ten verified hotels, from the dunes of Djanet to the Mediterranean coast —
-          with instant confirmation and Algerian payments.
+          {t("hero.subtitle")}
         </p>
 
         {/* SEARCH BAR */}
@@ -78,15 +79,15 @@ export default function HomeHero() {
               className={`nzs-field ${open === "city" ? "active" : ""}`}
               onClick={() => setOpen(open === "city" ? null : "city")}
             >
-              <span className="nzs-label">Destination</span>
-              <span className={`nzs-value ${city ? "" : "ph"}`}>{city || "Where to?"}</span>
+              <span className="nzs-label">{t("search.destination")}</span>
+              <span className={`nzs-value ${city ? "" : "ph"}`}>{city || t("search.destination_ph")}</span>
             </button>
 
             <button
               className={`nzs-field ${open === "dates" ? "active" : ""}`}
               onClick={() => setOpen(open === "dates" ? null : "dates")}
             >
-              <span className="nzs-label">Dates</span>
+              <span className="nzs-label">{t("search.dates")}</span>
               <span className={`nzs-value ${checkIn ? "" : "ph"}`}>{dateLabel}</span>
             </button>
 
@@ -94,19 +95,19 @@ export default function HomeHero() {
               className={`nzs-field ${open === "guests" ? "active" : ""}`}
               onClick={() => setOpen(open === "guests" ? null : "guests")}
             >
-              <span className="nzs-label">Guests</span>
-              <span className="nzs-value">{guests} {guests === 1 ? "guest" : "guests"}</span>
+              <span className="nzs-label">{t("search.guests")}</span>
+              <span className="nzs-value">{guests} {guests === 1 ? t("search.guest") : t("search.guests_plural")}</span>
             </button>
 
             <button className="nzs-submit" onClick={search}>
               <Icon name="search" size={18} strokeWidth={2.4} />
-              <span>Search</span>
+              <span>{t("search.search")}</span>
             </button>
           </div>
 
           {open === "city" && (
             <div className="nzs-panel">
-              <div className="nzs-panel-title">Choose a destination</div>
+              <div className="nzs-panel-title">{t("search.choose_dest")}</div>
               <div className="nzs-cities">
                 {MOCK_CITIES.map((c) => (
                   <button key={c.key} className="nzs-city" onClick={() => pickCity(c.name)}>
@@ -137,9 +138,9 @@ export default function HomeHero() {
 
           {open === "guests" && (
             <div className="nzs-panel">
-              <div className="nzs-panel-title">How many guests?</div>
+              <div className="nzs-panel-title">{t("search.how_many")}</div>
               <div className="nzs-guests">
-                <span>Travelers</span>
+                <span>{t("search.travelers")}</span>
                 <div className="nzs-stepper">
                   <button onClick={() => setGuests((g) => Math.max(1, g - 1))} disabled={guests <= 1}>−</button>
                   <strong>{guests}</strong>
@@ -147,7 +148,7 @@ export default function HomeHero() {
                 </div>
               </div>
               <button className="nzs-done" onClick={() => { setOpen(null); search(); }}>
-                Search hotels
+                {t("search.search_hotels")}
               </button>
             </div>
           )}
@@ -156,9 +157,9 @@ export default function HomeHero() {
 
       <div className="nz-hero-foot">
         <div className="nz-hero-foot-trust">
-          <span>✓ Instant confirmation</span>
-          <span>✓ CIB &amp; Eddahabia</span>
-          <span>✓ 24/7 WhatsApp support</span>
+          <span>✓ {t("hero.foot1")}</span>
+          <span>✓ {t("hero.foot2")}</span>
+          <span>✓ {t("hero.foot3")}</span>
         </div>
         <div className="nz-hero-credit">Tassili n&apos;Ajjer, Djanet</div>
       </div>

@@ -3,14 +3,16 @@
 import Link from "next/link";
 import Icon from "./Icon";
 import { formatPriceShort } from "../lib/format";
+import { useLang } from "../lib/LangContext";
 
 export default function HotelCard({ hotel }) {
+  const { t } = useLang();
   return (
     <Link href={`/hotels/${hotel.slug}`} className="nz-hcard">
       <div className="nz-hcard-media">
         {hotel.trustSignals?.instantConfirmation && (
           <span className="nz-hcard-tag">
-            <span className="nz-live" /> Instant confirmation
+            <span className="nz-live" /> {t("card.instant")}
           </span>
         )}
         <span className="nz-hcard-score">
@@ -31,9 +33,9 @@ export default function HotelCard({ hotel }) {
         <div className="nz-hcard-foot">
           <div className="nz-hcard-price">
             <span className="amt display">{formatPriceShort(hotel.priceFrom)}</span>
-            <span className="unit">DZD / night</span>
+            <span className="unit">{t("card.per_night")}</span>
           </div>
-          <span className="nz-hcard-book">Book now</span>
+          <span className="nz-hcard-book">{t("card.book")}</span>
         </div>
       </div>
 

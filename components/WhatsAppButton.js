@@ -1,8 +1,10 @@
 "use client";
 
 import Icon from "./Icon";
+import { useLang } from "../lib/LangContext";
 
 export default function WhatsAppButton() {
+  const { t } = useLang();
   const number = process.env.NEXT_PUBLIC_WHATSAPP || "213XXXXXXXXX";
   return (
     <a
@@ -17,7 +19,7 @@ export default function WhatsAppButton() {
           <path d="M17.5 14.4c-.3-.1-1.7-.9-2-1-.3-.1-.5-.1-.6.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-1.5-.8-2.6-1.4-3.6-3.1-.3-.5.3-.5.8-1.5.1-.2 0-.4 0-.5-.1-.1-.6-1.5-.9-2-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.7.7-1 1.6-1 2.6 0 1.5 1.1 3 1.2 3.2.1.2 2.1 3.3 5.2 4.6 2 .8 2.7.9 3.7.8.6-.1 1.7-.7 2-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3M12 2a10 10 0 00-8.6 15l-1.3 4.7L7 20.4A10 10 0 1012 2" />
         </svg>
       </span>
-      <span className="nz-wa-label">Chat with us</span>
+      <span className="nz-wa-label">{t("wa.chat")}</span>
       <style jsx>{`
         .nz-wa {
           position: fixed; bottom: 26px; right: 26px; z-index: 200;

@@ -7,6 +7,7 @@
 // =============================================================================
 
 import { useState } from "react";
+import { useLang } from "../lib/LangContext";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"];
@@ -30,6 +31,7 @@ function startOfDay(d) {
 }
 
 export default function DateRangePicker({ checkIn, checkOut, onChange, onComplete }) {
+  const { t } = useLang();
   const today = startOfDay(new Date());
   const [view, setView] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
 
@@ -109,13 +111,13 @@ export default function DateRangePicker({ checkIn, checkOut, onChange, onComplet
       </div>
 
       <div className="drp-foot">
-        {ci && !co && <span className="drp-hint">Now pick your check-out date</span>}
+        {ci && !co && <span className="drp-hint">{t("cal.pick_checkout")}</span>}
         {ci && co && (
           <span className="drp-hint done">
-            {Math.round((co - ci) / 86400000)} night{Math.round((co - ci) / 86400000) === 1 ? "" : "s"} selected
+            {Math.round((co - ci) / 86400000)} {Math.round((co - ci) / 86400000) === 1 ? t("cal.night") : t("cal.nights")} {t("cal.selected")}
           </span>
         )}
-        {!ci && <span className="drp-hint">Pick your check-in date</span>}
+        {!ci && <span className="drp-hint">{t("cal.pick_checkin")}</span>}
       </div>
 
       <style jsx>{`

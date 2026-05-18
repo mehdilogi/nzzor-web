@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Icon, { AMENITY_ICON } from "./Icon";
 import Lightbox from "./Lightbox";
-import { formatPrice, formatPriceShort, ratingLabel } from "../lib/format";
+import { formatPrice, formatPriceShort } from "../lib/format";
+import { useLang } from "../lib/LangContext";
 
 export default function HotelDetail({ hotel }) {
   const router = useRouter();
   const rooms = hotel.rooms || [];
+  const { t } = useLang();
   const [selectedRoom, setSelectedRoom] = useState(rooms[0] || null);
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
@@ -41,8 +43,8 @@ export default function HotelDetail({ hotel }) {
     <div className="nz-detail">
       {/* breadcrumb */}
       <div className="wrap nz-bc">
-        <Link href="/">Home</Link><span>/</span>
-        <Link href="/hotels">Hotels</Link><span>/</span>
+        <Link href="/">{t("detail.home")}</Link><span>/</span>
+        <Link href="/hotels">{t("nav.hotels")}</Link><span>/</span>
         <Link href={`/hotels?city=${hotel.city}`}>{hotel.city}</Link><span>/</span>
         <span className="cur">{hotel.name}</span>
       </div>
@@ -87,11 +89,11 @@ export default function HotelDetail({ hotel }) {
               <span className="nz-badge stars">{"★".repeat(hotel.stars)}</span>
               {hotel.trustSignals?.verifiedPartner && (
                 <span className="nz-badge verified">
-                  <Icon name="check" size={13} strokeWidth={2.2} /> Verified by Allouni
+                  <Icon name="check" size={13} strokeWidth={2.2} /> {t("detail.verified")}
                 </span>
               )}
               {hotel.trustSignals?.instantConfirmation && (
-                <span className="nz-badge instant"><span className="live" /> Instant confirmation</span>
+                <span className="nz-badge instant"><span className="live" /> {t("detail.instant")}</span>
               )}
             </div>
             <h1 className="display">{hotel.name}</h1>
@@ -99,20 +101,20 @@ export default function HotelDetail({ hotel }) {
               <span className="loc"><Icon name="pin" size={16} /> {hotel.city} · {hotel.region}</span>
               <span className="rate">
                 <span className="pill">{hotel.rating}</span>
-                <span className="rtext"><strong>{ratingLabel(hotel.rating)}</strong> · {hotel.reviewCount} reviews</span>
+                <span className="rtext"><strong>{t(ratingKey(hotel.rating))}</strong> · {hotel.reviewCount} {t("detail.reviews")}</span>
               </span>
             </div>
           </div>
 
           {/* about */}
           <section className="nz-dsection">
-            <h2 className="display">About this hotel</h2>
+            <h2 className="display">{t("detail.about")}</h2>
             <p className="nz-about">{hotel.description}</p>
           </section>
 
           {/* rooms */}
           <section className="nz-dsection">
-            <h2 className="display">Choose your room</h2>
+            <h2 className="display">{t("detail.choose_room")}</h2>
             <div className="nz-rooms">
               {rooms.map((r) => {
                 const selected = selectedRoom?.id === r.id;
@@ -125,25 +127,25 @@ export default function HotelDetail({ hotel }) {
                     <div className="nz-room-info">
                       <h3 className="display">{r.type}</h3>
                       <div className="nz-room-specs">
-                        <span><Icon name="guest" size={15} /> {r.capacity} guests</span>
+                        <span><Icon name="guest" size={15} /> {r.capacity} {t("detail.guests")}</span>
                         {r.sizeSqm && <span><Icon name="size" size={15} /> {r.sizeSqm} m²</span>}
                         <span><Icon name="bed" size={15} /> {r.bedType}</span>
                       </div>
                       <div className="nz-room-perks">
-                        <span><Icon name="check" size={13} strokeWidth={2.5} /> Free cancellation</span>
-                        <span><Icon name="check" size={13} strokeWidth={2.5} /> Breakfast included</span>
+                        <span><Icon name="check" size={13} strokeWidth={2.5} /> {t("detail.free_cancel")}</span>
+                        <span><Icon name="check" size={13} strokeWidth={2.5} /> {t("detail.breakfast")}</span>
                       </div>
                     </div>
                     <div className="nz-room-action">
                       <div className="nz-room-price">
                         <span className="amt display">{formatPriceShort(r.price)}</span>
-                        <span className="unit">DZD / night</span>
+                        <span className="unit">{t("detail.per_night")}</span>
                       </div>
                       <button
                         className={`nz-room-btn ${selected ? "sel" : ""}`}
                         onClick={() => setSelectedRoom(r)}
                       >
-                        {selected ? "Selected ✓" : "Select"}
+                        {selected ? t("detail.selected") + " ✓" : t("detail.select")}
                       </button>
                     </div>
                   </div>
@@ -154,7 +156,7 @@ export default function HotelDetail({ hotel }) {
 
           {/* amenities */}
           <section className="nz-dsection">
-            <h2 className="display">What this place offers</h2>
+            <h2 className="display">{t("detail.offers")}</h2>
             <div className="nz-amenities">
               {(hotel.amenities || []).map((a) => (
                 <div className="nz-amenity" key={a.key}>
@@ -167,18 +169,18 @@ export default function HotelDetail({ hotel }) {
 
           {/* policies */}
           <section className="nz-dsection">
-            <h2 className="display">Hotel policies</h2>
+            <h2 className="display">{t("detail.policies")}</h2>
             <div className="nz-policies">
-              <Policy icon="clock" label="Check-in" value={`From ${hotel.checkInTime}`} />
-              <Policy icon="clock" label="Check-out" value={`Until ${hotel.checkOutTime}`} />
-              <Policy icon="check" label="Cancellation"
-                value={`Free up to ${hotel.policies?.cancellationHours || 48}h before arrival`} good />
-              <Policy icon="child" label="Children"
-                value={hotel.policies?.childrenAllowed ? "All ages welcome" : "Not suitable for children"} />
-              <Policy icon="pet" label="Pets"
-                value={hotel.policies?.petsAllowed ? "Pets allowed" : "Not allowed"} />
-              <Policy icon="parking" label="Parking"
-                value={hotel.policies?.parkingFree ? "Free on-site parking" : "Paid parking"}
+              <Policy icon="clock" label={t("detail.checkin")} value={`${t("detail.from")} ${hotel.checkInTime}`} />
+              <Policy icon="clock" label={t("detail.checkout")} value={`${t("detail.until")} ${hotel.checkOutTime}`} />
+              <Policy icon="check" label={t("detail.cancellation")}
+                value={`${t("detail.cancel_free")} ${hotel.policies?.cancellationHours || 48}h ${t("detail.before_arrival")}`} good />
+              <Policy icon="child" label={t("detail.children")}
+                value={hotel.policies?.childrenAllowed ? t("detail.children_ok") : t("detail.children_no")} />
+              <Policy icon="pet" label={t("detail.pets")}
+                value={hotel.policies?.petsAllowed ? t("detail.pets_ok") : t("detail.pets_no")} />
+              <Policy icon="parking" label={t("detail.parking")}
+                value={hotel.policies?.parkingFree ? t("detail.parking_free") : t("detail.parking_paid")}
                 good={hotel.policies?.parkingFree} />
             </div>
           </section>
@@ -188,12 +190,12 @@ export default function HotelDetail({ hotel }) {
         <aside>
           <div className="nz-widget">
             <div className="nz-widget-head">
-              <span className="live" /> Instant confirmation — confirmed in seconds
+              <span className="live" /> {t("detail.widget_head")}
             </div>
             <div className="nz-widget-body">
               <div className="nz-widget-price">
                 <span className="amt display">{selectedRoom ? formatPriceShort(selectedRoom.price) : "—"}</span>
-                <span className="unit">DZD / night</span>
+                <span className="unit">{t("detail.per_night")}</span>
               </div>
 
               <div className="nz-widget-dates">
@@ -209,7 +211,7 @@ export default function HotelDetail({ hotel }) {
 
               {selectedRoom && (
                 <div className="nz-widget-room">
-                  <div className="wr-label">Selected room</div>
+                  <div className="wr-label">{t("detail.selected_room")}</div>
                   <div className="wr-name display">{selectedRoom.type}</div>
                   <div className="wr-calc">
                     <span>{formatPrice(selectedRoom.price)} × {nights} nights</span>
@@ -219,17 +221,17 @@ export default function HotelDetail({ hotel }) {
               )}
 
               <div className="nz-widget-breakdown">
-                <div className="bd-row"><span>Taxes &amp; fees</span><span>Included</span></div>
+                <div className="bd-row"><span>{t("detail.taxes")}</span><span>{t("detail.included")}</span></div>
                 <div className="bd-row total">
-                  <span>Total</span>
+                  <span>{t("detail.total")}</span>
                   <span className="display">{formatPrice(subtotal)}</span>
                 </div>
               </div>
 
-              <button className="nz-widget-cta" onClick={reserve}>Reserve now</button>
+              <button className="nz-widget-cta" onClick={reserve}>{t("detail.reserve")}</button>
               <div className="nz-widget-reassure">
                 <Icon name="check" size={14} strokeWidth={2.5} />
-                Free cancellation · You won&apos;t be charged yet
+                {t("detail.reassure")}
               </div>
 
               <a
@@ -239,14 +241,14 @@ export default function HotelDetail({ hotel }) {
               >
                 <span className="ww-ic"><Icon name="whatsapp" size={20} style={{ color: "#fff" }} strokeWidth={0} /></span>
                 <span className="ww-tx">
-                  <strong>Prefer to book by WhatsApp?</strong>
-                  <span>Our Algerian team will help you</span>
+                  <strong>{t("detail.wa_title")}</strong>
+                  <span>{t("detail.wa_sub")}</span>
                 </span>
               </a>
             </div>
             <div className="nz-widget-foot">
               <Icon name="shield" size={24} style={{ color: "var(--gray-300)" }} />
-              Secured by SATIM · Operated by Allouni Travel Agency, licensed by the Ministry of Tourism
+              {t("detail.secured")}
             </div>
           </div>
         </aside>
@@ -256,9 +258,9 @@ export default function HotelDetail({ hotel }) {
       <div className="nz-mobile-reserve">
         <div className="nz-mr-price">
           <span className="amt display">{selectedRoom ? formatPriceShort(selectedRoom.price) : "—"}</span>
-          <span className="unit">DZD / night</span>
+          <span className="unit">{t("detail.per_night")}</span>
         </div>
-        <button className="nz-mr-btn" onClick={reserve}>Reserve now</button>
+        <button className="nz-mr-btn" onClick={reserve}>{t("detail.reserve")}</button>
       </div>
 
       <DetailStyles />
@@ -472,4 +474,12 @@ function DetailStyles() {
       }
     `}</style>
   );
+}
+
+function ratingKey(rating) {
+  if (rating >= 9) return "rate.exceptional";
+  if (rating >= 8.5) return "rate.excellent";
+  if (rating >= 8) return "rate.verygood";
+  if (rating >= 7) return "rate.good";
+  return "rate.pleasant";
 }

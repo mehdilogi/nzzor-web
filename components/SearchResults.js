@@ -2,8 +2,10 @@
 
 import { useState, useMemo } from "react";
 import HotelCard from "./HotelCard";
+import { useLang } from "../lib/LangContext";
 
 export default function SearchResults({ initialHotels, cities, initialFilters }) {
+  const { t } = useLang();
   const [city, setCity] = useState(initialFilters.city || "");
   const [stars, setStars] = useState(Number(initialFilters.stars) || 0);
   const [sort, setSort] = useState(initialFilters.sort || "popular");
@@ -25,9 +27,9 @@ export default function SearchResults({ initialHotels, cities, initialFilters })
       <div className="nz-sr-head">
         <div className="wrap">
           <h1 className="display">
-            {initialFilters.q ? `Hotels matching "${initialFilters.q}"` : "Hotels in Algeria"}
+            {initialFilters.q ? `${t("results.matching")} "${initialFilters.q}"` : t("results.title")}
           </h1>
-          <p>{hotels.length} {hotels.length === 1 ? "hotel" : "hotels"} · verified by Allouni Travel Agency</p>
+          <p>{hotels.length} {hotels.length === 1 ? t("search.hotel") : t("search.hotels")} · {t("results.verified_by")}</p>
         </div>
       </div>
 
@@ -35,7 +37,7 @@ export default function SearchResults({ initialHotels, cities, initialFilters })
         {/* filter bar */}
         <div className="nz-sr-filters">
           <select value={city} onChange={(e) => setCity(e.target.value)}>
-            <option value="">All destinations</option>
+            <option value="">{t("results.all_dest")}</option>
             {cities.map((c) => (
               <option key={c.key} value={c.name}>{c.name} ({c.hotelCount})</option>
             ))}
@@ -48,16 +50,16 @@ export default function SearchResults({ initialHotels, cities, initialFilters })
                 className={stars === s ? "on" : ""}
                 onClick={() => setStars(s)}
               >
-                {s === 0 ? "Any" : "★".repeat(s) + "+"}
+                {s === 0 ? t("results.any") : "★".repeat(s) + "+"}
               </button>
             ))}
           </div>
 
           <select className="nz-sr-sort" value={sort} onChange={(e) => setSort(e.target.value)}>
-            <option value="popular">Most popular</option>
-            <option value="price_asc">Lowest price</option>
-            <option value="price_desc">Highest price</option>
-            <option value="rating">Top rated</option>
+            <option value="popular">{t("results.popular")}</option>
+            <option value="price_asc">{t("results.price_low")}</option>
+            <option value="price_desc">{t("results.price_high")}</option>
+            <option value="rating">{t("results.top_rated")}</option>
           </select>
         </div>
 
@@ -68,8 +70,8 @@ export default function SearchResults({ initialHotels, cities, initialFilters })
           </div>
         ) : (
           <div className="nz-sr-empty">
-            <p className="display">No hotels match your filters</p>
-            <span>Try widening your search or clearing filters.</span>
+            <p className="display">{t("results.none_title")}</p>
+            <span>{t("results.none_sub")}</span>
           </div>
         )}
       </div>

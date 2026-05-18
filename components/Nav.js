@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import LogoMark from "./LogoMark";
+import { useLang } from "../lib/LangContext";
 
 // Nzzor top navigation. Transparent over hero, solid white on scroll.
 export default function Nav({ overHero = false }) {
+  const { lang, setLang, t } = useLang();
   const [scrolled, setScrolled] = useState(!overHero);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -41,14 +43,24 @@ export default function Nav({ overHero = false }) {
         </Link>
 
         <div className="nzn-links">
-          <Link href="/hotels">Hotels</Link>
-          <Link href="/hotels">Destinations</Link>
-          <Link href="/#how">How it works</Link>
-          <Link href="/#allouni">About Allouni</Link>
+          <Link href="/hotels">{t("nav.hotels")}</Link>
+          <Link href="/hotels">{t("nav.destinations")}</Link>
+          <Link href="/#how">{t("nav.how")}</Link>
+          <Link href="/#allouni">{t("nav.about")}</Link>
         </div>
 
         <div className="nzn-right">
-          <button className="nzn-signin">Sign in</button>
+          <div className="nzn-lang">
+            <button
+              className={lang === "en" ? "on" : ""}
+              onClick={() => setLang("en")}
+            >EN</button>
+            <button
+              className={lang === "fr" ? "on" : ""}
+              onClick={() => setLang("fr")}
+            >FR</button>
+          </div>
+          <button className="nzn-signin">{t("nav.signin")}</button>
           <button
             className="nzn-burger"
             onClick={() => setMenuOpen(true)}
@@ -81,14 +93,24 @@ export default function Nav({ overHero = false }) {
             </button>
           </div>
           <nav className="nzn-menu-links">
-            <Link href="/hotels" onClick={() => setMenuOpen(false)}>Hotels</Link>
-            <Link href="/hotels" onClick={() => setMenuOpen(false)}>Destinations</Link>
-            <Link href="/#how" onClick={() => setMenuOpen(false)}>How it works</Link>
-            <Link href="/#allouni" onClick={() => setMenuOpen(false)}>About Allouni</Link>
+            <Link href="/hotels" onClick={() => setMenuOpen(false)}>{t("nav.hotels")}</Link>
+            <Link href="/hotels" onClick={() => setMenuOpen(false)}>{t("nav.destinations")}</Link>
+            <Link href="/#how" onClick={() => setMenuOpen(false)}>{t("nav.how")}</Link>
+            <Link href="/#allouni" onClick={() => setMenuOpen(false)}>{t("nav.about")}</Link>
           </nav>
-          <button className="nzn-menu-cta">Sign in</button>
+          <div className="nzn-menu-lang">
+            <button
+              className={lang === "en" ? "on" : ""}
+              onClick={() => setLang("en")}
+            >English</button>
+            <button
+              className={lang === "fr" ? "on" : ""}
+              onClick={() => setLang("fr")}
+            >Français</button>
+          </div>
+          <button className="nzn-menu-cta">{t("nav.signin")}</button>
           <p className="nzn-menu-foot">
-            Operated by Allouni Travel Agency · Licensed by the Algerian Ministry of Tourism
+            {t("nav.menu_foot")}
           </p>
         </div>
       )}
@@ -135,6 +157,23 @@ export default function Nav({ overHero = false }) {
         .nzn-links :global(a:hover) { color: var(--red); }
 
         .nzn-right { display: flex; align-items: center; gap: 12px; }
+
+        /* language toggle */
+        .nzn-lang {
+          display: flex; gap: 2px; padding: 3px; border-radius: 980px;
+          background: ${dark ? "rgba(255,255,255,0.15)" : "var(--gray-100)"};
+          border: 1px solid ${dark ? "rgba(255,255,255,0.25)" : "var(--gray-200)"};
+        }
+        .nzn-lang button {
+          border: none; background: transparent; font-size: 12px; font-weight: 700;
+          padding: 5px 11px; border-radius: 980px; cursor: pointer; font-family: inherit;
+          color: ${dark ? "rgba(255,255,255,0.8)" : "var(--gray-400)"};
+          transition: all .15s;
+        }
+        .nzn-lang button.on {
+          background: ${dark ? "#fff" : "var(--ink)"};
+          color: ${dark ? "var(--ink)" : "#fff"};
+        }
         .nzn-signin {
           background: ${dark ? "#fff" : "var(--ink)"};
           color: ${dark ? "var(--ink)" : "#fff"};
@@ -187,10 +226,22 @@ export default function Nav({ overHero = false }) {
           padding: 18px 4px; font-size: 19px; font-weight: 700; color: var(--ink);
           text-decoration: none; border-bottom: 1px solid var(--gray-100);
         }
+        .nzn-menu-lang {
+          display: flex; gap: 8px; margin-top: 8px;
+        }
+        .nzn-menu-lang button {
+          flex: 1; padding: 12px; border-radius: var(--r-sm);
+          border: 1.5px solid var(--gray-200); background: #fff;
+          font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit;
+          color: var(--gray-400);
+        }
+        .nzn-menu-lang button.on {
+          border-color: var(--red); background: var(--red-soft); color: var(--red-deep);
+        }
         .nzn-menu-cta {
           width: 100%; padding: 16px; background: var(--red); color: #fff;
           border: none; border-radius: var(--r-sm);
-          font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 20px;
+          font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 12px;
         }
         .nzn-menu-foot {
           font-size: 12px; color: var(--gray-400); text-align: center;
@@ -202,6 +253,7 @@ export default function Nav({ overHero = false }) {
           .nzn { padding: 12px 20px; }
           .nzn-links { display: none; }
           .nzn-signin { display: none; }
+          .nzn-lang { display: none; }
           .nzn-burger { display: flex; }
         }
       `}</style>
