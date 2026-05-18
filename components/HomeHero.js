@@ -51,7 +51,7 @@ export default function HomeHero() {
       <div className="nz-hero-photo">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="https://www.istockphoto.com/photo/bay-of-algiers-gm1213558494-352743184"
+          src="https://unsplash.com/photos/a-body-of-water-with-a-cave-eAoiLZgn-zU"
           alt="Algeria"
         />
       </div>
@@ -340,6 +340,7 @@ export default function HomeHero() {
 
 function fmtDate(s) {
   if (!s) return "";
-  const d = new Date(s);
-  return d.toLocaleDateString("en", { day: "numeric", month: "short" });
+  const [y, m, d] = s.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString("en", { day: "numeric", month: "short" });
 }

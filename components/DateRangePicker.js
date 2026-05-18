@@ -15,6 +15,13 @@ const DOW = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 function ymd(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+// Parse a "YYYY-MM-DD" string as a LOCAL date (avoids the UTC off-by-one bug
+// where new Date("2026-05-20") becomes the previous day in UTC+ timezones).
+function parseYmd(s) {
+  if (!s) return null;
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
 function sameDay(a, b) {
   return a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
@@ -26,8 +33,8 @@ export default function DateRangePicker({ checkIn, checkOut, onChange, onComplet
   const today = startOfDay(new Date());
   const [view, setView] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
 
-  const ci = checkIn ? startOfDay(new Date(checkIn)) : null;
-  const co = checkOut ? startOfDay(new Date(checkOut)) : null;
+  const ci = checkIn ? startOfDay(parseYmd(checkIn)) : null;
+  const co = checkOut ? startOfDay(parseYmd(checkOut)) : null;
 
   function pick(day) {
     if (!ci || (ci && co)) {
