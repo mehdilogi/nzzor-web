@@ -172,3 +172,42 @@ input, select, textarea { font-family: inherit; }
   .nz-section { padding-top: 64px; padding-bottom: 64px; }
   .nz-why { padding: 64px 0; }
 }
+
+/* =============================================================================
+   Admin dashboard — shared
+   ============================================================================= */
+.ad-panel {
+  background: #fff; border: 1px solid var(--gray-200); border-radius: var(--r-md);
+  padding: 22px; margin-bottom: 16px;
+}
+.ad-panel h3 { font-size: 15px; font-weight: 800; margin-bottom: 14px; letter-spacing: -0.01em; }
+.ad-table { width: 100%; border-collapse: collapse; }
+.ad-table th {
+  text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--gray-400); padding: 8px 10px;
+  border-bottom: 1.5px solid var(--gray-200);
+}
+.ad-table td { padding: 11px 10px; font-size: 13px; border-bottom: 1px solid var(--gray-100); vertical-align: top; }
+.ad-table tr:last-child td { border-bottom: none; }
+.ad-btn-primary {
+  background: var(--red); color: #fff; border: none; padding: 10px 18px;
+  border-radius: var(--r-sm); font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+.ad-btn-primary:hover { background: var(--red-deep); }
+.ad-btn-primary:disabled { opacity: 0.6; }
+.ad-btn-ghost {
+  background: #fff; color: var(--ink); border: 1.5px solid var(--gray-200);
+  padding: 9px 16px; border-radius: var(--r-sm); font-size: 13px; font-weight: 700;
+  cursor: pointer; font-family: inherit;
+}
+.ad-btn-ghost:hover { border-color: var(--ink); }
+.ad-btn-danger {
+  background: #fff; color: var(--red-deep); border: 1.5px solid var(--red-soft);
+  padding: 10px 18px; border-radius: var(--r-sm); font-size: 13px; font-weight: 700;
+  cursor: pointer; font-family: inherit;
+}
+.ad-btn-danger:hover { background: var(--red-soft); }
+.ad-btn-mini-danger {
+  background: transparent; color: var(--red-deep); border: none;
+  font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
