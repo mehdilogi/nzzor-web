@@ -72,6 +72,7 @@ export default function HomeHero() {
 
         {/* SEARCH BAR */}
         <div className="nz-search" ref={barRef}>
+          {open && <div className="nzs-backdrop" onClick={() => setOpen(null)} />}
           <div className="nz-search-bar">
             <button
               className={`nzs-field ${open === "city" ? "active" : ""}`}
@@ -163,8 +164,8 @@ export default function HomeHero() {
       </div>
 
       <style jsx>{`
-        .nz-hero { position: relative; height: 100vh; min-height: 720px; overflow: hidden; }
-        .nz-hero-photo { position: absolute; inset: 0; }
+        .nz-hero { position: relative; height: 100vh; min-height: 720px; }
+        .nz-hero-photo { position: absolute; inset: 0; overflow: hidden; }
         .nz-hero-photo img {
           width: 100%; height: 100%; object-fit: cover;
           animation: kenburns 24s ease-out infinite alternate;
@@ -212,7 +213,7 @@ export default function HomeHero() {
         }
 
         .nz-search {
-          position: relative; max-width: 820px;
+          position: relative; max-width: 820px; z-index: 30;
           opacity: 0; animation: rise 1s cubic-bezier(0.16,1,0.3,1) 0.7s forwards;
         }
         .nz-search-bar {
@@ -248,8 +249,9 @@ export default function HomeHero() {
           position: absolute; top: calc(100% + 10px); left: 0; right: 0;
           background: #fff; border-radius: var(--r-lg); padding: 20px;
           box-shadow: 0 32px 64px -20px rgba(0,0,0,0.4);
-          z-index: 20;
+          z-index: 60;
         }
+        .nzs-backdrop { display: none; }
         .nzs-panel-title { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 14px; }
         .nzs-cities { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
         .nzs-city {
@@ -307,9 +309,21 @@ export default function HomeHero() {
           .nzs-field { padding: 13px 16px; }
           .nzs-field:not(:last-of-type) { border-bottom: 1px solid var(--gray-100); }
           .nzs-submit { padding: 15px; justify-content: center; margin-top: 4px; }
-          .nzs-panel { left: -14px; right: -14px; padding: 16px; }
           .nzs-cities { grid-template-columns: 1fr; }
           .nz-hero-foot { bottom: 20px; }
+          /* panels become a bottom sheet on mobile — never clipped */
+          .nzs-backdrop {
+            display: block; position: fixed; inset: 0;
+            background: rgba(12,12,16,0.5); z-index: 240;
+          }
+          .nzs-panel {
+            position: fixed; top: auto; left: 0; right: 0; bottom: 0;
+            border-radius: var(--r-lg) var(--r-lg) 0 0;
+            padding: 22px 20px 28px;
+            max-height: 80vh; overflow-y: auto;
+            z-index: 250;
+            box-shadow: 0 -20px 60px -10px rgba(0,0,0,0.5);
+          }
         }
       `}</style>
     </header>
