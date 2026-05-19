@@ -50,12 +50,12 @@ export default function HomeSections({ featured }) {
 
       {/* WHY NZZOR */}
       <section className="nz-why-v2" id="how">
-        {/* HERO STRIP — full bleed, photograph background */}
+        {/* HERO STRIP — Algerian Sahara backdrop */}
         <div className="nz-why-hero">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=1800&q=85"
-            alt="Algeria hospitality"
+            src="https://images.unsplash.com/photo-1473580044384-7ba9967e16a0?w=1800&q=85"
+            alt="Algerian Sahara"
             className="nz-why-hero-img"
           />
           <div className="nz-why-hero-shade" />
@@ -110,6 +110,30 @@ export default function HomeSections({ featured }) {
             <h3 className="display">{t("why.allouni_t")}</h3>
             <p>{t("why.allouni_d")}</p>
           </div>
+        </div>
+
+        {/* CLOSING BAND — wraps the section emotionally */}
+        <div className="wrap nz-why-close">
+          <div className="nz-why-close-stats">
+            <div className="nz-why-close-stat">
+              <span className="num display">10</span>
+              <span className="lbl">{t("trust.hotels")}</span>
+            </div>
+            <div className="nz-why-close-divider" />
+            <div className="nz-why-close-stat">
+              <span className="num display">8</span>
+              <span className="lbl">{t("trust.cities")}</span>
+            </div>
+            <div className="nz-why-close-divider" />
+            <div className="nz-why-close-stat">
+              <span className="num display">24/7</span>
+              <span className="lbl">{t("trust.support")}</span>
+            </div>
+          </div>
+          <p className="nz-why-close-line">{t("why.closing")}</p>
+          <a href="/hotels" className="nz-why-close-cta">
+            {t("why.cta")} <Icon name="arrow" size={15} strokeWidth={2.5} />
+          </a>
         </div>
       </section>
 
