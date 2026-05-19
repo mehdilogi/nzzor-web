@@ -109,19 +109,32 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
   // ---- confirm -------------------------------------------------------------
   async function payNow() {
     setProcessing(true);
-    // NOTE: when the SATIM/CIB merchant API is live, the real card-redirect
-    // call goes here. For now the booking is created as pending-payment.
+    // split the full name into first / last for the backend
+    const parts = name.trim().split(/\s+/);
+    const firstName = parts[0] || name.trim();
+    const lastName = parts.slice(1).join(" ") || parts[0] || "-";
+
+    // backend payment-method codes are uppercase
+    const methodCode = payMethod === "edahabia" ? "EDDAHABIA" : "CIB";
+
+    // payload shaped exactly as the backend's bookings route expects
     const payload = {
-      hotelSlug: hotel.slug,
-      roomId: room.id,
-      nights,
+      hotelId: hotel.id,
+      rooms: [{ roomId: room.id, quantity: 1 }],
       checkIn,
       checkOut,
-      guest: { name: name.trim(), email: email.trim(), phone: phone.trim() },
-      notes: notes.trim(),
+      guest: {
+        firstName,
+        lastName,
+        email: email.trim(),
+        phone: phone.trim(),
+      },
+      specialRequests: notes.trim() || undefined,
+      paymentMethod: methodCode,
+      lang: "en",
+      // extra context the backend can ignore safely if it doesn't use it
       createAccount,
-      payment: { method: payMethod, status: "PENDING" },
-      pricing: { subtotal, discount, total, coupon: coupon?.code || null },
+      promoCode: coupon?.code || undefined,
     };
     const result = await createBooking(payload);
     setProcessing(false);
@@ -130,7 +143,7 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
       setStep(3);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
-      // even if the API errors, never dead-end the user
+      // never dead-end the user, even on an API error
       const fallback =
         "NZR-" +
         Math.random().toString(36).slice(2, 6).toUpperCase() +
