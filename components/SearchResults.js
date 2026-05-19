@@ -3,12 +3,26 @@
 import { useState, useMemo } from "react";
 import HotelCard from "./HotelCard";
 import { useLang } from "../lib/LangContext";
+import { parseQuery } from "../lib/nlSearch";
 
 export default function SearchResults({ initialHotels, cities, initialFilters }) {
   const { t } = useLang();
   const [city, setCity] = useState(initialFilters.city || "");
   const [stars, setStars] = useState(Number(initialFilters.stars) || 0);
   const [sort, setSort] = useState(initialFilters.sort || "popular");
+
+  // when arriving from natural-language search, re-parse the raw query so we
+  // can show the user what we understood
+  const aiResult = initialFilters.ai && initialFilters.q
+    ? parseQuery(initialFilters.q)
+    : null;
+
+  function describeMatch(m) {
+    if (m.type === "city") return m.value;
+    if (m.type === "price") return m.value === "cheap" ? t("ai.cheap") : t("ai.luxury");
+    if (m.type === "stars") return `${m.value}${t("ai.stars_label")}`;
+    return "";
+  }
 
   const hotels = useMemo(() => {
     let list = [...initialHotels];
@@ -30,6 +44,21 @@ export default function SearchResults({ initialHotels, cities, initialFilters })
             {initialFilters.q ? `${t("results.matching")} "${initialFilters.q}"` : t("results.title")}
           </h1>
           <p>{hotels.length} {hotels.length === 1 ? t("search.hotel") : t("search.hotels")} · {t("results.verified_by")}</p>
+
+          {aiResult && (
+            <div className="nz-ai-banner">
+              {aiResult.understood ? (
+                <>
+                  <span className="nz-ai-banner-label">{t("ai.understood")}</span>
+                  {aiResult.matched.map((m, i) => (
+                    <span className="nz-ai-chip" key={i}>{describeMatch(m)}</span>
+                  ))}
+                </>
+              ) : (
+                <span className="nz-ai-banner-note">{t("ai.not_understood")}</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -80,6 +109,21 @@ export default function SearchResults({ initialHotels, cities, initialFilters })
         .nz-sr-head { background: var(--ink); color: #fff; padding: 48px 0; }
         .nz-sr-head h1 { font-size: clamp(30px, 4vw, 46px); font-weight: 600; letter-spacing: -0.03em; }
         .nz-sr-head p { color: rgba(255,255,255,0.6); margin-top: 8px; font-size: 14px; font-weight: 500; }
+        .nz-ai-banner {
+          display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+          margin-top: 18px;
+        }
+        .nz-ai-banner-label {
+          font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.55);
+        }
+        .nz-ai-chip {
+          font-size: 13px; font-weight: 700; color: #fff;
+          background: var(--red); padding: 5px 13px; border-radius: 980px;
+        }
+        .nz-ai-banner-note {
+          font-size: 13.5px; font-weight: 500; color: rgba(255,255,255,0.75);
+          line-height: 1.5; max-width: 560px;
+        }
         .nz-sr-body { padding-top: 28px; padding-bottom: 80px; }
         .nz-sr-filters {
           display: flex; align-items: center; gap: 12px; flex-wrap: wrap;

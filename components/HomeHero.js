@@ -6,6 +6,7 @@ import Icon from "./Icon";
 import DateRangePicker from "./DateRangePicker";
 import { MOCK_CITIES } from "../lib/mockData";
 import { useLang } from "../lib/LangContext";
+import { parseQuery } from "../lib/nlSearch";
 
 // search bar steps: city -> dates -> guests, with auto-advance
 export default function HomeHero() {
@@ -16,6 +17,8 @@ export default function HomeHero() {
   const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState(2);
   const [open, setOpen] = useState(null); // 'city' | 'dates' | 'guests' | null
+  const [aiMode, setAiMode] = useState(false); // natural-language search toggle
+  const [aiQuery, setAiQuery] = useState("");
   const barRef = useRef(null);
 
   useEffect(() => {
@@ -34,6 +37,22 @@ export default function HomeHero() {
     if (guests) params.set("guests", String(guests));
     const qs = params.toString();
     router.push(qs ? `/hotels?${qs}` : "/hotels");
+  }
+
+  // natural-language search — parse the sentence locally, then hand the
+  // resulting structured filter to the results page as URL params.
+  function aiSearch() {
+    const q = aiQuery.trim();
+    if (!q) return;
+    const { filter } = parseQuery(q);
+    const params = new URLSearchParams();
+    if (filter.city) params.set("city", filter.city);
+    if (filter.minStars) params.set("stars", String(filter.minStars));
+    if (filter.maxPrice) params.set("maxPrice", String(filter.maxPrice));
+    if (filter.minPrice) params.set("minPrice", String(filter.minPrice));
+    params.set("q", q); // keep the raw query so the results page can echo it
+    params.set("ai", "1");
+    router.push(`/hotels?${params.toString()}`);
   }
 
   function pickCity(c) {
@@ -74,38 +93,73 @@ export default function HomeHero() {
         {/* SEARCH BAR */}
         <div className="nz-search" ref={barRef}>
           {open && <div className="nzs-backdrop" onClick={() => setOpen(null)} />}
-          <div className="nz-search-bar">
-            <button
-              className={`nzs-field ${open === "city" ? "active" : ""}`}
-              onClick={() => setOpen(open === "city" ? null : "city")}
-            >
-              <span className="nzs-label">{t("search.destination")}</span>
-              <span className={`nzs-value ${city ? "" : "ph"}`}>{city || t("search.destination_ph")}</span>
-            </button>
 
-            <button
-              className={`nzs-field ${open === "dates" ? "active" : ""}`}
-              onClick={() => setOpen(open === "dates" ? null : "dates")}
-            >
-              <span className="nzs-label">{t("search.dates")}</span>
-              <span className={`nzs-value ${checkIn ? "" : "ph"}`}>{dateLabel}</span>
-            </button>
+          {aiMode ? (
+            /* ---- NATURAL-LANGUAGE SEARCH BOX ---- */
+            <div className="nz-search-bar nz-ai-bar">
+              <div className="nz-ai-input">
+                <Icon name="search" size={18} style={{ color: "var(--gray-400)" }} />
+                <input
+                  type="text"
+                  value={aiQuery}
+                  onChange={(e) => setAiQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") aiSearch(); }}
+                  placeholder={t("ai.placeholder")}
+                  aria-label={t("ai.toggle")}
+                />
+              </div>
+              <button className="nzs-submit" onClick={aiSearch}>
+                <Icon name="search" size={18} strokeWidth={2.4} />
+                <span>{t("ai.search")}</span>
+              </button>
+            </div>
+          ) : (
+            /* ---- STRUCTURED SEARCH BAR ---- */
+            <div className="nz-search-bar">
+              <button
+                className={`nzs-field ${open === "city" ? "active" : ""}`}
+                onClick={() => setOpen(open === "city" ? null : "city")}
+              >
+                <span className="nzs-label">{t("search.destination")}</span>
+                <span className={`nzs-value ${city ? "" : "ph"}`}>{city || t("search.destination_ph")}</span>
+              </button>
 
-            <button
-              className={`nzs-field ${open === "guests" ? "active" : ""}`}
-              onClick={() => setOpen(open === "guests" ? null : "guests")}
-            >
-              <span className="nzs-label">{t("search.guests")}</span>
-              <span className="nzs-value">{guests} {guests === 1 ? t("search.guest") : t("search.guests_plural")}</span>
-            </button>
+              <button
+                className={`nzs-field ${open === "dates" ? "active" : ""}`}
+                onClick={() => setOpen(open === "dates" ? null : "dates")}
+              >
+                <span className="nzs-label">{t("search.dates")}</span>
+                <span className={`nzs-value ${checkIn ? "" : "ph"}`}>{dateLabel}</span>
+              </button>
 
-            <button className="nzs-submit" onClick={search}>
-              <Icon name="search" size={18} strokeWidth={2.4} />
-              <span>{t("search.search")}</span>
-            </button>
-          </div>
+              <button
+                className={`nzs-field ${open === "guests" ? "active" : ""}`}
+                onClick={() => setOpen(open === "guests" ? null : "guests")}
+              >
+                <span className="nzs-label">{t("search.guests")}</span>
+                <span className="nzs-value">{guests} {guests === 1 ? t("search.guest") : t("search.guests_plural")}</span>
+              </button>
 
-          {open === "city" && (
+              <button className="nzs-submit" onClick={search}>
+                <Icon name="search" size={18} strokeWidth={2.4} />
+                <span>{t("search.search")}</span>
+              </button>
+            </div>
+          )}
+
+          {/* AI toggle — VRBO-style, sits under the bar */}
+          <button
+            className={`nz-ai-toggle ${aiMode ? "on" : ""}`}
+            onClick={() => { setAiMode(!aiMode); setOpen(null); }}
+          >
+            <span className={`nz-ai-switch ${aiMode ? "on" : ""}`}>
+              <span className="knob" />
+            </span>
+            <span className="nz-ai-toggle-label">{t("ai.toggle")}</span>
+            <span className="nz-ai-badge">{t("ai.beta")}</span>
+          </button>
+
+          {!aiMode && open === "city" && (
             <div className="nzs-panel">
               <div className="nzs-panel-title">{t("search.choose_dest")}</div>
               <div className="nzs-cities">
@@ -122,7 +176,7 @@ export default function HomeHero() {
             </div>
           )}
 
-          {open === "dates" && (
+          {!aiMode && open === "dates" && (
             <div className="nzs-panel">
               <DateRangePicker
                 checkIn={checkIn}
@@ -136,7 +190,7 @@ export default function HomeHero() {
             </div>
           )}
 
-          {open === "guests" && (
+          {!aiMode && open === "guests" && (
             <div className="nzs-panel">
               <div className="nzs-panel-title">{t("search.how_many")}</div>
               <div className="nzs-guests">
@@ -245,6 +299,47 @@ export default function HomeHero() {
           white-space: nowrap;
         }
         .nzs-submit:hover { background: var(--red-deep); }
+
+        /* ---- AI / NATURAL-LANGUAGE SEARCH ---- */
+        .nz-ai-bar { align-items: stretch; }
+        .nz-ai-input {
+          flex: 1; display: flex; align-items: center; gap: 12px;
+          padding: 0 18px; min-width: 0;
+        }
+        .nz-ai-input input {
+          flex: 1; border: none; background: transparent; outline: none;
+          font-size: 15px; font-weight: 600; color: var(--ink); min-width: 0;
+          font-family: inherit;
+        }
+        .nz-ai-input input::placeholder { color: var(--gray-300); font-weight: 500; }
+
+        .nz-ai-toggle {
+          display: flex; align-items: center; gap: 10px;
+          margin-top: 12px; padding: 9px 14px; border: none; cursor: pointer;
+          background: rgba(255,255,255,0.16); border-radius: 980px;
+          backdrop-filter: blur(14px); width: fit-content;
+          transition: background .2s;
+        }
+        .nz-ai-toggle:hover { background: rgba(255,255,255,0.24); }
+        .nz-ai-switch {
+          width: 38px; height: 22px; border-radius: 980px; flex-shrink: 0;
+          background: rgba(255,255,255,0.35); position: relative; transition: background .2s;
+        }
+        .nz-ai-switch.on { background: var(--red); }
+        .nz-ai-switch .knob {
+          position: absolute; top: 2px; left: 2px;
+          width: 18px; height: 18px; border-radius: 50%; background: #fff;
+          transition: transform .2s;
+        }
+        .nz-ai-switch.on .knob { transform: translateX(16px); }
+        .nz-ai-toggle-label {
+          font-size: 13px; font-weight: 600; color: #fff;
+        }
+        .nz-ai-badge {
+          font-size: 10px; font-weight: 800; letter-spacing: 0.04em;
+          background: var(--red); color: #fff; padding: 3px 8px; border-radius: 980px;
+          text-transform: uppercase;
+        }
 
         /* panel: a centered modal anchored to the VIEWPORT, so it can never
            hang off-screen regardless of where the search bar sits */
