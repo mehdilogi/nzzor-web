@@ -59,6 +59,10 @@ export default function Nav({ overHero = false }) {
               className={lang === "fr" ? "on" : ""}
               onClick={() => setLang("fr")}
             >FR</button>
+            <button
+              className={lang === "ar" ? "on" : ""}
+              onClick={() => setLang("ar")}
+            >ع</button>
           </div>
           <button className="nzn-signin">{t("nav.signin")}</button>
           <button
@@ -107,6 +111,10 @@ export default function Nav({ overHero = false }) {
               className={lang === "fr" ? "on" : ""}
               onClick={() => setLang("fr")}
             >Français</button>
+            <button
+              className={lang === "ar" ? "on" : ""}
+              onClick={() => setLang("ar")}
+            >العربية</button>
           </div>
           <button className="nzn-menu-cta">{t("nav.signin")}</button>
           <p className="nzn-menu-foot">

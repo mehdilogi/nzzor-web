@@ -4,6 +4,7 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
 @import url('https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
 
 :root {
   --red: #E63946;
@@ -283,3 +284,60 @@ input, select, textarea { font-family: inherit; }
   box-shadow: 0 30px 70px -24px rgba(20,20,30,0.28) !important;
   border-color: var(--gray-300) !important;
 }
+
+/* =============================================================================
+   ARABIC / RTL SUPPORT
+   When <html dir="rtl"> is set (Arabic), the browser mirrors most of the
+   layout automatically. These rules handle the font swap and the cases the
+   browser does not mirror on its own.
+   ============================================================================= */
+
+/* Arabic font — Clash Display & Manrope have no Arabic glyphs */
+html[lang="ar"] body,
+html[lang="ar"] button,
+html[lang="ar"] input,
+html[lang="ar"] select,
+html[lang="ar"] textarea {
+  font-family: 'IBM Plex Sans Arabic', 'Manrope', system-ui, sans-serif;
+}
+/* headings: IBM Plex Arabic also covers display text in Arabic */
+html[lang="ar"] .display {
+  font-family: 'IBM Plex Sans Arabic', 'Clash Display', sans-serif;
+  letter-spacing: 0;            /* tight latin tracking looks wrong in Arabic */
+  font-weight: 700;
+}
+
+/* default text alignment follows the reading direction */
+html[dir="rtl"] body { text-align: right; }
+
+/* flip any element that uses a directional arrow icon */
+html[dir="rtl"] .nz-viewall svg,
+html[dir="rtl"] .icon-flip {
+  transform: scaleX(-1);
+}
+
+/* numbers, prices, latin brand names stay left-to-right even inside RTL text */
+.ltr-nums, .nz-price .amt, .nz-hcard-price .amt {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* the search bar: on RTL, the submit button and fields mirror naturally via
+   flex, but keep the rounded corners correct */
+html[dir="rtl"] .nzs-field { text-align: right; }
+
+/* breadcrumb separators read correctly in RTL automatically; just ensure the
+   row flows RTL */
+html[dir="rtl"] .nz-bc { flex-direction: row-reverse; justify-content: flex-end; }
+
+/* calendar: weekday header + day grid stay LTR — calendars are conventionally
+   laid out the same way; only the surrounding text flips */
+html[dir="rtl"] .drp-grid,
+html[dir="rtl"] .drp-dow { direction: ltr; }
+
+/* hero text block aligns right in Arabic */
+html[dir="rtl"] .nz-hero-inner { text-align: right; }
+
+/* footer columns align right */
+html[dir="rtl"] .nz-fcol { text-align: right; }
+/* (WhatsApp button stays bottom-right in all languages — universally expected) */

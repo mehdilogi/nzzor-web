@@ -465,7 +465,7 @@ function DetailStyles() {
           padding: 12px 20px; box-shadow: 0 -8px 24px -12px rgba(20,20,30,0.2);
         }
         .nz-mr-price .amt { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
-        .nz-mr-price .unit { font-size: 11px; color: var(--gray-400); font-weight: 600; margin-left: 4px; }
+        .nz-mr-price .unit { font-size: 11px; color: var(--gray-400); font-weight: 600; margin-inline-start: 4px; }
         .nz-mr-btn {
           flex: 1; max-width: 200px; padding: 14px; background: var(--red); color: #fff;
           border: none; border-radius: var(--r-sm);

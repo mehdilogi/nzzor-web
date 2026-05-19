@@ -90,7 +90,7 @@ export default function SearchResults({ initialHotels, cities, initialFilters })
           padding: 9px 14px; border: 1.5px solid var(--gray-200); border-radius: var(--r-sm);
           font-size: 13px; font-weight: 600; outline: none; color: var(--ink); background: var(--white);
         }
-        .nz-sr-sort { margin-left: auto; }
+        .nz-sr-sort { margin-inline-start: auto; }
         .nz-sr-stars { display: flex; gap: 4px; }
         .nz-sr-stars button {
           padding: 7px 13px; border-radius: 980px; font-size: 12px; font-weight: 700;
@@ -104,7 +104,7 @@ export default function SearchResults({ initialHotels, cities, initialFilters })
         .nz-sr-empty span { font-size: 14px; color: var(--gray-400); }
         @media (max-width: 860px) {
           .nz-sr-grid { grid-template-columns: 1fr; }
-          .nz-sr-sort { margin-left: 0; }
+          .nz-sr-sort { margin-inline-start: 0; }
         }
         @media (max-width: 560px) {
           .nz-sr-head { padding: 32px 0; }

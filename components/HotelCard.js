@@ -97,7 +97,7 @@ export default function HotelCard({ hotel }) {
           padding-top: 16px; border-top: 1px solid var(--gray-100);
         }
         .nz-hcard-price .amt { font-size: 21px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); }
-        .nz-hcard-price .unit { font-size: 12px; color: var(--gray-400); font-weight: 600; margin-left: 4px; }
+        .nz-hcard-price .unit { font-size: 12px; color: var(--gray-400); font-weight: 600; margin-inline-start: 4px; }
         .nz-hcard-book {
           background: var(--ink); color: #fff; padding: 11px 22px; border-radius: 980px;
           font-size: 13px; font-weight: 700; transition: background .2s, transform .15s;
