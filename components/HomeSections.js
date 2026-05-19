@@ -49,47 +49,66 @@ export default function HomeSections({ featured }) {
       </section>
 
       {/* WHY NZZOR */}
-      <section className="nz-why" id="how">
-        <div className="wrap">
-          <div className="nz-section-head">
-            <div>
-              <div className="nz-kicker">{t("why.kicker")}</div>
-              <h2 className="display">{t("why.title1")}<br />{t("why.title2")}</h2>
+      <section className="nz-why-v2" id="how">
+        {/* HERO STRIP — full bleed, photograph background */}
+        <div className="nz-why-hero">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=1800&q=85"
+            alt="Algeria hospitality"
+            className="nz-why-hero-img"
+          />
+          <div className="nz-why-hero-shade" />
+          <div className="wrap nz-why-hero-inner">
+            <div className="nz-why-hero-kicker">{t("why.kicker")}</div>
+            <h2 className="display nz-why-hero-title">
+              {t("why.title1")}<br />{t("why.title2")}
+            </h2>
+            <p className="nz-why-hero-sub">{t("why.hero_sub")}</p>
+            <div className="nz-why-badges">
+              <span className="nz-why-badge">
+                <Icon name="check" size={14} strokeWidth={2.5} />
+                {t("allouni.badge1")}
+              </span>
+              <span className="nz-why-badge">
+                <Icon name="check" size={14} strokeWidth={2.5} />
+                {t("allouni.badge2")}
+              </span>
+              <span className="nz-why-badge">
+                <Icon name="check" size={14} strokeWidth={2.5} />
+                {t("allouni.badge3")}
+              </span>
             </div>
           </div>
-          <div className="nz-bento">
-            <div className="nz-bento-card feature">
-              <div className="nz-bento-icon"><Icon name="shield" size={30} /></div>
-              <div>
-                <h3 className="display">{t("why.allouni_t")}</h3>
-                <p>{t("why.allouni_d")}</p>
-              </div>
-            </div>
-            <div className="nz-bento-card">
-              <div className="nz-bento-icon"><Icon name="clock" size={22} /></div>
-              <div>
-                <h3 className="display">{t("why.instant_t")}</h3>
-                <p>{t("why.instant_d")}</p>
-              </div>
-            </div>
-            <div className="nz-bento-card">
-              <div className="nz-bento-stat display"><span className="red">5s</span></div>
-              <div><p>{t("why.speed_d")}</p></div>
-            </div>
-            <div className="nz-bento-card wide">
-              <div className="nz-bento-icon"><Icon name="card" size={22} /></div>
-              <div>
-                <h3 className="display">{t("why.pay_t")}</h3>
-                <p>{t("why.pay_d")}</p>
-              </div>
-            </div>
-            <div className="nz-bento-card">
-              <div className="nz-bento-icon"><Icon name="whatsapp" size={22} /></div>
-              <div>
-                <h3 className="display">{t("why.support_t")}</h3>
-                <p>{t("why.support_d")}</p>
-              </div>
-            </div>
+        </div>
+
+        {/* INLINE SPEED LINE — the "5s" moment, integrated not isolated */}
+        <div className="wrap nz-why-speed">
+          <span className="nz-why-speed-num display">5s</span>
+          <span className="nz-why-speed-text">{t("why.speed_inline")}</span>
+        </div>
+
+        {/* FOUR CLEAN FEATURE COLUMNS */}
+        <div className="wrap nz-why-cols">
+          <div className="nz-why-col">
+            <Icon name="clock" size={26} strokeWidth={1.7} style={{ color: "var(--red)" }} />
+            <h3 className="display">{t("why.instant_t")}</h3>
+            <p>{t("why.instant_d")}</p>
+          </div>
+          <div className="nz-why-col">
+            <Icon name="card" size={26} strokeWidth={1.7} style={{ color: "var(--red)" }} />
+            <h3 className="display">{t("why.pay_t")}</h3>
+            <p>{t("why.pay_d")}</p>
+          </div>
+          <div className="nz-why-col">
+            <Icon name="whatsapp" size={26} strokeWidth={1.7} style={{ color: "var(--red)" }} />
+            <h3 className="display">{t("why.support_t")}</h3>
+            <p>{t("why.support_d")}</p>
+          </div>
+          <div className="nz-why-col">
+            <Icon name="shield" size={26} strokeWidth={1.7} style={{ color: "var(--red)" }} />
+            <h3 className="display">{t("why.allouni_t")}</h3>
+            <p>{t("why.allouni_d")}</p>
           </div>
         </div>
       </section>
