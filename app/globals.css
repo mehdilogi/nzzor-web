@@ -125,10 +125,10 @@ input, select, textarea { font-family: inherit; }
 /* HERO STRIP */
 .nz-why-hero {
   position: relative;
-  min-height: 440px;
+  min-height: 460px;
   display: flex; align-items: center;
   overflow: hidden;
-  margin-bottom: 64px;
+  margin-bottom: 80px;
 }
 .nz-why-hero-img {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
@@ -173,20 +173,59 @@ input, select, textarea { font-family: inherit; }
 }
 .nz-why-badge :global(svg) { color: #ffffff; opacity: 0.85; }
 
-/* INLINE SPEED LINE — the "5s" moment */
+/* INLINE SPEED LINE — the "5s" moment with animated counter */
 .nz-why-speed {
-  display: flex; align-items: baseline; gap: 22px;
+  display: flex; align-items: center; gap: 28px;
   padding: 0 0 56px; margin-bottom: 56px;
   border-bottom: 1px solid var(--gray-200);
 }
+.nz-why-speed-num-wrap {
+  position: relative; display: inline-flex; align-items: baseline; flex-shrink: 0;
+}
 .nz-why-speed-num {
   font-size: clamp(72px, 9vw, 120px); font-weight: 600; letter-spacing: -0.04em;
-  color: var(--red); line-height: 0.9; flex-shrink: 0;
+  color: var(--red); line-height: 0.9;
+  /* a subtle glow that pulses on first reveal */
+  text-shadow: 0 0 0 transparent;
+  transition: text-shadow .3s;
 }
+.nz-why-speed.is-done .nz-why-speed-num {
+  text-shadow: 0 0 38px rgba(230,57,70,0.25);
+}
+/* heartbeat pulse — appears after the count finishes, lives beside the 5s */
+.nz-why-speed-pulse {
+  position: relative; flex-shrink: 0;
+  width: 11px; height: 11px; border-radius: 50%;
+  background: var(--red);
+  margin-inline-start: 14px; align-self: center;
+  animation: nzs-pulse 1.8s ease-out infinite;
+}
+.nz-why-speed-pulse::after {
+  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  background: var(--red); opacity: 0.5;
+  animation: nzs-ping 1.8s cubic-bezier(0,0,0.2,1) infinite;
+}
+@keyframes nzs-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+@keyframes nzs-ping {
+  0% { transform: scale(1); opacity: 0.5; }
+  75%, 100% { transform: scale(2.4); opacity: 0; }
+}
+/* the sentence — with an animated red underline that sweeps in */
 .nz-why-speed-text {
+  position: relative; display: inline-block;
   font-size: clamp(18px, 2.2vw, 26px); font-weight: 500; line-height: 1.4;
   color: var(--ink); letter-spacing: -0.01em; max-width: 600px;
+  padding-bottom: 6px;
 }
+.nz-why-speed-underline {
+  position: absolute; left: 0; bottom: 0; height: 2px;
+  background: var(--red);
+  width: 0; transition: width 1.1s cubic-bezier(0.16, 1, 0.3, 1) 0.15s;
+}
+.nz-why-speed.is-done .nz-why-speed-underline { width: 100%; }
 
 /* CLEAN FEATURE COLUMNS */
 .nz-why-cols {

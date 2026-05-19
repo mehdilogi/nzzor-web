@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import HotelCard from "./HotelCard";
 import Icon from "./Icon";
 import { useLang } from "../lib/LangContext";
@@ -50,12 +51,12 @@ export default function HomeSections({ featured }) {
 
       {/* WHY NZZOR */}
       <section className="nz-why-v2" id="how">
-        {/* HERO STRIP — Algerian Sahara backdrop */}
+        {/* HERO STRIP — Algiers Bay / Casbah */}
         <div className="nz-why-hero">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="https://images.unsplash.com/photo-1473580044384-7ba9967e16a0?w=1800&q=85"
-            alt="Algerian Sahara"
+            src="https://images.unsplash.com/photo-1583774590468-c2da9d75d2da?w=1800&q=85"
+            alt="Algiers"
             className="nz-why-hero-img"
           />
           <div className="nz-why-hero-shade" />
@@ -82,11 +83,8 @@ export default function HomeSections({ featured }) {
           </div>
         </div>
 
-        {/* INLINE SPEED LINE — the "5s" moment, integrated not isolated */}
-        <div className="wrap nz-why-speed">
-          <span className="nz-why-speed-num display">5s</span>
-          <span className="nz-why-speed-text">{t("why.speed_inline")}</span>
-        </div>
+        {/* INLINE SPEED LINE — animated counter, triggers on scroll into view */}
+        <SpeedCounter label={t("why.speed_inline")} />
 
         {/* FOUR CLEAN FEATURE COLUMNS */}
         <div className="wrap nz-why-cols">
@@ -158,5 +156,59 @@ export default function HomeSections({ featured }) {
         </div>
       </div>
     </>
+  );
+}
+
+// =============================================================================
+// SpeedCounter — animated 0→5 counter that fires once when scrolled into view.
+// The animation itself takes about the same time as a real Nzzor confirmation:
+// it dramatises the "5 seconds" claim instead of just stating it.
+// =============================================================================
+function SpeedCounter({ label }) {
+  const ref = useRef(null);
+  const [n, setN] = useState(0);
+  const [done, setDone] = useState(false);
+  const fired = useRef(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !fired.current) {
+            fired.current = true;
+            // animate 0 -> 5 over ~1.1s with an ease-out
+            const duration = 1100;
+            const start = performance.now();
+            function tick(now) {
+              const t = Math.min(1, (now - start) / duration);
+              // ease-out cubic
+              const eased = 1 - Math.pow(1 - t, 3);
+              setN(Math.round(eased * 5));
+              if (t < 1) requestAnimationFrame(tick);
+              else setDone(true);
+            }
+            requestAnimationFrame(tick);
+          }
+        });
+      },
+      { threshold: 0.4 }
+    );
+    io.observe(node);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className={`wrap nz-why-speed ${done ? "is-done" : ""}`}>
+      <div className="nz-why-speed-num-wrap">
+        <span className="nz-why-speed-num display">{n}s</span>
+        {done && <span className="nz-why-speed-pulse" aria-hidden />}
+      </div>
+      <span className="nz-why-speed-text">
+        {label}
+        <span className="nz-why-speed-underline" />
+      </span>
+    </div>
   );
 }
