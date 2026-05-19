@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Icon, { AMENITY_ICON } from "./Icon";
 import Lightbox from "./Lightbox";
@@ -10,11 +10,13 @@ import { useLang } from "../lib/LangContext";
 
 export default function HotelDetail({ hotel }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const rooms = hotel.rooms || [];
   const { t } = useLang();
   const [selectedRoom, setSelectedRoom] = useState(rooms[0] || null);
-  const [checkIn, setCheckIn] = useState("");
-  const [checkOut, setCheckOut] = useState("");
+  // pre-fill dates from the URL (carried over from the search bar)
+  const [checkIn, setCheckIn] = useState(searchParams.get("checkIn") || "");
+  const [checkOut, setCheckOut] = useState(searchParams.get("checkOut") || "");
   const [lightboxIndex, setLightboxIndex] = useState(null);
 
   // nights — default to 3 for preview if dates not set

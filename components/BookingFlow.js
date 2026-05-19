@@ -172,7 +172,7 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
               <h2 className="display">{t("bk.guest_details")}</h2>
 
               <div className="bk-field">
-                <label>{t("bk.full_name")}</label>
+                <label>{t("bk.full_name")} <span className="bk-req">*</span></label>
                 <input
                   type="text"
                   value={name}
@@ -185,7 +185,7 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
 
               <div className="bk-field-row">
                 <div className="bk-field">
-                  <label>{t("bk.email")}</label>
+                  <label>{t("bk.email")} <span className="bk-req">*</span></label>
                   <input
                     type="email"
                     value={email}
@@ -196,7 +196,7 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
                   {errors.email && <span className="bk-err">{errors.email}</span>}
                 </div>
                 <div className="bk-field">
-                  <label>{t("bk.phone")}</label>
+                  <label>{t("bk.phone")} <span className="bk-req">*</span></label>
                   <input
                     type="tel"
                     value={phone}
@@ -428,6 +428,7 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
           display: block; font-size: 13px; font-weight: 700; color: var(--ink-2);
           margin-bottom: 7px;
         }
+        .bk-req { color: var(--red); font-weight: 800; }
         .bk-field input, .bk-field textarea {
           width: 100%; border: 1.5px solid var(--gray-200); border-radius: var(--r-sm);
           padding: 13px 15px; font-size: 14.5px; font-family: inherit; color: var(--ink);

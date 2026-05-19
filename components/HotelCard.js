@@ -1,14 +1,29 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import Icon from "./Icon";
 import { formatPriceShort } from "../lib/format";
 import { useLang } from "../lib/LangContext";
 
 export default function HotelCard({ hotel }) {
   const { t } = useLang();
+  const searchParams = useSearchParams();
+
+  // carry dates (and guests) from the current search through to the hotel page
+  const ci = searchParams.get("checkIn");
+  const co = searchParams.get("checkOut");
+  const guests = searchParams.get("guests");
+  const qs = new URLSearchParams();
+  if (ci) qs.set("checkIn", ci);
+  if (co) qs.set("checkOut", co);
+  if (guests) qs.set("guests", guests);
+  const href = qs.toString()
+    ? `/hotels/${hotel.slug}?${qs.toString()}`
+    : `/hotels/${hotel.slug}`;
+
   return (
-    <Link href={`/hotels/${hotel.slug}`} className="nz-hcard">
+    <Link href={href} className="nz-hcard">
       <div className="nz-hcard-media">
         {hotel.trustSignals?.instantConfirmation && (
           <span className="nz-hcard-tag">

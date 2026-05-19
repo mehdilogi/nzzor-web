@@ -4,6 +4,7 @@ import WhatsAppButton from "../components/WhatsAppButton";
 import HomeHero from "../components/HomeHero";
 import HomeSections from "../components/HomeSections";
 import { getFeaturedHotels } from "../lib/api";
+import { Suspense } from "react";
 
 export default async function HomePage() {
   const featured = await getFeaturedHotels({ lang: "en" });
@@ -12,7 +13,9 @@ export default async function HomePage() {
     <>
       <Nav overHero />
       <HomeHero />
-      <HomeSections featured={featured} />
+      <Suspense fallback={null}>
+        <HomeSections featured={featured} />
+      </Suspense>
       <Footer />
       <WhatsAppButton />
     </>
