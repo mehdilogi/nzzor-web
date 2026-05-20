@@ -3,10 +3,11 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   getToken, clearToken, adminLogin, adminMe, adminDashboard,
-  adminHotels, adminBookings, adminUpdateBookingStatus,
+  adminHotels, adminBookings, adminBookingDetail, adminUpdateBookingStatus,
   adminCreateHotel, adminUpdateHotel, adminDeleteHotel,
   adminAddRoom, adminUpdateRoom, adminDeleteRoom,
   adminAddPhoto, adminDeletePhoto,
+  adminHotelManagers, adminAddHotelManager, adminRemoveHotelManager,
 } from "../../lib/adminApi";
 
 const fmt = (n) => Number(n || 0).toLocaleString("en") + " DZD";
@@ -537,8 +538,11 @@ function HotelEditor({ hotel, onClose, onSaved }) {
       {savedId && (
         <PhotosPanel hotelId={savedId} initialPhotos={hotel?.photos || []} />
       )}
+      {savedId && (
+        <ManagersPanel hotelId={savedId} />
+      )}
       {isNew && !savedId && (
-        <div className="ad-note">Save the hotel first to add rooms and photos.</div>
+        <div className="ad-note">Save the hotel first to add rooms, photos and partner accounts.</div>
       )}
 
       <style jsx>{`
@@ -736,11 +740,97 @@ function PhotosPanel({ hotelId, initialPhotos }) {
 }
 
 // =============================================================================
+// MANAGERS PANEL — admin creates hotel-partner accounts that log into /partner
+// =============================================================================
+function ManagersPanel({ hotelId }) {
+  const [list, setList] = useState(null);
+  const [err, setErr] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({ email: "", password: "", firstName: "", lastName: "" });
+
+  const load = useCallback(() => {
+    adminHotelManagers(hotelId).then(setList).catch((e) => setErr(e.message));
+  }, [hotelId]);
+  useEffect(() => { load(); }, [load]);
+
+  async function create() {
+    setErr("");
+    try {
+      await adminAddHotelManager(hotelId, form);
+      setForm({ email: "", password: "", firstName: "", lastName: "" });
+      setCreating(false);
+      load();
+    } catch (e) { setErr(e.message); }
+  }
+  async function remove(userId) {
+    if (!window.confirm("Remove this partner's access to this hotel?")) return;
+    try { await adminRemoveHotelManager(hotelId, userId); load(); }
+    catch (e) { setErr(e.message); }
+  }
+
+  return (
+    <div className="ad-panel ad-mgr">
+      <div className="ad-panel-head">
+        <h3>Hotel partner accounts</h3>
+        {!creating && <button className="ad-btn" onClick={() => setCreating(true)}>+ Add partner</button>}
+      </div>
+      <p className="ad-sub">These are the people at the hotel who log into the partner portal to confirm bookings and manage availability.</p>
+      {err && <ErrorBox msg={err} />}
+
+      {creating && (
+        <div className="ad-mgr-form">
+          <div className="ad-grid2">
+            <Field label="Email"><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="reception@hotel.dz" /></Field>
+            <Field label="Password (initial)"><input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="At least 6 characters" /></Field>
+            <Field label="First name"><input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} /></Field>
+            <Field label="Last name"><input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} /></Field>
+          </div>
+          <div className="ad-mgr-actions">
+            <button className="ad-btn ghost" onClick={() => { setCreating(false); setForm({ email: "", password: "", firstName: "", lastName: "" }); }}>Cancel</button>
+            <button className="ad-btn primary" onClick={create}>Create partner account</button>
+          </div>
+        </div>
+      )}
+
+      {list && list.length === 0 && !creating && (
+        <span className="ad-empty-inline">No partner accounts yet for this hotel.</span>
+      )}
+      {list && list.length > 0 && (
+        <table className="ad-table">
+          <thead><tr><th>Email</th><th>Name</th><th>Added</th><th></th></tr></thead>
+          <tbody>
+            {list.map((u) => (
+              <tr key={u.id}>
+                <td><strong>{u.email}</strong></td>
+                <td>{[u.firstName, u.lastName].filter(Boolean).join(" ") || "—"}</td>
+                <td className="ad-dim">{fmtDT(u.createdAt)}</td>
+                <td><button className="ad-link-danger" onClick={() => remove(u.id)}>Remove</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <style jsx>{`
+        .ad-mgr { margin-top: 28px; }
+        .ad-sub { font-size: 13px; color: var(--gray-400); margin-bottom: 14px; line-height: 1.5; }
+        .ad-mgr-form { background: var(--cream); padding: 18px; border-radius: var(--r-sm); margin-bottom: 16px; }
+        .ad-mgr-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+        .ad-link-danger { background: none; border: none; color: var(--red); font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .ad-dim { color: var(--gray-400); font-size: 12px; }
+        .ad-empty-inline { color: var(--gray-400); font-size: 13px; }
+      `}</style>
+    </div>
+  );
+}
+
+// =============================================================================
 // BOOKINGS MANAGER
 // =============================================================================
 function BookingsManager() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
+  const [selected, setSelected] = useState(null); // booking id for the detail panel
 
   const load = useCallback(() => {
     adminBookings({ limit: 50 }).then((r) => setData(r.data || [])).catch((e) => setErr(e.message));
@@ -772,16 +862,16 @@ function BookingsManager() {
             </thead>
             <tbody>
               {data.map((b) => (
-                <tr key={b.id}>
+                <tr key={b.id} className="ad-brow" onClick={() => setSelected(b.id)}>
                   <td><strong>{b.reference}</strong></td>
                   <td>{b.guest?.firstName} {b.guest?.lastName}<br /><span className="ad-dim">{b.guest?.phone}</span></td>
                   <td>{b.hotel?.name}</td>
                   <td className="ad-dim">{(b.checkIn || "").slice(0, 10)} → {(b.checkOut || "").slice(0, 10)}</td>
                   <td>{fmt(b.pricing?.total)}</td>
                   <td><span className={`ad-bstatus s-${b.status}`}>{b.status}</span></td>
-                  <td>
+                  <td onClick={(e) => e.stopPropagation()}>
                     <select value={b.status} onChange={(e) => setStatus(b.id, e.target.value)}>
-                      {["PENDING", "CONFIRMED", "CANCELLED", "COMPLETED", "NO_SHOW", "REFUNDED"].map((s) => (
+                      {["PENDING", "CONFIRMED", "REJECTED", "CANCELLED", "COMPLETED", "NO_SHOW", "REFUNDED"].map((s) => (
                         <option key={s} value={s}>{s}</option>
                       ))}
                     </select>
@@ -793,17 +883,222 @@ function BookingsManager() {
         </div>
       )}
 
+      {selected && (
+        <BookingDetailPanel
+          id={selected}
+          onClose={() => setSelected(null)}
+          onChanged={() => { load(); }}
+        />
+      )}
+
       <style jsx>{`
+        .ad-brow { cursor: pointer; }
+        .ad-brow:hover { background: var(--gray-100); }
         .ad-dim { color: var(--gray-400); font-size: 12px; }
         .ad-empty-inline { color: var(--gray-400); font-size: 13px; }
         .ad-bstatus { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 980px; }
         .s-CONFIRMED, .s-COMPLETED { background: var(--teal-soft); color: var(--teal); }
         .s-PENDING { background: #FFF4E0; color: #9A6700; }
-        .s-CANCELLED, .s-NO_SHOW, .s-REFUNDED { background: var(--red-soft); color: var(--red-deep); }
+        .s-REJECTED, .s-CANCELLED, .s-NO_SHOW, .s-REFUNDED { background: var(--red-soft); color: var(--red-deep); }
         select { padding: 6px 8px; border: 1.5px solid var(--gray-200); border-radius: var(--r-sm); font-size: 12px; }
       `}</style>
     </div>
   );
+}
+
+// =============================================================================
+// Booking detail modal — shows everything about one booking and lets
+// the admin confirm or reject it directly.
+// =============================================================================
+function BookingDetailPanel({ id, onClose, onChanged }) {
+  const [b, setB] = useState(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    adminBookingDetail(id).then(setB).catch((e) => setErr(e.message));
+  }, [id]);
+
+  async function confirm() {
+    setBusy(true);
+    try {
+      await adminUpdateBookingStatus(id, "CONFIRMED");
+      onChanged();
+      onClose();
+    } catch (e) { setErr(e.message); }
+    setBusy(false);
+  }
+  async function reject() {
+    if (!window.confirm("Reject this booking? The guest will need to be refunded.")) return;
+    setBusy(true);
+    try {
+      await adminUpdateBookingStatus(id, "REJECTED");
+      onChanged();
+      onClose();
+    } catch (e) { setErr(e.message); }
+    setBusy(false);
+  }
+
+  return (
+    <div className="bd-back" onClick={onClose}>
+      <div className="bd-panel" onClick={(e) => e.stopPropagation()}>
+        <button className="bd-close" onClick={onClose} aria-label="Close">×</button>
+        {err && <ErrorBox msg={err} />}
+        {!b && !err && <Loading />}
+        {b && (
+          <>
+            <div className="bd-head">
+              <div>
+                <div className="bd-ref">{b.reference}</div>
+                <span className={`ad-bstatus s-${b.status}`}>{b.status}</span>
+              </div>
+              <div className="bd-total">
+                <span>Total</span>
+                <strong>{fmt(b.pricing?.total)}</strong>
+              </div>
+            </div>
+
+            <div className="bd-grid">
+              <Section title="Guest">
+                <Row label="Name" value={`${b.guest?.firstName || ""} ${b.guest?.lastName || ""}`.trim()} />
+                <Row label="Email" value={b.guest?.email} link={b.guest?.email ? `mailto:${b.guest.email}` : null} />
+                <Row label="Phone" value={b.guest?.phone} link={b.guest?.phone ? `https://wa.me/${(b.guest.phone || "").replace(/\D/g, "")}` : null} />
+              </Section>
+
+              <Section title="Stay">
+                <Row label="Hotel" value={b.hotel?.name} />
+                <Row label="City" value={b.hotel?.city} />
+                <Row label="Check-in" value={(b.checkIn || "").slice(0, 10)} />
+                <Row label="Check-out" value={(b.checkOut || "").slice(0, 10)} />
+                <Row label="Nights" value={b.nights} />
+              </Section>
+
+              <Section title="Rooms">
+                {(b.rooms || []).map((r, i) => (
+                  <Row key={i} label={r.type || `Room ${i + 1}`} value={`× ${r.quantity} · ${fmt(r.pricePerNight)} / night`} />
+                ))}
+              </Section>
+
+              <Section title="Pricing">
+                <Row label="Subtotal" value={fmt(b.pricing?.subtotal)} />
+                {b.pricing?.discount > 0 && (
+                  <Row label="Discount" value={`− ${fmt(b.pricing.discount)}`} />
+                )}
+                <Row label="Taxes & fees" value="Included" />
+                <Row label="Total" value={fmt(b.pricing?.total)} strong />
+              </Section>
+
+              <Section title="Payment">
+                <Row label="Method" value={b.payment?.method} />
+                <Row label="Status" value={b.payment?.status} />
+              </Section>
+
+              {b.specialRequests && (
+                <Section title="Special requests" full>
+                  <p className="bd-notes">{b.specialRequests}</p>
+                </Section>
+              )}
+
+              <Section title="Timestamps" full>
+                <Row label="Created" value={fmtDT(b.createdAt)} />
+                {b.confirmedAt && <Row label="Confirmed" value={fmtDT(b.confirmedAt)} />}
+                {b.cancelledAt && <Row label="Cancelled" value={fmtDT(b.cancelledAt)} />}
+                {b.cancellationReason && <Row label="Reason" value={b.cancellationReason} />}
+              </Section>
+            </div>
+
+            {b.status === "PENDING" && (
+              <div className="bd-actions">
+                <button className="bd-reject" onClick={reject} disabled={busy}>Reject booking</button>
+                <button className="bd-confirm" onClick={confirm} disabled={busy}>Confirm booking</button>
+              </div>
+            )}
+          </>
+        )}
+
+        <style jsx>{`
+          .bd-back {
+            position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.45);
+            display: flex; align-items: center; justify-content: center;
+            padding: 24px; overflow-y: auto;
+          }
+          .bd-panel {
+            position: relative; background: #fff; border-radius: var(--r-lg);
+            max-width: 760px; width: 100%; max-height: 92vh; overflow-y: auto;
+            padding: 28px 32px;
+          }
+          .bd-close {
+            position: absolute; top: 14px; right: 14px;
+            width: 36px; height: 36px; border-radius: 50%; border: none;
+            background: var(--gray-100); font-size: 22px; line-height: 1; cursor: pointer;
+          }
+          .bd-head {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid var(--gray-100);
+          }
+          .bd-ref { font-size: 22px; font-weight: 800; letter-spacing: 0.02em; margin-bottom: 8px; color: var(--ink); }
+          .bd-total { text-align: right; }
+          .bd-total span { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gray-400); margin-bottom: 4px; }
+          .bd-total strong { font-size: 22px; font-weight: 800; color: var(--ink); }
+          .bd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+          .bd-notes { font-size: 14px; line-height: 1.6; color: var(--ink-2); white-space: pre-wrap; }
+          .bd-actions {
+            display: flex; gap: 10px; justify-content: flex-end;
+            margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--gray-100);
+          }
+          .bd-confirm, .bd-reject {
+            padding: 12px 22px; border-radius: var(--r-sm); border: none; cursor: pointer;
+            font-size: 14px; font-weight: 700; font-family: inherit;
+          }
+          .bd-confirm { background: var(--teal); color: #fff; }
+          .bd-reject { background: var(--red-soft); color: var(--red-deep); }
+          .bd-confirm:disabled, .bd-reject:disabled { opacity: 0.6; cursor: default; }
+          @media (max-width: 640px) {
+            .bd-grid { grid-template-columns: 1fr; }
+            .bd-panel { padding: 22px; }
+          }
+        `}</style>
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, children, full }) {
+  return (
+    <div className={`bd-section ${full ? "full" : ""}`}>
+      <h4>{title}</h4>
+      <div className="bd-rows">{children}</div>
+      <style jsx>{`
+        .bd-section.full { grid-column: 1 / -1; }
+        h4 { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-400); margin-bottom: 10px; }
+        .bd-rows { display: flex; flex-direction: column; gap: 6px; }
+      `}</style>
+    </div>
+  );
+}
+function Row({ label, value, link, strong }) {
+  if (!value && value !== 0) return null;
+  return (
+    <div className="bd-row">
+      <span>{label}</span>
+      {link ? <a href={link} target="_blank" rel="noreferrer"><strong>{value}</strong></a>
+            : <strong className={strong ? "is-strong" : ""}>{value}</strong>}
+      <style jsx>{`
+        .bd-row { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; }
+        .bd-row > span { color: var(--gray-400); font-weight: 500; }
+        .bd-row strong { color: var(--ink); font-weight: 700; }
+        .bd-row .is-strong { font-size: 15px; }
+        .bd-row a { text-decoration: none; color: var(--red); }
+        .bd-row a:hover { text-decoration: underline; }
+      `}</style>
+    </div>
+  );
+}
+function fmtDT(s) {
+  if (!s) return "";
+  try {
+    return new Date(s).toLocaleString("en", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  } catch { return s; }
 }
 
 // =============================================================================
