@@ -51,15 +51,10 @@ export default function HomeSections({ featured }) {
 
       {/* WHY NZZOR */}
       <section className="nz-why-v2" id="how">
-        {/* HERO STRIP — Algiers Bay / Casbah */}
+        {/* HERO STRIP — designed background (real photo swaps in here later) */}
         <div className="nz-why-hero">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="https://images.unsplash.com/photo-1583774590468-c2da9d75d2da?w=1800&q=85"
-            alt="Algiers"
-            className="nz-why-hero-img"
-          />
-          <div className="nz-why-hero-shade" />
+          <div className="nz-why-hero-bg" />
+          <div className="nz-why-hero-grain" />
           <div className="wrap nz-why-hero-inner">
             <div className="nz-why-hero-kicker">{t("why.kicker")}</div>
             <h2 className="display nz-why-hero-title">
@@ -170,27 +165,39 @@ function SpeedCounter({ label }) {
   const [done, setDone] = useState(false);
   const fired = useRef(false);
 
+  // run the counter animation once
+  function runOnce() {
+    if (fired.current) return;
+    fired.current = true;
+    setDone(false);
+    const duration = 1100;
+    const start = performance.now();
+    function tick(now) {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setN(Math.round(eased * 5));
+      if (t < 1) requestAnimationFrame(tick);
+      else setDone(true);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // replay on hover (allow it to be rediscovered)
+  function replay() {
+    fired.current = false;
+    setN(0);
+    setDone(false);
+    // tiny delay so the CSS transition resets cleanly
+    requestAnimationFrame(() => runOnce());
+  }
+
   useEffect(() => {
     const node = ref.current;
     if (!node) return;
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting && !fired.current) {
-            fired.current = true;
-            // animate 0 -> 5 over ~1.1s with an ease-out
-            const duration = 1100;
-            const start = performance.now();
-            function tick(now) {
-              const t = Math.min(1, (now - start) / duration);
-              // ease-out cubic
-              const eased = 1 - Math.pow(1 - t, 3);
-              setN(Math.round(eased * 5));
-              if (t < 1) requestAnimationFrame(tick);
-              else setDone(true);
-            }
-            requestAnimationFrame(tick);
-          }
+          if (entry.isIntersecting) runOnce();
         });
       },
       { threshold: 0.4 }
@@ -200,10 +207,10 @@ function SpeedCounter({ label }) {
   }, []);
 
   return (
-    <div ref={ref} className={`wrap nz-why-speed ${done ? "is-done" : ""}`}>
+    <div ref={ref} className={`wrap nz-why-speed ${done ? "is-done" : ""}`} onMouseEnter={replay}>
       <div className="nz-why-speed-num-wrap">
-        <span className="nz-why-speed-num display">{n}s</span>
-        {done && <span className="nz-why-speed-pulse" aria-hidden />}
+        <span className="nz-why-speed-num display">{n}<em>s</em></span>
+        <span className="nz-why-speed-pulse" aria-hidden />
       </div>
       <span className="nz-why-speed-text">
         {label}
