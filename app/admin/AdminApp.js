@@ -254,6 +254,8 @@ function Overview() {
     <div>
       <PageHead title="Overview" subtitle="Your platform at a glance" />
 
+      <OpsPanel />
+
       <div className="ad-stats">
         <Stat label="Total bookings" value={data.bookings.total} />
         <Stat label="Bookings · last 7 days" value={data.bookings.last7Days} />
@@ -306,6 +308,117 @@ function Overview() {
         .ad-status-chip span { color: var(--gray-400); font-weight: 600; font-size: 11px; }
         .ad-empty-inline { color: var(--gray-400); font-size: 13px; }
         @media (max-width: 720px) { .ad-stats { grid-template-columns: 1fr 1fr; } }
+      `}</style>
+    </div>
+  );
+}
+
+// =============================================================================
+// OPS PANEL — pending bookings sorted by how long they've been waiting
+// 2-minute "warn" (yellow) / 5-minute "urgent" (red)
+// Click hotel phone to call.
+// =============================================================================
+function OpsPanel() {
+  const [pending, setPending] = useState(null);
+  const [err, setErr] = useState("");
+  const [tick, setTick] = useState(0); // forces re-render every minute to update wait times
+
+  const load = useCallback(() => {
+    adminBookings({ status: "PENDING", limit: 50 })
+      .then((j) => setPending(j.data || []))
+      .catch((e) => setErr(e.message));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  // refresh from server every 30s; force a re-render every 30s so the
+  // "X min ago" labels stay current even if no data changes
+  useEffect(() => {
+    const refreshT = setInterval(load, 30_000);
+    const tickT = setInterval(() => setTick((t) => t + 1), 30_000);
+    return () => { clearInterval(refreshT); clearInterval(tickT); };
+  }, [load]);
+
+  if (err) return <ErrorBox msg={err} />;
+  if (!pending) return null; // silent while loading; overview shows other things
+
+  const now = Date.now();
+  const enriched = pending
+    .map((b) => {
+      const ageMs = now - new Date(b.createdAt).getTime();
+      const ageMin = Math.floor(ageMs / 60_000);
+      let level = "ok";
+      if (ageMin >= 5) level = "urgent";
+      else if (ageMin >= 2) level = "warn";
+      return { ...b, ageMin, level };
+    })
+    .sort((a, b) => b.ageMin - a.ageMin); // oldest waiting first
+
+  if (enriched.length === 0) return null; // no urgent items — clean overview
+
+  const urgentCount = enriched.filter((b) => b.level === "urgent").length;
+  const warnCount = enriched.filter((b) => b.level === "warn").length;
+
+  return (
+    <div className={`ops-panel ${urgentCount > 0 ? "has-urgent" : warnCount > 0 ? "has-warn" : ""}`}>
+      <div className="ops-head">
+        <h3>
+          ⚡ Pending bookings
+          {urgentCount > 0 && <span className="ops-pill urgent">{urgentCount} urgent</span>}
+          {warnCount > 0 && <span className="ops-pill warn">{warnCount} need a nudge</span>}
+        </h3>
+        <span className="ops-sub">Hotels haven't confirmed yet. Tap phone to call.</span>
+      </div>
+      <div className="ops-list">
+        {enriched.map((b) => (
+          <div key={b.id} className={`ops-row ${b.level}`}>
+            <div className="ops-row-main">
+              <strong>{b.reference}</strong>
+              <span className="ops-hotel">{b.hotel?.name || "—"}</span>
+              <span className="ops-age">{b.ageMin < 1 ? "just now" : `${b.ageMin} min`}</span>
+            </div>
+            <div className="ops-row-actions">
+              {b.hotel?.contactPhone ? (
+                <a className="ops-call" href={`tel:${b.hotel.contactPhone.replace(/\s+/g, "")}`}>
+                  📞 {b.hotel.contactPhone}
+                </a>
+              ) : (
+                <span className="ops-nophone">No hotel phone on file</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      <style jsx>{`
+        .ops-panel { background: #fff; border: 1px solid var(--gray-200); border-radius: var(--r-lg); padding: 20px 22px; margin-bottom: 24px; }
+        .ops-panel.has-warn { border-color: #F5C75A; }
+        .ops-panel.has-urgent { border-color: var(--red); background: linear-gradient(180deg, #FFF6F5 0%, #fff 60%); }
+        .ops-head { margin-bottom: 14px; }
+        .ops-head h3 { font-size: 15px; font-weight: 800; color: var(--ink); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .ops-head .ops-sub { display: block; font-size: 12.5px; color: var(--gray-400); margin-top: 4px; }
+        .ops-pill { font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 980px; letter-spacing: 0.04em; }
+        .ops-pill.warn { background: #FFF4E0; color: #9A6700; }
+        .ops-pill.urgent { background: var(--red); color: #fff; }
+        .ops-list { display: flex; flex-direction: column; gap: 8px; }
+        .ops-row {
+          display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+          padding: 12px 14px; border-radius: var(--r-sm); border: 1.5px solid var(--gray-200); background: #fff;
+        }
+        .ops-row.warn { border-color: #F5C75A; background: #FFFBF0; }
+        .ops-row.urgent { border-color: var(--red); background: #FFF1F0; }
+        .ops-row-main { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+        .ops-row-main strong { font-size: 13.5px; font-weight: 800; letter-spacing: 0.02em; }
+        .ops-hotel { font-size: 14px; font-weight: 600; color: var(--ink); }
+        .ops-age { font-size: 12px; font-weight: 700; color: var(--gray-400); }
+        .ops-row.warn .ops-age { color: #9A6700; }
+        .ops-row.urgent .ops-age { color: var(--red); }
+        .ops-call {
+          background: var(--ink); color: #fff; padding: 8px 16px; border-radius: 980px;
+          font-size: 13px; font-weight: 700; text-decoration: none;
+        }
+        .ops-call:hover { background: var(--red); }
+        .ops-row.urgent .ops-call { background: var(--red); }
+        .ops-nophone { font-size: 12px; color: var(--gray-400); font-style: italic; }
       `}</style>
     </div>
   );

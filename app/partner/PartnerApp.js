@@ -9,6 +9,8 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import LogoMark from "../../components/LogoMark";
+import { useBookingAlerts } from "../../lib/bookingAlerts";
+import { printArrivalWorksheet } from "../../lib/arrivalWorksheet";
 import {
   getPartnerToken, clearPartnerToken, partnerLogin,
   partnerMe, partnerBookings, partnerBookingDetail,
@@ -164,25 +166,51 @@ function PartnerBookings({ hotelId, hotelName }) {
   const [err, setErr] = useState("");
   const [selected, setSelected] = useState(null);
 
-  const load = useCallback(() => {
+  // Initial load shows the spinner. Subsequent polls refresh silently
+  // so the page doesn't blank out every 20 seconds.
+  const initialLoad = useCallback(() => {
     setList(null); setErr("");
     partnerBookings({ hotelId }).then(setList).catch((e) => setErr(e.message));
   }, [hotelId]);
-  useEffect(() => { load(); }, [load]);
+  const silentRefresh = useCallback(() => {
+    partnerBookings({ hotelId }).then((next) => setList(next)).catch(() => {});
+  }, [hotelId]);
+
+  useEffect(() => { initialLoad(); }, [initialLoad]);
+
+  // Poll for new bookings every 20 seconds so the partner doesn't have to
+  // refresh manually. Combined with the alert hook below, this is how new
+  // bookings ring in.
+  useEffect(() => {
+    const t = setInterval(silentRefresh, 20_000);
+    return () => clearInterval(t);
+  }, [silentRefresh]);
+
+  const pending = (list || []).filter((b) => b.status === "PENDING");
+  const others = (list || []).filter((b) => b.status !== "PENDING");
+
+  // Drive the audible + visual alert system from the live pending list.
+  const { muted, setMuted } = useBookingAlerts(pending);
 
   if (err) return <div className="p-err">{err}</div>;
   if (!list) return <div className="p-loading2">Loading…</div>;
-
-  const pending = list.filter((b) => b.status === "PENDING");
-  const others = list.filter((b) => b.status !== "PENDING");
 
   return (
     <div>
       <div className="pb-head">
         <h2>Bookings <span>· {hotelName}</span></h2>
-        {pending.length > 0 && (
-          <span className="pb-badge">{pending.length} awaiting your decision</span>
-        )}
+        <div className="pb-head-right">
+          {pending.length > 0 && (
+            <span className="pb-badge">{pending.length} awaiting your decision</span>
+          )}
+          <button
+            className={`pb-mute ${muted ? "on" : ""}`}
+            onClick={() => setMuted((m) => !m)}
+            title={muted ? "Sounds are muted — click to unmute" : "Mute booking sounds for this session"}
+          >
+            {muted ? "🔕 Muted" : "🔔 Sound on"}
+          </button>
+        </div>
       </div>
 
       {pending.length === 0 && others.length === 0 && (
@@ -208,11 +236,19 @@ function PartnerBookings({ hotelId, hotelName }) {
       )}
 
       {selected && (
-        <BookingDetailModal id={selected} onClose={() => setSelected(null)} onChanged={load} />
+        <BookingDetailModal id={selected} onClose={() => setSelected(null)} onChanged={silentRefresh} />
       )}
 
       <style jsx>{`
         .pb-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+        .pb-head-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .pb-mute {
+          background: #fff; border: 1.5px solid var(--gray-200); border-radius: 980px;
+          padding: 7px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+          font-family: inherit; color: var(--ink); transition: all .15s;
+        }
+        .pb-mute:hover { border-color: var(--ink); }
+        .pb-mute.on { background: var(--gray-100); color: var(--gray-400); border-color: var(--gray-200); }
         h2 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); }
         h2 span { font-size: 14px; font-weight: 500; color: var(--gray-400); }
         h3 { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-400); margin-bottom: 12px; }
@@ -338,6 +374,10 @@ function BookingDetailModal({ id, onClose, onChanged }) {
                 <button className="bd-confirm" onClick={confirm} disabled={busy}>Confirm booking</button>
               </div>
             )}
+
+            <button className="bd-print" onClick={() => printArrivalWorksheet(b)}>
+              🖨️ Print arrival worksheet
+            </button>
           </>
         )}
         <style jsx>{`
@@ -358,6 +398,12 @@ function BookingDetailModal({ id, onClose, onChanged }) {
           .bd-confirm { background: var(--teal); color: #fff; }
           .bd-reject { background: var(--red-soft); color: var(--red-deep); }
           .bd-confirm:disabled, .bd-reject:disabled { opacity: 0.6; cursor: default; }
+          .bd-print {
+            display: block; width: 100%; margin-top: 14px; padding: 12px;
+            background: var(--ink); color: #fff; border: none; border-radius: var(--r-sm);
+            font-size: 13.5px; font-weight: 700; cursor: pointer; font-family: inherit;
+          }
+          .bd-print:hover { background: #000; }
           .bd-err { background: var(--red-soft); color: var(--red-deep); padding: 10px 12px; border-radius: var(--r-sm); font-size: 13px; font-weight: 600; margin-bottom: 14px; }
           .bd-loading { padding: 40px; text-align: center; color: var(--gray-400); }
           .bc-st { font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 980px; }
