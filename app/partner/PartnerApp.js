@@ -190,19 +190,44 @@ function PartnerBookings({ hotelId, hotelName }) {
   const others = (list || []).filter((b) => b.status !== "PENDING");
 
   // Drive the audible + visual alert system from the live pending list.
-  const { muted, setMuted } = useBookingAlerts(pending);
+  const { muted, setMuted, newBookingBanner, dismissBanner, playTest } = useBookingAlerts(pending);
 
   if (err) return <div className="p-err">{err}</div>;
   if (!list) return <div className="p-loading2">Loading…</div>;
 
   return (
     <div>
+      {newBookingBanner && (
+        <div className="pb-newalert" role="alert">
+          <div className="pb-newalert-pulse" />
+          <div className="pb-newalert-text">
+            <strong>🔔 New booking — {newBookingBanner.reference}</strong>
+            <span>
+              {newBookingBanner.guest?.firstName || "Guest"} · {(newBookingBanner.checkIn || "").slice(0, 10)} → {(newBookingBanner.checkOut || "").slice(0, 10)}
+            </span>
+          </div>
+          <div className="pb-newalert-actions">
+            <button className="pb-newalert-open" onClick={() => { setSelected(newBookingBanner.id); dismissBanner(); }}>
+              Open booking
+            </button>
+            <button className="pb-newalert-dismiss" onClick={dismissBanner} aria-label="Dismiss alert">×</button>
+          </div>
+        </div>
+      )}
+
       <div className="pb-head">
         <h2>Bookings <span>· {hotelName}</span></h2>
         <div className="pb-head-right">
           {pending.length > 0 && (
             <span className="pb-badge">{pending.length} awaiting your decision</span>
           )}
+          <button
+            className="pb-test"
+            onClick={playTest}
+            title="Play a quick test chime — useful to verify your browser sound is on"
+          >
+            🔊 Test sound
+          </button>
           <button
             className={`pb-mute ${muted ? "on" : ""}`}
             onClick={() => setMuted((m) => !m)}
@@ -249,6 +274,52 @@ function PartnerBookings({ hotelId, hotelName }) {
         }
         .pb-mute:hover { border-color: var(--ink); }
         .pb-mute.on { background: var(--gray-100); color: var(--gray-400); border-color: var(--gray-200); }
+        .pb-test {
+          background: #fff; border: 1.5px solid var(--gray-200); border-radius: 980px;
+          padding: 7px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+          font-family: inherit; color: var(--ink);
+        }
+        .pb-test:hover { border-color: var(--ink); }
+
+        /* In-page banner — appears the moment a new booking arrives */
+        .pb-newalert {
+          position: sticky; top: 0; z-index: 10;
+          display: flex; align-items: center; gap: 16px;
+          background: var(--red); color: #fff;
+          padding: 14px 18px; border-radius: var(--r-lg);
+          margin-bottom: 18px;
+          box-shadow: 0 6px 24px rgba(230, 57, 70, 0.35);
+          animation: pb-pulse 1.4s ease-in-out infinite;
+        }
+        @keyframes pb-pulse {
+          0%, 100% { box-shadow: 0 6px 24px rgba(230, 57, 70, 0.35); }
+          50%      { box-shadow: 0 6px 36px rgba(230, 57, 70, 0.70); }
+        }
+        .pb-newalert-pulse {
+          width: 14px; height: 14px; border-radius: 50%; background: #fff;
+          flex-shrink: 0;
+          animation: pb-dot 1s ease-in-out infinite;
+        }
+        @keyframes pb-dot {
+          0%, 100% { opacity: 1;   transform: scale(1); }
+          50%      { opacity: 0.4; transform: scale(1.3); }
+        }
+        .pb-newalert-text { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+        .pb-newalert-text strong { font-size: 15px; font-weight: 800; letter-spacing: 0.01em; }
+        .pb-newalert-text span { font-size: 12.5px; font-weight: 500; opacity: 0.92; }
+        .pb-newalert-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .pb-newalert-open {
+          background: #fff; color: var(--red); border: none; border-radius: 980px;
+          padding: 9px 16px; font-size: 13px; font-weight: 800; cursor: pointer;
+          font-family: inherit;
+        }
+        .pb-newalert-open:hover { background: var(--ink); color: #fff; }
+        .pb-newalert-dismiss {
+          background: rgba(255,255,255,0.18); color: #fff; border: none;
+          width: 30px; height: 30px; border-radius: 50%;
+          font-size: 20px; line-height: 1; cursor: pointer;
+        }
+        .pb-newalert-dismiss:hover { background: rgba(255,255,255,0.32); }
         h2 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); }
         h2 span { font-size: 14px; font-weight: 500; color: var(--gray-400); }
         h3 { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-400); margin-bottom: 12px; }
