@@ -1,0 +1,362 @@
+"use client";
+
+// =============================================================================
+// Nzzor — Account App
+// Customer self-service: list/detail of bookings, profile editing, password
+// change, and the printable voucher.
+// =============================================================================
+
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "../../lib/AuthContext";
+import { useLang } from "../../lib/LangContext";
+import { myBookings, myBookingDetail, userUpdateProfile, userChangePassword } from "../../lib/accountApi";
+import { formatPrice } from "../../lib/format";
+import { openVoucher } from "../../lib/voucher";
+
+export default function AccountApp() {
+  const { user, loading, signOut, refresh } = useAuth();
+  const { t } = useLang();
+  const router = useRouter();
+  const [tab, setTab] = useState("bookings");
+
+  useEffect(() => {
+    // bounce to sign-in if not logged in (once we know)
+    if (!loading && !user) router.push("/signin?next=/account");
+  }, [loading, user, router]);
+
+  if (loading || !user) {
+    return <div className="ac-loading">Loading…<style jsx>{`.ac-loading{min-height:50vh;display:flex;align-items:center;justify-content:center;color:var(--gray-400);font-size:14px;}`}</style></div>;
+  }
+
+  return (
+    <div className="ac-shell">
+      <div className="wrap ac-head">
+        <div>
+          <h1 className="display">{t("acc.title")}</h1>
+          <p>{user.firstName ? `${user.firstName} · ` : ""}{user.email}</p>
+        </div>
+        <button className="ac-signout" onClick={() => { signOut(); router.push("/"); }}>{t("auth.signout")}</button>
+      </div>
+
+      <nav className="wrap ac-tabs">
+        <button className={tab === "bookings" ? "on" : ""} onClick={() => setTab("bookings")}>{t("acc.tab_bookings")}</button>
+        <button className={tab === "profile" ? "on" : ""} onClick={() => setTab("profile")}>{t("acc.tab_profile")}</button>
+        <button className={tab === "password" ? "on" : ""} onClick={() => setTab("password")}>{t("acc.tab_password")}</button>
+      </nav>
+
+      <main className="wrap ac-main">
+        {tab === "bookings" && <MyBookingsPanel />}
+        {tab === "profile" && <ProfilePanel user={user} onSaved={refresh} />}
+        {tab === "password" && <PasswordPanel />}
+      </main>
+
+      <style jsx>{`
+        .ac-shell { min-height: 60vh; background: var(--cream); padding-bottom: 80px; }
+        .ac-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 40px 0 24px; flex-wrap: wrap; gap: 14px; }
+        h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.025em; color: var(--ink); margin-bottom: 6px; }
+        .ac-head p { font-size: 14px; color: var(--gray-400); }
+        .ac-signout { background: #fff; border: 1.5px solid var(--gray-200); border-radius: 980px; padding: 9px 18px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .ac-signout:hover { border-color: var(--ink); }
+        .ac-tabs { display: flex; gap: 26px; border-bottom: 1px solid var(--gray-200); margin-bottom: 26px; padding-bottom: 0; }
+        .ac-tabs button { background: none; border: none; padding: 14px 0; font-size: 14.5px; font-weight: 600; color: var(--gray-400); cursor: pointer; border-bottom: 2px solid transparent; font-family: inherit; }
+        .ac-tabs button.on { color: var(--ink); border-bottom-color: var(--red); }
+      `}</style>
+    </div>
+  );
+}
+
+// =============================================================================
+// MY BOOKINGS
+// =============================================================================
+function MyBookingsPanel() {
+  const { lang, t } = useLang();
+  const [list, setList] = useState(null);
+  const [err, setErr] = useState("");
+  const [selected, setSelected] = useState(null);
+
+  const load = useCallback(() => {
+    setList(null); setErr("");
+    myBookings(lang).then(setList).catch((e) => setErr(e.message));
+  }, [lang]);
+  useEffect(() => { load(); }, [load]);
+
+  if (err) return <div className="ac-err">{err}</div>;
+  if (!list) return <div className="ac-load">…</div>;
+  if (list.length === 0) {
+    return (
+      <div className="ac-empty">
+        <p>{t("acc.no_bookings")}</p>
+        <Link href="/hotels">{t("acc.browse_hotels")} →</Link>
+        <style jsx>{`
+          .ac-empty { background: #fff; border: 1px solid var(--gray-200); border-radius: var(--r-lg); padding: 60px 30px; text-align: center; }
+          .ac-empty p { color: var(--gray-400); font-size: 14.5px; margin-bottom: 14px; }
+          .ac-empty :global(a) { color: var(--ink); font-weight: 700; text-decoration: underline; }
+        `}</style>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-list">
+      {list.map((b) => (
+        <button key={b.id} className="mb-card" onClick={() => setSelected(b.id)}>
+          <div className="mb-top">
+            <strong>{b.reference}</strong>
+            <span className={`mb-st s-${b.status}`}>{b.status}</span>
+          </div>
+          <div className="mb-hotel">{b.hotel?.name}</div>
+          <div className="mb-dates">{(b.checkIn || "").slice(0, 10)} → {(b.checkOut || "").slice(0, 10)} <em>· {b.nights} {b.nights === 1 ? "night" : "nights"}</em></div>
+          <div className="mb-foot">
+            <span>{(b.rooms || []).map((r) => r.type).join(", ")}</span>
+            <strong>{formatPrice(b.pricing?.total)}</strong>
+          </div>
+        </button>
+      ))}
+
+      {selected && <BookingDetailModal id={selected} onClose={() => setSelected(null)} />}
+
+      <style jsx>{`
+        .mb-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+        .mb-card { background: #fff; border: 1.5px solid var(--gray-200); border-radius: var(--r-lg); padding: 18px; text-align: left; cursor: pointer; font-family: inherit; transition: border-color .15s, transform .15s; }
+        .mb-card:hover { border-color: var(--ink); transform: translateY(-2px); }
+        .mb-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .mb-top strong { font-size: 14px; font-weight: 800; letter-spacing: 0.02em; color: var(--ink); }
+        .mb-st { font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 980px; }
+        .s-PENDING { background: #FFF4E0; color: #9A6700; }
+        .s-CONFIRMED, .s-COMPLETED { background: var(--teal-soft); color: var(--teal); }
+        .s-REJECTED, .s-CANCELLED, .s-NO_SHOW, .s-REFUNDED { background: var(--red-soft); color: var(--red-deep); }
+        .mb-hotel { font-size: 15.5px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+        .mb-dates { font-size: 13px; color: var(--ink-2); margin-bottom: 12px; }
+        .mb-dates em { font-style: normal; color: var(--gray-400); }
+        .mb-foot { display: flex; justify-content: space-between; align-items: baseline; padding-top: 10px; border-top: 1px solid var(--gray-100); }
+        .mb-foot span { font-size: 12px; color: var(--gray-400); }
+        .mb-foot strong { font-size: 14px; font-weight: 700; color: var(--ink); }
+      `}</style>
+    </div>
+  );
+}
+
+function BookingDetailModal({ id, onClose }) {
+  const { t, lang } = useLang();
+  const [b, setB] = useState(null);
+  const [err, setErr] = useState("");
+
+  useEffect(() => { myBookingDetail(id, lang).then(setB).catch((e) => setErr(e.message)); }, [id, lang]);
+
+  return (
+    <div className="md-back" onClick={onClose}>
+      <div className="md-panel" onClick={(e) => e.stopPropagation()}>
+        <button className="md-close" onClick={onClose} aria-label={t("auth.close")}>×</button>
+        {err && <div className="md-err">{err}</div>}
+        {!b && !err && <div className="md-load">…</div>}
+        {b && (
+          <>
+            <div className="md-head">
+              <div>
+                <div className="md-ref">{b.reference}</div>
+                <span className={`mb-st s-${b.status}`}>{b.status}</span>
+              </div>
+              <div className="md-total">
+                <span>Total</span>
+                <strong>{formatPrice(b.pricing?.total)}</strong>
+              </div>
+            </div>
+
+            <Section title="Stay">
+              <Row label="Hotel" value={b.hotel?.name} />
+              <Row label="City" value={b.hotel?.city} />
+              <Row label="Check-in" value={(b.checkIn || "").slice(0, 10)} />
+              <Row label="Check-out" value={(b.checkOut || "").slice(0, 10)} />
+              <Row label="Nights" value={b.nights} />
+            </Section>
+
+            <Section title="Rooms">
+              {(b.rooms || []).map((r, i) => (
+                <Row key={i} label={r.type} value={`× ${r.quantity}`} />
+              ))}
+            </Section>
+
+            <Section title="Pricing">
+              <Row label="Subtotal" value={formatPrice(b.pricing?.subtotal)} />
+              {b.pricing?.discount > 0 && <Row label="Discount" value={`− ${formatPrice(b.pricing.discount)}`} />}
+              <Row label="Total" value={formatPrice(b.pricing?.total)} strong />
+            </Section>
+
+            <Section title="Payment">
+              <Row label="Method" value={b.payment?.method} />
+              <Row label="Status" value={b.payment?.status} />
+            </Section>
+
+            {b.specialRequests && (
+              <Section title="Special requests">
+                <p className="md-notes">{b.specialRequests}</p>
+              </Section>
+            )}
+
+            {/* voucher available for CONFIRMED bookings */}
+            {(b.status === "CONFIRMED" || b.status === "COMPLETED") && (
+              <button className="md-voucher" onClick={() => openVoucher(b)}>{t("vch.download")}</button>
+            )}
+          </>
+        )}
+
+        <style jsx>{`
+          .md-back { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; padding: 24px; overflow-y: auto; }
+          .md-panel { position: relative; background: #fff; border-radius: var(--r-lg); max-width: 600px; width: 100%; max-height: 92vh; overflow-y: auto; padding: 28px 30px; }
+          .md-close { position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--gray-100); font-size: 22px; line-height: 1; cursor: pointer; }
+          .md-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid var(--gray-100); }
+          .md-ref { font-size: 22px; font-weight: 800; letter-spacing: 0.02em; margin-bottom: 8px; color: var(--ink); }
+          .md-total { text-align: right; }
+          .md-total span { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gray-400); margin-bottom: 4px; }
+          .md-total strong { font-size: 20px; font-weight: 800; color: var(--ink); }
+          .md-err { background: var(--red-soft); color: var(--red-deep); padding: 12px; border-radius: var(--r-sm); }
+          .md-load { padding: 30px; text-align: center; color: var(--gray-400); }
+          .md-notes { font-size: 14px; line-height: 1.6; color: var(--ink-2); white-space: pre-wrap; background: var(--cream); padding: 12px 14px; border-radius: var(--r-sm); }
+          .md-voucher { width: 100%; margin-top: 22px; padding: 14px; background: var(--ink); color: #fff; border: none; border-radius: var(--r-sm); font-size: 14.5px; font-weight: 700; cursor: pointer; font-family: inherit; }
+          .md-voucher:hover { background: var(--red); }
+          .mb-st { font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 980px; }
+          .s-PENDING { background: #FFF4E0; color: #9A6700; }
+          .s-CONFIRMED, .s-COMPLETED { background: var(--teal-soft); color: var(--teal); }
+          .s-REJECTED, .s-CANCELLED, .s-NO_SHOW, .s-REFUNDED { background: var(--red-soft); color: var(--red-deep); }
+        `}</style>
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, children }) {
+  return (
+    <div className="sect">
+      <h4>{title}</h4>
+      <div className="rows">{children}</div>
+      <style jsx>{`
+        .sect { margin-bottom: 18px; }
+        h4 { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-400); margin-bottom: 10px; }
+        .rows { display: flex; flex-direction: column; gap: 7px; }
+      `}</style>
+    </div>
+  );
+}
+
+function Row({ label, value, strong }) {
+  if (!value && value !== 0) return null;
+  return (
+    <div className="row">
+      <span>{label}</span>
+      <strong className={strong ? "big" : ""}>{value}</strong>
+      <style jsx>{`
+        .row { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; }
+        .row > span { color: var(--gray-400); font-weight: 500; }
+        .row strong { color: var(--ink); font-weight: 700; text-align: right; }
+        .row strong.big { font-size: 16px; }
+      `}</style>
+    </div>
+  );
+}
+
+// =============================================================================
+// PROFILE PANEL
+// =============================================================================
+function ProfilePanel({ user, onSaved }) {
+  const { t } = useLang();
+  const [firstName, setFirstName] = useState(user.firstName || "");
+  const [lastName, setLastName] = useState(user.lastName || "");
+  const [phone, setPhone] = useState(user.phone || "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [ok, setOk] = useState(false);
+
+  async function save(e) {
+    e.preventDefault();
+    setBusy(true); setErr(""); setOk(false);
+    try {
+      await userUpdateProfile({ firstName, lastName, phone });
+      await onSaved();
+      setOk(true);
+    } catch (e) { setErr(e.message); }
+    setBusy(false);
+  }
+
+  return (
+    <form className="pn-card" onSubmit={save}>
+      <label>{t("auth.email")}</label>
+      <input type="email" value={user.email} disabled />
+
+      <label>{t("auth.first_name")}</label>
+      <input type="text" value={firstName} onChange={(e) => { setFirstName(e.target.value); setOk(false); }} />
+
+      <label>{t("auth.last_name")}</label>
+      <input type="text" value={lastName} onChange={(e) => { setLastName(e.target.value); setOk(false); }} />
+
+      <label>{t("auth.phone")}</label>
+      <input type="tel" value={phone} onChange={(e) => { setPhone(e.target.value); setOk(false); }} />
+
+      {err && <div className="pn-err">{err}</div>}
+      {ok && <div className="pn-ok">{t("acc.saved")}</div>}
+
+      <button type="submit" disabled={busy}>{t("acc.save_changes")}</button>
+
+      <style jsx>{`
+        .pn-card { background: #fff; border: 1px solid var(--gray-200); border-radius: var(--r-lg); padding: 30px; max-width: 520px; }
+        label { display: block; font-size: 12.5px; font-weight: 700; color: var(--ink-2); margin-bottom: 6px; margin-top: 14px; }
+        input { width: 100%; padding: 12px 14px; border: 1.5px solid var(--gray-200); border-radius: var(--r-sm); font-size: 14px; font-family: inherit; outline: none; }
+        input:focus { border-color: var(--ink); }
+        input:disabled { background: var(--gray-100); color: var(--gray-400); }
+        button { margin-top: 20px; padding: 12px 24px; background: var(--ink); color: #fff; border: none; border-radius: var(--r-sm); font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .pn-err { background: var(--red-soft); color: var(--red-deep); padding: 10px 12px; border-radius: var(--r-sm); font-size: 13px; font-weight: 600; margin-top: 14px; }
+        .pn-ok { background: var(--teal-soft); color: var(--teal); padding: 10px 12px; border-radius: var(--r-sm); font-size: 13px; font-weight: 600; margin-top: 14px; }
+      `}</style>
+    </form>
+  );
+}
+
+// =============================================================================
+// PASSWORD PANEL
+// =============================================================================
+function PasswordPanel() {
+  const { t } = useLang();
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [ok, setOk] = useState(false);
+
+  async function save(e) {
+    e.preventDefault();
+    setBusy(true); setErr(""); setOk(false);
+    try {
+      await userChangePassword(current, next);
+      setCurrent(""); setNext(""); setOk(true);
+    } catch (e) { setErr(e.message); }
+    setBusy(false);
+  }
+
+  return (
+    <form className="pn-card" onSubmit={save}>
+      <label>{t("acc.current_password")}</label>
+      <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} required />
+
+      <label>{t("acc.new_password")}</label>
+      <input type="password" value={next} onChange={(e) => setNext(e.target.value)} required minLength={8} />
+      <span className="hint">{t("auth.password_hint")}</span>
+
+      {err && <div className="pn-err">{err}</div>}
+      {ok && <div className="pn-ok">{t("acc.password_changed")}</div>}
+
+      <button type="submit" disabled={busy}>{t("acc.change_password")}</button>
+
+      <style jsx>{`
+        .pn-card { background: #fff; border: 1px solid var(--gray-200); border-radius: var(--r-lg); padding: 30px; max-width: 520px; }
+        label { display: block; font-size: 12.5px; font-weight: 700; color: var(--ink-2); margin-bottom: 6px; margin-top: 14px; }
+        input { width: 100%; padding: 12px 14px; border: 1.5px solid var(--gray-200); border-radius: var(--r-sm); font-size: 14px; font-family: inherit; outline: none; }
+        input:focus { border-color: var(--ink); }
+        .hint { display: block; font-size: 11.5px; color: var(--gray-400); margin-top: 5px; }
+        button { margin-top: 20px; padding: 12px 24px; background: var(--ink); color: #fff; border: none; border-radius: var(--r-sm); font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .pn-err { background: var(--red-soft); color: var(--red-deep); padding: 10px 12px; border-radius: var(--r-sm); font-size: 13px; font-weight: 600; margin-top: 14px; }
+        .pn-ok { background: var(--teal-soft); color: var(--teal); padding: 10px 12px; border-radius: var(--r-sm); font-size: 13px; font-weight: 600; margin-top: 14px; }
+      `}</style>
+    </form>
+  );
+}

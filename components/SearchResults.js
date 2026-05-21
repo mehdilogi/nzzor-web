@@ -1,15 +1,35 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import HotelCard from "./HotelCard";
 import { useLang } from "../lib/LangContext";
 import { parseQuery } from "../lib/nlSearch";
 
 export default function SearchResults({ initialHotels, cities, initialFilters }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [city, setCity] = useState(initialFilters.city || "");
   const [stars, setStars] = useState(Number(initialFilters.stars) || 0);
   const [sort, setSort] = useState(initialFilters.sort || "popular");
+  const [tagDict, setTagDict] = useState(null);
+
+  // tags arrive on the URL as comma-separated keys
+  const activeTags = useMemo(
+    () => (initialFilters.tags ? String(initialFilters.tags).split(",").filter(Boolean) : []),
+    [initialFilters.tags]
+  );
+
+  // fetch the tag dictionary once so we can localize tag labels in chips
+  useEffect(() => {
+    const API = process.env.NEXT_PUBLIC_API_URL || "";
+    fetch(`${API}/api/hotels/meta/tags`).then((r) => r.json()).then((j) => setTagDict(j.data || [])).catch(() => {});
+  }, []);
+
+  function tagLabel(key) {
+    if (!tagDict) return key;
+    const t = tagDict.find((x) => x.key === key);
+    if (!t) return key;
+    return t[lang] || t.en || key;
+  }
 
   // when arriving from natural-language search, re-parse the raw query so we
   // can show the user what we understood
@@ -21,6 +41,7 @@ export default function SearchResults({ initialHotels, cities, initialFilters })
     if (m.type === "city") return m.value;
     if (m.type === "price") return m.value === "cheap" ? t("ai.cheap") : t("ai.luxury");
     if (m.type === "stars") return `${m.value}${t("ai.stars_label")}`;
+    if (m.type === "tag") return tagLabel(m.value);
     return "";
   }
 
@@ -28,12 +49,18 @@ export default function SearchResults({ initialHotels, cities, initialFilters })
     let list = [...initialHotels];
     if (city) list = list.filter((h) => h.city.toLowerCase() === city.toLowerCase());
     if (stars) list = list.filter((h) => h.stars >= stars);
+    if (activeTags.length) {
+      list = list.filter((h) => {
+        const hotelTags = Array.isArray(h.tags) ? h.tags : [];
+        return activeTags.every((t) => hotelTags.includes(t));
+      });
+    }
     if (sort === "price_asc") list.sort((a, b) => a.priceFrom - b.priceFrom);
     else if (sort === "price_desc") list.sort((a, b) => b.priceFrom - a.priceFrom);
     else if (sort === "rating") list.sort((a, b) => b.rating - a.rating);
     else list.sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured));
     return list;
-  }, [initialHotels, city, stars, sort]);
+  }, [initialHotels, city, stars, sort, activeTags]);
 
   return (
     <>

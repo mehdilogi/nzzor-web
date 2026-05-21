@@ -2,12 +2,16 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import LogoMark from "./LogoMark";
 import { useLang } from "../lib/LangContext";
+import { useAuth } from "../lib/AuthContext";
 
 // Nzzor top navigation. Transparent over hero, solid white on scroll.
 export default function Nav({ overHero = false }) {
   const { lang, setLang, t } = useLang();
+  const { user } = useAuth();
+  const router = useRouter();
   const [scrolled, setScrolled] = useState(!overHero);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -64,7 +68,12 @@ export default function Nav({ overHero = false }) {
               onClick={() => setLang("ar")}
             >ع</button>
           </div>
-          <button className="nzn-signin">{t("nav.signin")}</button>
+          <button
+            className="nzn-signin"
+            onClick={() => router.push(user ? "/account" : "/signin")}
+          >
+            {user ? (user.firstName || t("nav.signin")) : t("nav.signin")}
+          </button>
           <button
             className="nzn-burger"
             onClick={() => setMenuOpen(true)}
@@ -116,7 +125,12 @@ export default function Nav({ overHero = false }) {
               onClick={() => setLang("ar")}
             >العربية</button>
           </div>
-          <button className="nzn-menu-cta">{t("nav.signin")}</button>
+          <button
+            className="nzn-menu-cta"
+            onClick={() => { setMenuOpen(false); router.push(user ? "/account" : "/signin"); }}
+          >
+            {user ? t("acc.title") : t("nav.signin")}
+          </button>
           <p className="nzn-menu-foot">
             {t("nav.menu_foot")}
           </p>

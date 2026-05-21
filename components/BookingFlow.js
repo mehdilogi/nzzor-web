@@ -8,11 +8,12 @@
 // (Option B) — the real SATIM redirect slots into payNow() later.
 // =============================================================================
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Icon from "./Icon";
 import { useLang } from "../lib/LangContext";
+import { useAuth } from "../lib/AuthContext";
 import { formatPrice } from "../lib/format";
 import { validateCoupon, couponDiscount } from "../lib/coupons";
 import { createBooking } from "../lib/api";
@@ -20,6 +21,7 @@ import { createBooking } from "../lib/api";
 export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) {
   const { t } = useLang();
   const router = useRouter();
+  const { user } = useAuth();
 
   const [step, setStep] = useState(1);
 
@@ -30,6 +32,15 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
   const [notes, setNotes] = useState("");
   const [createAccount, setCreateAccount] = useState(false);
   const [errors, setErrors] = useState({});
+
+  // prefill the form when a signed-in user starts a booking
+  useEffect(() => {
+    if (user) {
+      setName(`${user.firstName || ""} ${user.lastName || ""}`.trim());
+      setEmail(user.email || "");
+      setPhone(user.phone || "");
+    }
+  }, [user]);
 
   // payment
   const [payMethod, setPayMethod] = useState("cib");
@@ -231,23 +242,27 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
                 />
               </div>
 
-              <label className="bk-check">
-                <input
-                  type="checkbox"
-                  checked={createAccount}
-                  onChange={(e) => setCreateAccount(e.target.checked)}
-                />
-                <span>{t("bk.account_offer")}</span>
-              </label>
+              {!user && (
+                <label className="bk-check">
+                  <input
+                    type="checkbox"
+                    checked={createAccount}
+                    onChange={(e) => setCreateAccount(e.target.checked)}
+                  />
+                  <span>{t("bk.account_offer")}</span>
+                </label>
+              )}
 
               <button className="bk-cta" onClick={goToPayment}>
                 {t("bk.continue_payment")}
                 <Icon name="arrow" size={16} strokeWidth={2.5} />
               </button>
 
-              <div className="bk-signin">
-                <Link href="/signin">{t("bk.have_account")}</Link>
-              </div>
+              {!user && (
+                <div className="bk-signin">
+                  <Link href="/signin">{t("bk.have_account")}</Link>
+                </div>
+              )}
             </div>
           )}
 
@@ -346,7 +361,16 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
               </div>
 
               <div className="bk-confirm-actions">
-                <Link href="/" className="bk-confirm-home">{t("bk.back_home")}</Link>
+                {createAccount && !user ? (
+                  <Link
+                    href={`/signup?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(name.split(/\s+/)[0] || "")}&next=/account`}
+                    className="bk-confirm-home"
+                  >
+                    {t("auth.signup")}
+                  </Link>
+                ) : (
+                  <Link href="/" className="bk-confirm-home">{t("bk.back_home")}</Link>
+                )}
                 <Link href="/hotels" className="bk-confirm-hotels">{t("bk.view_hotels")}</Link>
               </div>
             </div>

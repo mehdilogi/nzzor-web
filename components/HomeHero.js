@@ -50,6 +50,7 @@ export default function HomeHero() {
     if (filter.minStars) params.set("stars", String(filter.minStars));
     if (filter.maxPrice) params.set("maxPrice", String(filter.maxPrice));
     if (filter.minPrice) params.set("minPrice", String(filter.minPrice));
+    if (filter.tags && filter.tags.length) params.set("tags", filter.tags.join(","));
     params.set("q", q); // keep the raw query so the results page can echo it
     params.set("ai", "1");
     router.push(`/hotels?${params.toString()}`);

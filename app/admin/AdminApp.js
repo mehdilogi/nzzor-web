@@ -8,6 +8,7 @@ import {
   adminAddRoom, adminUpdateRoom, adminDeleteRoom,
   adminAddPhoto, adminDeletePhoto,
   adminHotelManagers, adminAddHotelManager, adminRemoveHotelManager,
+  adminTags,
 } from "../../lib/adminApi";
 
 const fmt = (n) => Number(n || 0).toLocaleString("en") + " DZD";
@@ -399,6 +400,7 @@ const BLANK_HOTEL = {
   childrenAllowed: true, petsAllowed: false, parkingFree: true,
   instantConfirmation: true, verifiedPartner: true,
   isActive: true, isFeatured: false,
+  tags: [],
 };
 
 function HotelEditor({ hotel, onClose, onSaved }) {
@@ -421,6 +423,7 @@ function HotelEditor({ hotel, onClose, onSaved }) {
       verifiedPartner: hotel.trustSignals?.verifiedPartner ?? hotel.verifiedPartner ?? true,
       isActive: hotel.isActive ?? true,
       isFeatured: hotel.isFeatured ?? false,
+      tags: Array.isArray(hotel.tags) ? hotel.tags : [],
     };
   });
   const [busy, setBusy] = useState(false);
@@ -521,6 +524,11 @@ function HotelEditor({ hotel, onClose, onSaved }) {
           <Toggle label="Active (visible on site)" v={form.isActive} onChange={(v) => set("isActive", v)} />
           <Toggle label="Featured on homepage" v={form.isFeatured} onChange={(v) => set("isFeatured", v)} />
         </div>
+
+        <TagsPicker
+          selected={form.tags || []}
+          onChange={(tags) => set("tags", tags)}
+        />
       </div>
 
       <div className="ad-editor-actions">
@@ -742,6 +750,67 @@ function PhotosPanel({ hotelId, initialPhotos }) {
 // =============================================================================
 // MANAGERS PANEL — admin creates hotel-partner accounts that log into /partner
 // =============================================================================
+// =============================================================================
+// TAGS PICKER — toggleable chips for AI-search tags
+// =============================================================================
+function TagsPicker({ selected, onChange }) {
+  const [tags, setTags] = useState(null);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    adminTags().then(setTags).catch((e) => setErr(e.message));
+  }, []);
+
+  function toggle(key) {
+    if (selected.includes(key)) onChange(selected.filter((k) => k !== key));
+    else onChange([...selected, key]);
+  }
+
+  return (
+    <div className="ad-tagspicker">
+      <div className="ad-tagspicker-head">
+        <h4>Tags</h4>
+        <span>How travelers find this hotel through search ({selected.length} selected)</span>
+      </div>
+      {err && <ErrorBox msg={err} />}
+      {!tags && !err && <span className="ad-dim">Loading…</span>}
+      {tags && (
+        <div className="ad-tag-grid">
+          {tags.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              className={`ad-tag-chip ${selected.includes(t.key) ? "on" : ""}`}
+              onClick={() => toggle(t.key)}
+            >
+              {t.en}
+            </button>
+          ))}
+        </div>
+      )}
+      <style jsx>{`
+        .ad-tagspicker { margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--gray-100); }
+        .ad-tagspicker-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+        .ad-tagspicker h4 { font-size: 13px; font-weight: 700; color: var(--ink); }
+        .ad-tagspicker-head span { font-size: 12px; color: var(--gray-400); }
+        .ad-tag-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+        .ad-tag-chip {
+          padding: 8px 14px; border-radius: 980px;
+          border: 1.5px solid var(--gray-200); background: #fff;
+          font-size: 13px; font-weight: 600; color: var(--ink-2);
+          cursor: pointer; font-family: inherit;
+          transition: all .15s;
+        }
+        .ad-tag-chip:hover { border-color: var(--ink); }
+        .ad-tag-chip.on {
+          background: var(--ink); color: #fff; border-color: var(--ink);
+        }
+        .ad-dim { color: var(--gray-400); font-size: 13px; }
+      `}</style>
+    </div>
+  );
+}
+
 function ManagersPanel({ hotelId }) {
   const [list, setList] = useState(null);
   const [err, setErr] = useState("");
