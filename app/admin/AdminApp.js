@@ -7,7 +7,7 @@ import {
   adminCreateHotel, adminUpdateHotel, adminDeleteHotel,
   adminAddRoom, adminUpdateRoom, adminDeleteRoom,
   adminAddPhoto, adminDeletePhoto,
-  adminHotelManagers, adminAddHotelManager, adminRemoveHotelManager,
+  adminHotelManagers, adminAddHotelManager, adminRemoveHotelManager, adminResetHotelManagerPassword,
   adminTags,
 } from "../../lib/adminApi";
 
@@ -837,6 +837,16 @@ function ManagersPanel({ hotelId }) {
     catch (e) { setErr(e.message); }
   }
 
+  async function resetPwd(userId, email) {
+    const newPwd = window.prompt(`Reset password for ${email}\n\nEnter a new password (min 6 characters):`);
+    if (!newPwd) return;
+    if (newPwd.length < 6) { setErr("Password must be at least 6 characters."); return; }
+    try {
+      await adminResetHotelManagerPassword(hotelId, userId, newPwd);
+      window.alert(`Password reset for ${email}.\n\nGive the partner their new password.`);
+    } catch (e) { setErr(e.message); }
+  }
+
   return (
     <div className="ad-panel ad-mgr">
       <div className="ad-panel-head">
@@ -885,7 +895,11 @@ function ManagersPanel({ hotelId }) {
                 <td><strong>{u.email}</strong></td>
                 <td>{[u.firstName, u.lastName].filter(Boolean).join(" ") || "—"}</td>
                 <td className="ad-dim">{fmtDT(u.createdAt)}</td>
-                <td><button className="ad-link-danger" onClick={() => remove(u.id)}>Remove</button></td>
+                <td>
+                  <button className="ad-link" onClick={() => resetPwd(u.id, u.email)}>Reset password</button>
+                  <span className="ad-sep">·</span>
+                  <button className="ad-link-danger" onClick={() => remove(u.id)}>Remove</button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -897,7 +911,9 @@ function ManagersPanel({ hotelId }) {
         .ad-sub { font-size: 13px; color: var(--gray-400); margin-bottom: 14px; line-height: 1.5; }
         .ad-mgr-form { background: var(--cream); padding: 18px; border-radius: var(--r-sm); margin-bottom: 16px; }
         .ad-mgr-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
-        .ad-link-danger { background: none; border: none; color: var(--red); font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .ad-link-danger { background: none; border: none; color: var(--red); font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; padding: 0; }
+        .ad-link { background: none; border: none; color: var(--ink); font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; padding: 0; text-decoration: underline; }
+        .ad-sep { color: var(--gray-300); margin: 0 8px; font-size: 12px; }
         .ad-dim { color: var(--gray-400); font-size: 12px; }
         .ad-empty-inline { color: var(--gray-400); font-size: 13px; }
         .ad-mgr-field label { display: block; font-size: 11.5px; font-weight: 700; color: var(--gray-400); margin-bottom: 5px; }
