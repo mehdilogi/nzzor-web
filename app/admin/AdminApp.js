@@ -849,10 +849,22 @@ function ManagersPanel({ hotelId }) {
       {creating && (
         <div className="ad-mgr-form">
           <div className="ad-grid2">
-            <Field label="Email"><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="reception@hotel.dz" /></Field>
-            <Field label="Password (initial)"><input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="At least 6 characters" /></Field>
-            <Field label="First name"><input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} /></Field>
-            <Field label="Last name"><input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} /></Field>
+            <div className="ad-mgr-field">
+              <label>Email</label>
+              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="reception@hotel.dz" />
+            </div>
+            <div className="ad-mgr-field">
+              <label>Password (initial)</label>
+              <input type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="At least 6 characters" />
+            </div>
+            <div className="ad-mgr-field">
+              <label>First name</label>
+              <input type="text" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
+            </div>
+            <div className="ad-mgr-field">
+              <label>Last name</label>
+              <input type="text" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
+            </div>
           </div>
           <div className="ad-mgr-actions">
             <button className="ad-btn ghost" onClick={() => { setCreating(false); setForm({ email: "", password: "", firstName: "", lastName: "" }); }}>Cancel</button>
@@ -888,6 +900,12 @@ function ManagersPanel({ hotelId }) {
         .ad-link-danger { background: none; border: none; color: var(--red); font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; }
         .ad-dim { color: var(--gray-400); font-size: 12px; }
         .ad-empty-inline { color: var(--gray-400); font-size: 13px; }
+        .ad-mgr-field label { display: block; font-size: 11.5px; font-weight: 700; color: var(--gray-400); margin-bottom: 5px; }
+        .ad-mgr-field input {
+          width: 100%; padding: 9px 12px; border: 1.5px solid var(--gray-200);
+          border-radius: var(--r-sm); font-size: 13px; outline: none; font-family: inherit;
+        }
+        .ad-mgr-field input:focus { border-color: var(--red); }
       `}</style>
     </div>
   );
