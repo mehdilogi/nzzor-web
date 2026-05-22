@@ -589,7 +589,7 @@ function HotelEditor({ hotel, onClose, onSaved }) {
       <div className="nzad-panel">
         <h3>Names (3 languages)</h3>
         <div className="nzad-grid3">
-          <Field label="Name (English)" v={form.nameEn} onChange={(v) => set("nameEn", v)} />
+          <Field label="Name (English)" v={form.nameEn} onChange={(v) => set("nameEn", v)} required />
           <Field label="Name (French)" v={form.nameFr} onChange={(v) => set("nameFr", v)} />
           <Field label="Name (Arabic)" v={form.nameAr} onChange={(v) => set("nameAr", v)} rtl />
         </div>
@@ -598,7 +598,7 @@ function HotelEditor({ hotel, onClose, onSaved }) {
       <div className="nzad-panel">
         <h3>Description (3 languages)</h3>
         <div className="nzad-grid3">
-          <Field label="Description (EN)" v={form.descEn} onChange={(v) => set("descEn", v)} area />
+          <Field label="Description (EN)" v={form.descEn} onChange={(v) => set("descEn", v)} area required />
           <Field label="Description (FR)" v={form.descFr} onChange={(v) => set("descFr", v)} area />
           <Field label="Description (AR)" v={form.descAr} onChange={(v) => set("descAr", v)} area rtl />
         </div>
@@ -607,8 +607,8 @@ function HotelEditor({ hotel, onClose, onSaved }) {
       <div className="nzad-panel">
         <h3>Location &amp; rating</h3>
         <div className="nzad-grid3">
-          <Field label="City key (lowercase, e.g. algiers)" v={form.city} onChange={(v) => set("city", v)} />
-          <Field label="Stars (1–5)" v={form.stars} onChange={(v) => set("stars", v)} type="number" />
+          <Field label="City key (lowercase, e.g. algiers)" v={form.city} onChange={(v) => set("city", v)} required />
+          <Field label="Stars (1–5)" v={form.stars} onChange={(v) => set("stars", v)} type="number" required />
           <Field label="Address" v={form.address} onChange={(v) => set("address", v)} />
           <Field label="City (EN)" v={form.cityEn} onChange={(v) => set("cityEn", v)} />
           <Field label="City (FR)" v={form.cityFr} onChange={(v) => set("cityFr", v)} />
@@ -813,7 +813,15 @@ function PhotosPanel({ hotelId, initialPhotos }) {
   return (
     <div className="nzad-panel">
       <h3>Photos</h3>
-      <p className="nzad-photo-hint">Paste an image URL (hosted on Cloudflare R2, Unsplash, etc.). Direct upload comes later.</p>
+
+      <div className="nzad-photo-banner">
+        <span className="nzad-photo-banner-icon">📷</span>
+        <div>
+          <strong>Photos by URL (interim)</strong>
+          <span>Direct file upload from your computer is coming soon — it needs Cloudflare R2 storage set up first. For now, host the image somewhere and paste its URL below.</span>
+        </div>
+      </div>
+
       {err && <ErrorBox msg={err} />}
 
       <div className="nzad-photo-grid">
@@ -829,7 +837,7 @@ function PhotosPanel({ hotelId, initialPhotos }) {
 
       <div className="nzad-photo-add">
         <input value={url} onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://…/photo.jpg"
+          placeholder="Paste an image URL — e.g. https://images.unsplash.com/photo-…"
           onKeyDown={(e) => e.key === "Enter" && add()} />
         <button className="nzad-btn-primary" onClick={add} disabled={busy}>
           {busy ? "Adding…" : "Add photo"}
@@ -837,6 +845,18 @@ function PhotosPanel({ hotelId, initialPhotos }) {
       </div>
 
       <style jsx>{`
+        .nzad-photo-banner {
+          display: flex; gap: 12px; align-items: flex-start;
+          background: linear-gradient(135deg, #FFF7E6, #FFF4F4);
+          border: 1px solid #F5E0C8;
+          border-radius: var(--r-sm);
+          padding: 12px 14px;
+          margin-bottom: 16px;
+        }
+        .nzad-photo-banner-icon { font-size: 20px; flex-shrink: 0; line-height: 1.2; }
+        .nzad-photo-banner > div { display: flex; flex-direction: column; gap: 3px; }
+        .nzad-photo-banner strong { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+        .nzad-photo-banner span { font-size: 12px; color: var(--gray-400); line-height: 1.5; }
         .nzad-photo-hint { font-size: 12.5px; color: var(--gray-400); margin-bottom: 14px; }
         .nzad-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
         .nzad-photo { position: relative; height: 90px; border-radius: var(--r-sm); overflow: hidden; background: var(--gray-100); }
@@ -1351,15 +1371,19 @@ function Stat({ label, value }) {
   );
 }
 
-function Field({ label, v, onChange, type = "text", area, rtl }) {
+function Field({ label, v, onChange, type = "text", area, rtl, required }) {
   return (
     <div className="nzad-field">
-      <label>{label}</label>
+      <label>
+        {label}
+        {required && <span className="nzad-req">*</span>}
+      </label>
       {area
         ? <textarea value={v} onChange={(e) => onChange(e.target.value)} dir={rtl ? "rtl" : "ltr"} rows={3} />
         : <input type={type} value={v} onChange={(e) => onChange(e.target.value)} dir={rtl ? "rtl" : "ltr"} />}
       <style jsx>{`
         .nzad-field label { display: block; font-size: 11.5px; font-weight: 700; color: var(--gray-400); margin-bottom: 5px; }
+        .nzad-req { color: var(--red); font-weight: 800; margin-left: 3px; }
         .nzad-field input, .nzad-field textarea {
           width: 100%; padding: 9px 12px; border: 1.5px solid var(--gray-200);
           border-radius: var(--r-sm); font-size: 13px; outline: none; font-family: inherit;
@@ -1373,18 +1397,65 @@ function Field({ label, v, onChange, type = "text", area, rtl }) {
 
 function Toggle({ label, v, onChange }) {
   return (
-    <button className={`ad-toggle ${v ? "on" : ""}`} onClick={() => onChange(!v)} type="button">
-      <span className="nzad-toggle-dot" />
-      {label}
+    <button
+      className={`nzad-toggle ${v ? "on" : ""}`}
+      onClick={() => onChange(!v)}
+      type="button"
+      role="switch"
+      aria-checked={v}
+    >
+      <span className="nzad-toggle-track">
+        <span className="nzad-toggle-thumb" />
+      </span>
+      <span className="nzad-toggle-label">{label}</span>
       <style jsx>{`
         .nzad-toggle {
-          display: flex; align-items: center; gap: 8px; padding: 8px 12px;
-          border: 1.5px solid var(--gray-200); background: #fff; border-radius: 980px;
-          font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit; color: var(--gray-400);
+          display: inline-flex; align-items: center; gap: 10px;
+          padding: 8px 14px 8px 8px;
+          border: 1.5px solid var(--gray-200);
+          background: #fff;
+          border-radius: 980px;
+          cursor: pointer;
+          font-family: inherit;
+          transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
         }
-        .nzad-toggle.on { border-color: var(--red); color: var(--ink); background: var(--red-soft); }
-        .nzad-toggle-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--gray-300); }
-        .nzad-toggle.on .nzad-toggle-dot { background: var(--red); }
+        .nzad-toggle:hover { border-color: var(--gray-300); }
+        .nzad-toggle.on {
+          border-color: var(--red);
+          background: #fff;
+          box-shadow: 0 1px 3px rgba(230, 57, 70, 0.18);
+        }
+        .nzad-toggle-track {
+          position: relative;
+          display: inline-block;
+          width: 32px;
+          height: 18px;
+          border-radius: 999px;
+          background: var(--gray-200);
+          transition: background 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+          flex-shrink: 0;
+        }
+        .nzad-toggle.on .nzad-toggle-track { background: var(--red); }
+        .nzad-toggle-thumb {
+          position: absolute;
+          top: 2px;
+          left: 2px;
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          background: #fff;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+          transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .nzad-toggle.on .nzad-toggle-thumb { transform: translateX(14px); }
+        .nzad-toggle-label {
+          font-size: 12.5px;
+          font-weight: 600;
+          color: var(--gray-400);
+          transition: color 0.18s;
+          white-space: nowrap;
+        }
+        .nzad-toggle.on .nzad-toggle-label { color: var(--ink); }
       `}</style>
     </button>
   );
