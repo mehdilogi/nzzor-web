@@ -377,6 +377,18 @@ function BookingDetailModal({ id, onClose, onChanged }) {
 
   useEffect(() => { partnerBookingDetail(id).then(setB).catch((e) => setErr(e.message)); }, [id]);
 
+  // Escape key to close + lock body scroll while modal is open
+  useEffect(() => {
+    function onKey(e) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
   async function confirm() {
     setBusy(true); setErr("");
     try { await partnerConfirmBooking(id); onChanged(); onClose(); }
@@ -452,9 +464,9 @@ function BookingDetailModal({ id, onClose, onChanged }) {
           </>
         )}
         <style jsx>{`
-          .bd-back { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; padding: 24px; overflow-y: auto; }
-          .bd-panel { position: relative; background: #fff; border-radius: var(--r-lg); max-width: 560px; width: 100%; max-height: 92vh; overflow-y: auto; padding: 26px 28px; }
-          .bd-close { position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--gray-100); font-size: 22px; line-height: 1; cursor: pointer; }
+          /* Layout selectors (.bd-back, .bd-panel, .bd-close) live in globals.css
+             with !important — styled-jsx scoping has been unreliable for
+             position:fixed in this app. The visual-only styles stay here. */
           .bd-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--gray-100); }
           .bd-ref { font-size: 20px; font-weight: 800; letter-spacing: 0.02em; margin-bottom: 6px; color: var(--ink); }
           .bd-total { text-align: right; }
