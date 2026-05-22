@@ -41,16 +41,16 @@ export default function AdminPage() {
 // =============================================================================
 function Splash() {
   return (
-    <div className="ad-splash">
-      <div className="ad-logo-mark" />
+    <div className="nzad-splash">
+      <div className="nzad-logo-mark" />
       <span>Loading Nzzor Admin…</span>
       <style jsx>{`
-        .ad-splash {
+        .nzad-splash {
           min-height: 100vh; display: flex; flex-direction: column;
           align-items: center; justify-content: center; gap: 16px;
           background: var(--ink); color: rgba(255,255,255,0.6); font-size: 14px;
         }
-        .ad-logo-mark { width: 36px; height: 36px; border-radius: 50%; background: var(--red); animation: blink 1.4s infinite; }
+        .nzad-logo-mark { width: 36px; height: 36px; border-radius: 50%; background: var(--red); animation: blink 1.4s infinite; }
       `}</style>
     </div>
   );
@@ -78,17 +78,17 @@ function Login({ onLogin }) {
   }
 
   return (
-    <div className="ad-login">
-      <div className="ad-login-card">
-        <div className="ad-login-brand">
-          <span className="ad-logo-mark" />
+    <div className="nzad-login">
+      <div className="nzad-login-card">
+        <div className="nzad-login-brand">
+          <span className="nzad-logo-mark" />
           <div>
-            <div className="ad-login-name display">Nzzor</div>
-            <div className="ad-login-sub">Admin Dashboard</div>
+            <div className="nzad-login-name display">Nzzor</div>
+            <div className="nzad-login-sub">Admin Dashboard</div>
           </div>
         </div>
         <h1>Sign in</h1>
-        <p className="ad-login-hint">Allouni Travel Agency staff only.</p>
+        <p className="nzad-login-hint">Allouni Travel Agency staff only.</p>
 
         <label>Email</label>
         <input value={email} onChange={(e) => setEmail(e.target.value)}
@@ -100,48 +100,48 @@ function Login({ onLogin }) {
           onKeyDown={(e) => e.key === "Enter" && submit()}
           placeholder="••••••••" type="password" />
 
-        {err && <div className="ad-login-err">{err}</div>}
+        {err && <div className="nzad-login-err">{err}</div>}
 
-        <button className="ad-login-btn" onClick={submit} disabled={busy}>
+        <button className="nzad-login-btn" onClick={submit} disabled={busy}>
           {busy ? "Signing in…" : "Sign in"}
         </button>
       </div>
 
       <style jsx>{`
-        .ad-login {
+        .nzad-login {
           min-height: 100vh; display: flex; align-items: center; justify-content: center;
           background: var(--ink); padding: 24px;
         }
-        .ad-login-card {
+        .nzad-login-card {
           width: 100%; max-width: 380px; background: #fff;
           border-radius: var(--r-lg); padding: 36px;
         }
-        .ad-login-brand { display: flex; align-items: center; gap: 11px; margin-bottom: 28px; }
-        .ad-logo-mark { width: 34px; height: 34px; border-radius: 50%; background: var(--red); flex-shrink: 0; position: relative; }
-        .ad-logo-mark::after {
+        .nzad-login-brand { display: flex; align-items: center; gap: 11px; margin-bottom: 28px; }
+        .nzad-logo-mark { width: 34px; height: 34px; border-radius: 50%; background: var(--red); flex-shrink: 0; position: relative; }
+        .nzad-logo-mark::after {
           content: ''; position: absolute; inset: 0; border-radius: 50%;
           background: var(--red); animation: ping 3s cubic-bezier(0,0,0.2,1) infinite;
         }
-        .ad-login-name { font-size: 21px; font-weight: 600; letter-spacing: -0.02em; }
-        .ad-login-sub { font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; font-weight: 700; color: var(--gray-400); }
-        .ad-login-card h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
-        .ad-login-hint { font-size: 13px; color: var(--gray-400); margin-bottom: 24px; }
-        .ad-login-card label { display: block; font-size: 12px; font-weight: 700; color: var(--gray-400); margin-bottom: 6px; margin-top: 14px; }
-        .ad-login-card input {
+        .nzad-login-name { font-size: 21px; font-weight: 600; letter-spacing: -0.02em; }
+        .nzad-login-sub { font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; font-weight: 700; color: var(--gray-400); }
+        .nzad-login-card h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
+        .nzad-login-hint { font-size: 13px; color: var(--gray-400); margin-bottom: 24px; }
+        .nzad-login-card label { display: block; font-size: 12px; font-weight: 700; color: var(--gray-400); margin-bottom: 6px; margin-top: 14px; }
+        .nzad-login-card input {
           width: 100%; padding: 11px 14px; border: 1.5px solid var(--gray-200);
           border-radius: var(--r-sm); font-size: 14px; outline: none;
         }
-        .ad-login-card input:focus { border-color: var(--red); }
-        .ad-login-err {
+        .nzad-login-card input:focus { border-color: var(--red); }
+        .nzad-login-err {
           margin-top: 14px; padding: 10px 12px; background: var(--red-soft);
           color: var(--red-deep); border-radius: var(--r-sm); font-size: 13px; font-weight: 600;
         }
-        .ad-login-btn {
+        .nzad-login-btn {
           width: 100%; margin-top: 22px; padding: 13px; background: var(--red);
           color: #fff; border: none; border-radius: var(--r-sm);
           font-size: 15px; font-weight: 700; cursor: pointer;
         }
-        .ad-login-btn:disabled { opacity: 0.6; }
+        .nzad-login-btn:disabled { opacity: 0.6; }
       `}</style>
     </div>
   );
@@ -154,13 +154,13 @@ function Dashboard({ user, onLogout }) {
   const [tab, setTab] = useState("overview");
 
   return (
-    <div className="ad-shell">
-      <aside className="ad-sidebar">
-        <div className="ad-side-brand">
-          <span className="ad-logo-mark" />
+    <div className="nzad-shell">
+      <aside className="nzad-sidebar">
+        <div className="nzad-side-brand">
+          <span className="nzad-logo-mark" />
           <div>
-            <div className="ad-side-name display">Nzzor</div>
-            <div className="ad-side-sub">Admin</div>
+            <div className="nzad-side-name display">Nzzor</div>
+            <div className="nzad-side-sub">Admin</div>
           </div>
         </div>
         <nav>
@@ -174,62 +174,62 @@ function Dashboard({ user, onLogout }) {
             </button>
           ))}
         </nav>
-        <div className="ad-side-foot">
-          <div className="ad-side-user">
+        <div className="nzad-side-foot">
+          <div className="nzad-side-user">
             <strong>{user.firstName || "Admin"}</strong>
             <span>{user.email}</span>
           </div>
-          <button className="ad-logout" onClick={onLogout}>Sign out</button>
+          <button className="nzad-logout" onClick={onLogout}>Sign out</button>
         </div>
       </aside>
 
-      <main className="ad-main">
+      <main className="nzad-main">
         {tab === "overview" && <Overview />}
         {tab === "hotels" && <HotelsManager />}
         {tab === "bookings" && <BookingsManager />}
       </main>
 
       <style jsx>{`
-        .ad-shell { display: flex; min-height: 100vh; background: var(--cream); }
-        .ad-sidebar {
+        .nzad-shell { display: flex; min-height: 100vh; background: var(--cream); }
+        .nzad-sidebar {
           width: 240px; flex-shrink: 0; background: var(--ink); color: #fff;
           display: flex; flex-direction: column; padding: 24px 16px;
         }
-        .ad-side-brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 28px; }
-        .ad-logo-mark { width: 32px; height: 32px; border-radius: 50%; background: var(--red); flex-shrink: 0; position: relative; }
-        .ad-logo-mark::after {
+        .nzad-side-brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 28px; }
+        .nzad-logo-mark { width: 32px; height: 32px; border-radius: 50%; background: var(--red); flex-shrink: 0; position: relative; }
+        .nzad-logo-mark::after {
           content: ''; position: absolute; inset: 0; border-radius: 50%;
           background: var(--red); animation: ping 3s cubic-bezier(0,0,0.2,1) infinite;
         }
-        .ad-side-name { font-size: 19px; font-weight: 600; letter-spacing: -0.02em; }
-        .ad-side-sub { font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; color: rgba(255,255,255,0.5); }
-        .ad-sidebar nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
-        .ad-sidebar nav button {
+        .nzad-side-name { font-size: 19px; font-weight: 600; letter-spacing: -0.02em; }
+        .nzad-side-sub { font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; color: rgba(255,255,255,0.5); }
+        .nzad-sidebar nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+        .nzad-sidebar nav button {
           text-align: left; padding: 11px 14px; border: none; background: transparent;
           color: rgba(255,255,255,0.7); font-size: 14px; font-weight: 600;
           border-radius: var(--r-sm); cursor: pointer; font-family: inherit;
         }
-        .ad-sidebar nav button:hover { background: rgba(255,255,255,0.06); color: #fff; }
-        .ad-sidebar nav button.on { background: var(--red); color: #fff; }
-        .ad-side-foot { border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px; }
-        .ad-side-user { padding: 0 8px 12px; }
-        .ad-side-user strong { display: block; font-size: 13px; }
-        .ad-side-user span { font-size: 11px; color: rgba(255,255,255,0.5); }
-        .ad-logout {
+        .nzad-sidebar nav button:hover { background: rgba(255,255,255,0.06); color: #fff; }
+        .nzad-sidebar nav button.on { background: var(--red); color: #fff; }
+        .nzad-side-foot { border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px; }
+        .nzad-side-user { padding: 0 8px 12px; }
+        .nzad-side-user strong { display: block; font-size: 13px; }
+        .nzad-side-user span { font-size: 11px; color: rgba(255,255,255,0.5); }
+        .nzad-logout {
           width: 100%; padding: 9px; background: rgba(255,255,255,0.08);
           color: #fff; border: none; border-radius: var(--r-sm);
           font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
         }
-        .ad-logout:hover { background: rgba(255,255,255,0.14); }
-        .ad-main { flex: 1; padding: 32px 40px; overflow-x: hidden; }
+        .nzad-logout:hover { background: rgba(255,255,255,0.14); }
+        .nzad-main { flex: 1; padding: 32px 40px; overflow-x: hidden; }
         @media (max-width: 720px) {
-          .ad-shell { flex-direction: column; }
-          .ad-sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 12px 16px; }
-          .ad-side-brand { padding: 0; }
-          .ad-sidebar nav { flex-direction: row; flex: 0; gap: 4px; }
-          .ad-side-foot { border: none; padding: 0; display: flex; align-items: center; gap: 8px; }
-          .ad-side-user { display: none; }
-          .ad-main { padding: 20px; }
+          .nzad-shell { flex-direction: column; }
+          .nzad-sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 12px 16px; }
+          .nzad-side-brand { padding: 0; }
+          .nzad-sidebar nav { flex-direction: row; flex: 0; gap: 4px; }
+          .nzad-side-foot { border: none; padding: 0; display: flex; align-items: center; gap: 8px; }
+          .nzad-side-user { display: none; }
+          .nzad-main { padding: 20px; }
         }
       `}</style>
     </div>
@@ -256,33 +256,33 @@ function Overview() {
 
       <OpsPanel />
 
-      <div className="ad-stats">
+      <div className="nzad-stats">
         <Stat label="Total bookings" value={data.bookings.total} />
         <Stat label="Bookings · last 7 days" value={data.bookings.last7Days} />
         <Stat label="Revenue · last 30 days" value={fmt(data.revenue.last30Days)} />
         <Stat label="Active hotels" value={data.hotels.total} />
       </div>
 
-      <div className="ad-panel">
+      <div className="nzad-panel">
         <h3>Bookings by status</h3>
-        <div className="ad-status-row">
+        <div className="nzad-status-row">
           {Object.entries(data.bookings.byStatus || {}).length === 0 && (
-            <span className="ad-empty-inline">No bookings yet.</span>
+            <span className="nzad-empty-inline">No bookings yet.</span>
           )}
           {Object.entries(data.bookings.byStatus || {}).map(([s, n]) => (
-            <div className="ad-status-chip" key={s}>
+            <div className="nzad-status-chip" key={s}>
               <strong>{n}</strong> <span>{s}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="ad-panel">
+      <div className="nzad-panel">
         <h3>Top hotels by revenue</h3>
         {(!data.topHotels || data.topHotels.length === 0) ? (
-          <span className="ad-empty-inline">No bookings yet — top hotels will appear here.</span>
+          <span className="nzad-empty-inline">No bookings yet — top hotels will appear here.</span>
         ) : (
-          <table className="ad-table">
+          <table className="nzad-table">
             <thead><tr><th>Hotel</th><th>Bookings</th><th>Revenue</th></tr></thead>
             <tbody>
               {data.topHotels.map((h, i) => (
@@ -298,16 +298,16 @@ function Overview() {
       </div>
 
       <style jsx>{`
-        .ad-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
-        .ad-status-row { display: flex; gap: 10px; flex-wrap: wrap; }
-        .ad-status-chip {
+        .nzad-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+        .nzad-status-row { display: flex; gap: 10px; flex-wrap: wrap; }
+        .nzad-status-chip {
           padding: 10px 16px; background: var(--cream); border: 1px solid var(--gray-200);
           border-radius: var(--r-sm); font-size: 13px;
         }
-        .ad-status-chip strong { font-size: 16px; font-weight: 800; }
-        .ad-status-chip span { color: var(--gray-400); font-weight: 600; font-size: 11px; }
-        .ad-empty-inline { color: var(--gray-400); font-size: 13px; }
-        @media (max-width: 720px) { .ad-stats { grid-template-columns: 1fr 1fr; } }
+        .nzad-status-chip strong { font-size: 16px; font-weight: 800; }
+        .nzad-status-chip span { color: var(--gray-400); font-weight: 600; font-size: 11px; }
+        .nzad-empty-inline { color: var(--gray-400); font-size: 13px; }
+        @media (max-width: 720px) { .nzad-stats { grid-template-columns: 1fr 1fr; } }
       `}</style>
     </div>
   );
@@ -447,53 +447,53 @@ function HotelsManager() {
   return (
     <div>
       <PageHead title="Hotels" subtitle="Add and manage your hotel inventory"
-        action={<button className="ad-btn-primary" onClick={() => setEditing("new")}>+ New hotel</button>} />
+        action={<button className="nzad-btn-primary" onClick={() => setEditing("new")}>+ New hotel</button>} />
 
       {err && <ErrorBox msg={err} />}
       {!hotels && !err && <Loading />}
 
       {hotels && (
-        <div className="ad-hotel-list">
-          {hotels.length === 0 && <div className="ad-panel"><span className="ad-empty-inline">No hotels yet. Click &quot;New hotel&quot; to add your first one.</span></div>}
+        <div className="nzad-hotel-list">
+          {hotels.length === 0 && <div className="nzad-panel"><span className="nzad-empty-inline">No hotels yet. Click &quot;New hotel&quot; to add your first one.</span></div>}
           {hotels.map((h) => (
-            <div className="ad-hotel-row" key={h.id}>
-              <div className="ad-hotel-thumb">
+            <div className="nzad-hotel-row" key={h.id}>
+              <div className="nzad-hotel-thumb">
                 {h.primaryPhoto
                   /* eslint-disable-next-line @next/next/no-img-element */
                   ? <img src={h.primaryPhoto} alt={h.name} />
-                  : <div className="ad-noimg">No photo</div>}
+                  : <div className="nzad-noimg">No photo</div>}
               </div>
-              <div className="ad-hotel-meta">
-                <div className="ad-hotel-name">
+              <div className="nzad-hotel-meta">
+                <div className="nzad-hotel-name">
                   {h.name}
-                  {!h.isActive && <span className="ad-tag-off">Inactive</span>}
-                  {h.isFeatured && <span className="ad-tag-feat">Featured</span>}
+                  {!h.isActive && <span className="nzad-tag-off">Inactive</span>}
+                  {h.isFeatured && <span className="nzad-tag-feat">Featured</span>}
                 </div>
-                <div className="ad-hotel-sub">
+                <div className="nzad-hotel-sub">
                   {"★".repeat(h.stars)} · {h.city} · {h.rooms?.length || 0} room types · from {fmt(h.priceFrom)}
                 </div>
               </div>
-              <button className="ad-btn-ghost" onClick={() => setEditing(h)}>Manage</button>
+              <button className="nzad-btn-ghost" onClick={() => setEditing(h)}>Manage</button>
             </div>
           ))}
         </div>
       )}
 
       <style jsx>{`
-        .ad-hotel-list { display: flex; flex-direction: column; gap: 10px; }
-        .ad-hotel-row {
+        .nzad-hotel-list { display: flex; flex-direction: column; gap: 10px; }
+        .nzad-hotel-row {
           display: flex; align-items: center; gap: 16px; padding: 12px;
           background: #fff; border: 1px solid var(--gray-200); border-radius: var(--r-md);
         }
-        .ad-hotel-thumb { width: 80px; height: 60px; border-radius: var(--r-sm); overflow: hidden; flex-shrink: 0; background: var(--gray-100); }
-        .ad-hotel-thumb img { width: 100%; height: 100%; object-fit: cover; }
-        .ad-noimg { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--gray-400); }
-        .ad-hotel-meta { flex: 1; }
-        .ad-hotel-name { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px; }
-        .ad-hotel-sub { font-size: 12.5px; color: var(--gray-400); font-weight: 600; margin-top: 2px; }
-        .ad-tag-off { font-size: 10px; background: var(--gray-100); color: var(--gray-400); padding: 2px 7px; border-radius: 980px; font-weight: 700; }
-        .ad-tag-feat { font-size: 10px; background: var(--red-soft); color: var(--red-deep); padding: 2px 7px; border-radius: 980px; font-weight: 700; }
-        .ad-empty-inline { color: var(--gray-400); font-size: 13px; }
+        .nzad-hotel-thumb { width: 80px; height: 60px; border-radius: var(--r-sm); overflow: hidden; flex-shrink: 0; background: var(--gray-100); }
+        .nzad-hotel-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .nzad-noimg { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--gray-400); }
+        .nzad-hotel-meta { flex: 1; }
+        .nzad-hotel-name { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+        .nzad-hotel-sub { font-size: 12.5px; color: var(--gray-400); font-weight: 600; margin-top: 2px; }
+        .nzad-tag-off { font-size: 10px; background: var(--gray-100); color: var(--gray-400); padding: 2px 7px; border-radius: 980px; font-weight: 700; }
+        .nzad-tag-feat { font-size: 10px; background: var(--red-soft); color: var(--red-deep); padding: 2px 7px; border-radius: 980px; font-weight: 700; }
+        .nzad-empty-inline { color: var(--gray-400); font-size: 13px; }
       `}</style>
     </div>
   );
@@ -581,32 +581,32 @@ function HotelEditor({ hotel, onClose, onSaved }) {
       <PageHead
         title={isNew ? "New hotel" : `Edit · ${form.nameEn || "Hotel"}`}
         subtitle={isNew ? "Add a new hotel to the platform" : "Update hotel details"}
-        action={<button className="ad-btn-ghost" onClick={onClose}>← Back to hotels</button>}
+        action={<button className="nzad-btn-ghost" onClick={onClose}>← Back to hotels</button>}
       />
 
       {err && <ErrorBox msg={err} />}
 
-      <div className="ad-panel">
+      <div className="nzad-panel">
         <h3>Names (3 languages)</h3>
-        <div className="ad-grid3">
+        <div className="nzad-grid3">
           <Field label="Name (English)" v={form.nameEn} onChange={(v) => set("nameEn", v)} />
           <Field label="Name (French)" v={form.nameFr} onChange={(v) => set("nameFr", v)} />
           <Field label="Name (Arabic)" v={form.nameAr} onChange={(v) => set("nameAr", v)} rtl />
         </div>
       </div>
 
-      <div className="ad-panel">
+      <div className="nzad-panel">
         <h3>Description (3 languages)</h3>
-        <div className="ad-grid3">
+        <div className="nzad-grid3">
           <Field label="Description (EN)" v={form.descEn} onChange={(v) => set("descEn", v)} area />
           <Field label="Description (FR)" v={form.descFr} onChange={(v) => set("descFr", v)} area />
           <Field label="Description (AR)" v={form.descAr} onChange={(v) => set("descAr", v)} area rtl />
         </div>
       </div>
 
-      <div className="ad-panel">
+      <div className="nzad-panel">
         <h3>Location &amp; rating</h3>
-        <div className="ad-grid3">
+        <div className="nzad-grid3">
           <Field label="City key (lowercase, e.g. algiers)" v={form.city} onChange={(v) => set("city", v)} />
           <Field label="Stars (1–5)" v={form.stars} onChange={(v) => set("stars", v)} type="number" />
           <Field label="Address" v={form.address} onChange={(v) => set("address", v)} />
@@ -619,16 +619,16 @@ function HotelEditor({ hotel, onClose, onSaved }) {
         </div>
       </div>
 
-      <div className="ad-panel">
+      <div className="nzad-panel">
         <h3>Policies &amp; contact</h3>
-        <div className="ad-grid3">
+        <div className="nzad-grid3">
           <Field label="Check-in time" v={form.checkInTime} onChange={(v) => set("checkInTime", v)} />
           <Field label="Check-out time" v={form.checkOutTime} onChange={(v) => set("checkOutTime", v)} />
           <Field label="Free cancellation (hours)" v={form.cancellationHours} onChange={(v) => set("cancellationHours", v)} type="number" />
           <Field label="Contact email" v={form.contactEmail} onChange={(v) => set("contactEmail", v)} />
           <Field label="Contact phone" v={form.contactPhone} onChange={(v) => set("contactPhone", v)} />
         </div>
-        <div className="ad-toggles">
+        <div className="nzad-toggles">
           <Toggle label="Children allowed" v={form.childrenAllowed} onChange={(v) => set("childrenAllowed", v)} />
           <Toggle label="Pets allowed" v={form.petsAllowed} onChange={(v) => set("petsAllowed", v)} />
           <Toggle label="Free parking" v={form.parkingFree} onChange={(v) => set("parkingFree", v)} />
@@ -644,12 +644,12 @@ function HotelEditor({ hotel, onClose, onSaved }) {
         />
       </div>
 
-      <div className="ad-editor-actions">
-        <button className="ad-btn-primary" onClick={save} disabled={busy}>
+      <div className="nzad-editor-actions">
+        <button className="nzad-btn-primary" onClick={save} disabled={busy}>
           {busy ? "Saving…" : isNew && !savedId ? "Create hotel" : "Save changes"}
         </button>
         {!isNew && (
-          <button className="ad-btn-danger" onClick={remove} disabled={busy}>Deactivate hotel</button>
+          <button className="nzad-btn-danger" onClick={remove} disabled={busy}>Deactivate hotel</button>
         )}
       </div>
 
@@ -663,15 +663,15 @@ function HotelEditor({ hotel, onClose, onSaved }) {
         <ManagersPanel hotelId={savedId} />
       )}
       {isNew && !savedId && (
-        <div className="ad-note">Save the hotel first to add rooms, photos and partner accounts.</div>
+        <div className="nzad-note">Save the hotel first to add rooms, photos and partner accounts.</div>
       )}
 
       <style jsx>{`
-        .ad-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-        .ad-toggles { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
-        .ad-editor-actions { display: flex; gap: 10px; margin-bottom: 24px; }
-        .ad-note { padding: 16px; background: var(--cream); border: 1px dashed var(--gray-300); border-radius: var(--r-md); font-size: 13px; color: var(--gray-400); }
-        @media (max-width: 720px) { .ad-grid3 { grid-template-columns: 1fr; } }
+        .nzad-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+        .nzad-toggles { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+        .nzad-editor-actions { display: flex; gap: 10px; margin-bottom: 24px; }
+        .nzad-note { padding: 16px; background: var(--cream); border: 1px dashed var(--gray-300); border-radius: var(--r-md); font-size: 13px; color: var(--gray-400); }
+        @media (max-width: 720px) { .nzad-grid3 { grid-template-columns: 1fr; } }
       `}</style>
     </div>
   );
@@ -723,30 +723,30 @@ function RoomsPanel({ hotelId, initialRooms }) {
   }
 
   return (
-    <div className="ad-panel">
-      <div className="ad-panel-head">
+    <div className="nzad-panel">
+      <div className="nzad-panel-head">
         <h3>Rooms</h3>
-        {!adding && <button className="ad-btn-ghost" onClick={() => setAdding(true)}>+ Add room</button>}
+        {!adding && <button className="nzad-btn-ghost" onClick={() => setAdding(true)}>+ Add room</button>}
       </div>
       {err && <ErrorBox msg={err} />}
 
       {rooms.length === 0 && !adding && (
-        <span className="ad-empty-inline">No rooms yet. Add at least one room type.</span>
+        <span className="nzad-empty-inline">No rooms yet. Add at least one room type.</span>
       )}
 
       {rooms.map((r) => (
-        <div className="ad-room-row" key={r.id}>
+        <div className="nzad-room-row" key={r.id}>
           <div>
             <strong>{r.typeEn || r.type}</strong>
             <span> · {r.capacity} guests · {r.bedType} · {fmt(r.basePrice ?? r.price)}/night</span>
           </div>
-          <button className="ad-btn-mini-danger" onClick={() => delRoom(r.id)}>Remove</button>
+          <button className="nzad-btn-mini-danger" onClick={() => delRoom(r.id)}>Remove</button>
         </div>
       ))}
 
       {adding && (
-        <div className="ad-room-form">
-          <div className="ad-grid3">
+        <div className="nzad-room-form">
+          <div className="nzad-grid3">
             <Field label="Type (EN)" v={draft.typeEn} onChange={(v) => set("typeEn", v)} />
             <Field label="Type (FR)" v={draft.typeFr} onChange={(v) => set("typeFr", v)} />
             <Field label="Type (AR)" v={draft.typeAr} onChange={(v) => set("typeAr", v)} rtl />
@@ -756,29 +756,29 @@ function RoomsPanel({ hotelId, initialRooms }) {
             <Field label="Bed type" v={draft.bedType} onChange={(v) => set("bedType", v)} />
             <Field label="Number of rooms" v={draft.totalUnits} onChange={(v) => set("totalUnits", v)} type="number" />
           </div>
-          <div className="ad-editor-actions">
-            <button className="ad-btn-primary" onClick={addRoom} disabled={busy}>
+          <div className="nzad-editor-actions">
+            <button className="nzad-btn-primary" onClick={addRoom} disabled={busy}>
               {busy ? "Adding…" : "Add room"}
             </button>
-            <button className="ad-btn-ghost" onClick={() => { setAdding(false); setDraft(BLANK_ROOM); }}>Cancel</button>
+            <button className="nzad-btn-ghost" onClick={() => { setAdding(false); setDraft(BLANK_ROOM); }}>Cancel</button>
           </div>
         </div>
       )}
 
       <style jsx>{`
-        .ad-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-        .ad-panel-head h3 { margin: 0; }
-        .ad-room-row {
+        .nzad-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .nzad-panel-head h3 { margin: 0; }
+        .nzad-room-row {
           display: flex; align-items: center; justify-content: space-between;
           padding: 12px 14px; background: var(--cream); border-radius: var(--r-sm); margin-bottom: 8px;
         }
-        .ad-room-row strong { font-size: 14px; }
-        .ad-room-row span { font-size: 12.5px; color: var(--gray-400); font-weight: 600; }
-        .ad-room-form { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--gray-100); }
-        .ad-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-        .ad-editor-actions { display: flex; gap: 10px; margin-top: 14px; }
-        .ad-empty-inline { color: var(--gray-400); font-size: 13px; }
-        @media (max-width: 720px) { .ad-grid3 { grid-template-columns: 1fr; } }
+        .nzad-room-row strong { font-size: 14px; }
+        .nzad-room-row span { font-size: 12.5px; color: var(--gray-400); font-weight: 600; }
+        .nzad-room-form { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--gray-100); }
+        .nzad-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+        .nzad-editor-actions { display: flex; gap: 10px; margin-top: 14px; }
+        .nzad-empty-inline { color: var(--gray-400); font-size: 13px; }
+        @media (max-width: 720px) { .nzad-grid3 { grid-template-columns: 1fr; } }
       `}</style>
     </div>
   );
@@ -811,47 +811,47 @@ function PhotosPanel({ hotelId, initialPhotos }) {
   }
 
   return (
-    <div className="ad-panel">
+    <div className="nzad-panel">
       <h3>Photos</h3>
-      <p className="ad-photo-hint">Paste an image URL (hosted on Cloudflare R2, Unsplash, etc.). Direct upload comes later.</p>
+      <p className="nzad-photo-hint">Paste an image URL (hosted on Cloudflare R2, Unsplash, etc.). Direct upload comes later.</p>
       {err && <ErrorBox msg={err} />}
 
-      <div className="ad-photo-grid">
+      <div className="nzad-photo-grid">
         {photos.map((p) => (
-          <div className="ad-photo" key={p.id}>
+          <div className="nzad-photo" key={p.id}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={p.url} alt="" />
-            {p.isPrimary && <span className="ad-photo-primary">Primary</span>}
-            <button className="ad-photo-del" onClick={() => del(p.id)}>×</button>
+            {p.isPrimary && <span className="nzad-photo-primary">Primary</span>}
+            <button className="nzad-photo-del" onClick={() => del(p.id)}>×</button>
           </div>
         ))}
       </div>
 
-      <div className="ad-photo-add">
+      <div className="nzad-photo-add">
         <input value={url} onChange={(e) => setUrl(e.target.value)}
           placeholder="https://…/photo.jpg"
           onKeyDown={(e) => e.key === "Enter" && add()} />
-        <button className="ad-btn-primary" onClick={add} disabled={busy}>
+        <button className="nzad-btn-primary" onClick={add} disabled={busy}>
           {busy ? "Adding…" : "Add photo"}
         </button>
       </div>
 
       <style jsx>{`
-        .ad-photo-hint { font-size: 12.5px; color: var(--gray-400); margin-bottom: 14px; }
-        .ad-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
-        .ad-photo { position: relative; height: 90px; border-radius: var(--r-sm); overflow: hidden; background: var(--gray-100); }
-        .ad-photo img { width: 100%; height: 100%; object-fit: cover; }
-        .ad-photo-primary {
+        .nzad-photo-hint { font-size: 12.5px; color: var(--gray-400); margin-bottom: 14px; }
+        .nzad-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
+        .nzad-photo { position: relative; height: 90px; border-radius: var(--r-sm); overflow: hidden; background: var(--gray-100); }
+        .nzad-photo img { width: 100%; height: 100%; object-fit: cover; }
+        .nzad-photo-primary {
           position: absolute; bottom: 4px; left: 4px; background: var(--red); color: #fff;
           font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 980px;
         }
-        .ad-photo-del {
+        .nzad-photo-del {
           position: absolute; top: 4px; right: 4px; width: 22px; height: 22px;
           border-radius: 50%; border: none; background: rgba(0,0,0,0.6); color: #fff;
           font-size: 14px; cursor: pointer; line-height: 1;
         }
-        .ad-photo-add { display: flex; gap: 8px; }
-        .ad-photo-add input {
+        .nzad-photo-add { display: flex; gap: 8px; }
+        .nzad-photo-add input {
           flex: 1; padding: 10px 12px; border: 1.5px solid var(--gray-200);
           border-radius: var(--r-sm); font-size: 13px; outline: none;
         }
@@ -880,15 +880,15 @@ function TagsPicker({ selected, onChange }) {
   }
 
   return (
-    <div className="ad-tagspicker">
-      <div className="ad-tagspicker-head">
+    <div className="nzad-tagspicker">
+      <div className="nzad-tagspicker-head">
         <h4>Tags</h4>
         <span>How travelers find this hotel through search ({selected.length} selected)</span>
       </div>
       {err && <ErrorBox msg={err} />}
-      {!tags && !err && <span className="ad-dim">Loading…</span>}
+      {!tags && !err && <span className="nzad-dim">Loading…</span>}
       {tags && (
-        <div className="ad-tag-grid">
+        <div className="nzad-tag-grid">
           {tags.map((t) => (
             <button
               key={t.key}
@@ -902,23 +902,23 @@ function TagsPicker({ selected, onChange }) {
         </div>
       )}
       <style jsx>{`
-        .ad-tagspicker { margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--gray-100); }
-        .ad-tagspicker-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
-        .ad-tagspicker h4 { font-size: 13px; font-weight: 700; color: var(--ink); }
-        .ad-tagspicker-head span { font-size: 12px; color: var(--gray-400); }
-        .ad-tag-grid { display: flex; flex-wrap: wrap; gap: 8px; }
-        .ad-tag-chip {
+        .nzad-tagspicker { margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--gray-100); }
+        .nzad-tagspicker-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+        .nzad-tagspicker h4 { font-size: 13px; font-weight: 700; color: var(--ink); }
+        .nzad-tagspicker-head span { font-size: 12px; color: var(--gray-400); }
+        .nzad-tag-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+        .nzad-tag-chip {
           padding: 8px 14px; border-radius: 980px;
           border: 1.5px solid var(--gray-200); background: #fff;
           font-size: 13px; font-weight: 600; color: var(--ink-2);
           cursor: pointer; font-family: inherit;
           transition: all .15s;
         }
-        .ad-tag-chip:hover { border-color: var(--ink); }
-        .ad-tag-chip.on {
+        .nzad-tag-chip:hover { border-color: var(--ink); }
+        .nzad-tag-chip.on {
           background: var(--ink); color: #fff; border-color: var(--ink);
         }
-        .ad-dim { color: var(--gray-400); font-size: 13px; }
+        .nzad-dim { color: var(--gray-400); font-size: 13px; }
       `}</style>
     </div>
   );
@@ -961,57 +961,57 @@ function ManagersPanel({ hotelId }) {
   }
 
   return (
-    <div className="ad-panel ad-mgr">
-      <div className="ad-panel-head">
+    <div className="nzad-panel ad-mgr">
+      <div className="nzad-panel-head">
         <h3>Hotel partner accounts</h3>
-        {!creating && <button className="ad-btn" onClick={() => setCreating(true)}>+ Add partner</button>}
+        {!creating && <button className="nzad-btn" onClick={() => setCreating(true)}>+ Add partner</button>}
       </div>
-      <p className="ad-sub">These are the people at the hotel who log into the partner portal to confirm bookings and manage availability.</p>
+      <p className="nzad-sub">These are the people at the hotel who log into the partner portal to confirm bookings and manage availability.</p>
       {err && <ErrorBox msg={err} />}
 
       {creating && (
-        <div className="ad-mgr-form">
-          <div className="ad-grid2">
-            <div className="ad-mgr-field">
+        <div className="nzad-mgr-form">
+          <div className="nzad-grid2">
+            <div className="nzad-mgr-field">
               <label>Email</label>
               <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="reception@hotel.dz" />
             </div>
-            <div className="ad-mgr-field">
+            <div className="nzad-mgr-field">
               <label>Password (initial)</label>
               <input type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="At least 6 characters" />
             </div>
-            <div className="ad-mgr-field">
+            <div className="nzad-mgr-field">
               <label>First name</label>
               <input type="text" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
             </div>
-            <div className="ad-mgr-field">
+            <div className="nzad-mgr-field">
               <label>Last name</label>
               <input type="text" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
             </div>
           </div>
-          <div className="ad-mgr-actions">
-            <button className="ad-btn ghost" onClick={() => { setCreating(false); setForm({ email: "", password: "", firstName: "", lastName: "" }); }}>Cancel</button>
-            <button className="ad-btn primary" onClick={create}>Create partner account</button>
+          <div className="nzad-mgr-actions">
+            <button className="nzad-btn ghost" onClick={() => { setCreating(false); setForm({ email: "", password: "", firstName: "", lastName: "" }); }}>Cancel</button>
+            <button className="nzad-btn primary" onClick={create}>Create partner account</button>
           </div>
         </div>
       )}
 
       {list && list.length === 0 && !creating && (
-        <span className="ad-empty-inline">No partner accounts yet for this hotel.</span>
+        <span className="nzad-empty-inline">No partner accounts yet for this hotel.</span>
       )}
       {list && list.length > 0 && (
-        <table className="ad-table">
+        <table className="nzad-table">
           <thead><tr><th>Email</th><th>Name</th><th>Added</th><th></th></tr></thead>
           <tbody>
             {list.map((u) => (
               <tr key={u.id}>
                 <td><strong>{u.email}</strong></td>
                 <td>{[u.firstName, u.lastName].filter(Boolean).join(" ") || "—"}</td>
-                <td className="ad-dim">{fmtDT(u.createdAt)}</td>
+                <td className="nzad-dim">{fmtDT(u.createdAt)}</td>
                 <td>
-                  <button className="ad-link" onClick={() => resetPwd(u.id, u.email)}>Reset password</button>
-                  <span className="ad-sep">·</span>
-                  <button className="ad-link-danger" onClick={() => remove(u.id)}>Remove</button>
+                  <button className="nzad-link" onClick={() => resetPwd(u.id, u.email)}>Reset password</button>
+                  <span className="nzad-sep">·</span>
+                  <button className="nzad-link-danger" onClick={() => remove(u.id)}>Remove</button>
                 </td>
               </tr>
             ))}
@@ -1020,21 +1020,21 @@ function ManagersPanel({ hotelId }) {
       )}
 
       <style jsx>{`
-        .ad-mgr { margin-top: 28px; }
-        .ad-sub { font-size: 13px; color: var(--gray-400); margin-bottom: 14px; line-height: 1.5; }
-        .ad-mgr-form { background: var(--cream); padding: 18px; border-radius: var(--r-sm); margin-bottom: 16px; }
-        .ad-mgr-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
-        .ad-link-danger { background: none; border: none; color: var(--red); font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; padding: 0; }
-        .ad-link { background: none; border: none; color: var(--ink); font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; padding: 0; text-decoration: underline; }
-        .ad-sep { color: var(--gray-300); margin: 0 8px; font-size: 12px; }
-        .ad-dim { color: var(--gray-400); font-size: 12px; }
-        .ad-empty-inline { color: var(--gray-400); font-size: 13px; }
-        .ad-mgr-field label { display: block; font-size: 11.5px; font-weight: 700; color: var(--gray-400); margin-bottom: 5px; }
-        .ad-mgr-field input {
+        .nzad-mgr { margin-top: 28px; }
+        .nzad-sub { font-size: 13px; color: var(--gray-400); margin-bottom: 14px; line-height: 1.5; }
+        .nzad-mgr-form { background: var(--cream); padding: 18px; border-radius: var(--r-sm); margin-bottom: 16px; }
+        .nzad-mgr-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+        .nzad-link-danger { background: none; border: none; color: var(--red); font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; padding: 0; }
+        .nzad-link { background: none; border: none; color: var(--ink); font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; padding: 0; text-decoration: underline; }
+        .nzad-sep { color: var(--gray-300); margin: 0 8px; font-size: 12px; }
+        .nzad-dim { color: var(--gray-400); font-size: 12px; }
+        .nzad-empty-inline { color: var(--gray-400); font-size: 13px; }
+        .nzad-mgr-field label { display: block; font-size: 11.5px; font-weight: 700; color: var(--gray-400); margin-bottom: 5px; }
+        .nzad-mgr-field input {
           width: 100%; padding: 9px 12px; border: 1.5px solid var(--gray-200);
           border-radius: var(--r-sm); font-size: 13px; outline: none; font-family: inherit;
         }
-        .ad-mgr-field input:focus { border-color: var(--red); }
+        .nzad-mgr-field input:focus { border-color: var(--red); }
       `}</style>
     </div>
   );
@@ -1067,22 +1067,22 @@ function BookingsManager() {
       {!data && !err && <Loading />}
 
       {data && data.length === 0 && (
-        <div className="ad-panel"><span className="ad-empty-inline">No bookings yet.</span></div>
+        <div className="nzad-panel"><span className="nzad-empty-inline">No bookings yet.</span></div>
       )}
 
       {data && data.length > 0 && (
-        <div className="ad-panel">
-          <table className="ad-table">
+        <div className="nzad-panel">
+          <table className="nzad-table">
             <thead>
               <tr><th>Reference</th><th>Guest</th><th>Hotel</th><th>Dates</th><th>Total</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
               {data.map((b) => (
-                <tr key={b.id} className="ad-brow" onClick={() => setSelected(b.id)}>
+                <tr key={b.id} className="nzad-brow" onClick={() => setSelected(b.id)}>
                   <td><strong>{b.reference}</strong></td>
-                  <td>{b.guest?.firstName} {b.guest?.lastName}<br /><span className="ad-dim">{b.guest?.phone}</span></td>
+                  <td>{b.guest?.firstName} {b.guest?.lastName}<br /><span className="nzad-dim">{b.guest?.phone}</span></td>
                   <td>{b.hotel?.name}</td>
-                  <td className="ad-dim">{(b.checkIn || "").slice(0, 10)} → {(b.checkOut || "").slice(0, 10)}</td>
+                  <td className="nzad-dim">{(b.checkIn || "").slice(0, 10)} → {(b.checkOut || "").slice(0, 10)}</td>
                   <td>{fmt(b.pricing?.total)}</td>
                   <td><span className={`ad-bstatus s-${b.status}`}>{b.status}</span></td>
                   <td onClick={(e) => e.stopPropagation()}>
@@ -1108,11 +1108,11 @@ function BookingsManager() {
       )}
 
       <style jsx>{`
-        .ad-brow { cursor: pointer; }
-        .ad-brow:hover { background: var(--gray-100); }
-        .ad-dim { color: var(--gray-400); font-size: 12px; }
-        .ad-empty-inline { color: var(--gray-400); font-size: 13px; }
-        .ad-bstatus { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 980px; }
+        .nzad-brow { cursor: pointer; }
+        .nzad-brow:hover { background: var(--gray-100); }
+        .nzad-dim { color: var(--gray-400); font-size: 12px; }
+        .nzad-empty-inline { color: var(--gray-400); font-size: 13px; }
+        .nzad-bstatus { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 980px; }
         .s-CONFIRMED, .s-COMPLETED { background: var(--teal-soft); color: var(--teal); }
         .s-PENDING { background: #FFF4E0; color: #9A6700; }
         .s-REJECTED, .s-CANCELLED, .s-NO_SHOW, .s-REFUNDED { background: var(--red-soft); color: var(--red-deep); }
@@ -1322,16 +1322,16 @@ function fmtDT(s) {
 // =============================================================================
 function PageHead({ title, subtitle, action }) {
   return (
-    <div className="ad-pagehead">
+    <div className="nzad-pagehead">
       <div>
         <h1>{title}</h1>
         {subtitle && <p>{subtitle}</p>}
       </div>
       {action}
       <style jsx>{`
-        .ad-pagehead { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; gap: 16px; }
-        .ad-pagehead h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
-        .ad-pagehead p { font-size: 13.5px; color: var(--gray-400); margin-top: 3px; }
+        .nzad-pagehead { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; gap: 16px; }
+        .nzad-pagehead h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+        .nzad-pagehead p { font-size: 13.5px; color: var(--gray-400); margin-top: 3px; }
       `}</style>
     </div>
   );
@@ -1339,13 +1339,13 @@ function PageHead({ title, subtitle, action }) {
 
 function Stat({ label, value }) {
   return (
-    <div className="ad-stat">
-      <div className="ad-stat-value display">{value}</div>
-      <div className="ad-stat-label">{label}</div>
+    <div className="nzad-stat">
+      <div className="nzad-stat-value display">{value}</div>
+      <div className="nzad-stat-label">{label}</div>
       <style jsx>{`
-        .ad-stat { background: #fff; border: 1px solid var(--gray-200); border-radius: var(--r-md); padding: 18px; }
-        .ad-stat-value { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
-        .ad-stat-label { font-size: 12px; color: var(--gray-400); font-weight: 600; margin-top: 4px; }
+        .nzad-stat { background: #fff; border: 1px solid var(--gray-200); border-radius: var(--r-md); padding: 18px; }
+        .nzad-stat-value { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+        .nzad-stat-label { font-size: 12px; color: var(--gray-400); font-weight: 600; margin-top: 4px; }
       `}</style>
     </div>
   );
@@ -1353,19 +1353,19 @@ function Stat({ label, value }) {
 
 function Field({ label, v, onChange, type = "text", area, rtl }) {
   return (
-    <div className="ad-field">
+    <div className="nzad-field">
       <label>{label}</label>
       {area
         ? <textarea value={v} onChange={(e) => onChange(e.target.value)} dir={rtl ? "rtl" : "ltr"} rows={3} />
         : <input type={type} value={v} onChange={(e) => onChange(e.target.value)} dir={rtl ? "rtl" : "ltr"} />}
       <style jsx>{`
-        .ad-field label { display: block; font-size: 11.5px; font-weight: 700; color: var(--gray-400); margin-bottom: 5px; }
-        .ad-field input, .ad-field textarea {
+        .nzad-field label { display: block; font-size: 11.5px; font-weight: 700; color: var(--gray-400); margin-bottom: 5px; }
+        .nzad-field input, .nzad-field textarea {
           width: 100%; padding: 9px 12px; border: 1.5px solid var(--gray-200);
           border-radius: var(--r-sm); font-size: 13px; outline: none; font-family: inherit;
         }
-        .ad-field input:focus, .ad-field textarea:focus { border-color: var(--red); }
-        .ad-field textarea { resize: vertical; }
+        .nzad-field input:focus, .nzad-field textarea:focus { border-color: var(--red); }
+        .nzad-field textarea { resize: vertical; }
       `}</style>
     </div>
   );
@@ -1374,31 +1374,31 @@ function Field({ label, v, onChange, type = "text", area, rtl }) {
 function Toggle({ label, v, onChange }) {
   return (
     <button className={`ad-toggle ${v ? "on" : ""}`} onClick={() => onChange(!v)} type="button">
-      <span className="ad-toggle-dot" />
+      <span className="nzad-toggle-dot" />
       {label}
       <style jsx>{`
-        .ad-toggle {
+        .nzad-toggle {
           display: flex; align-items: center; gap: 8px; padding: 8px 12px;
           border: 1.5px solid var(--gray-200); background: #fff; border-radius: 980px;
           font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit; color: var(--gray-400);
         }
-        .ad-toggle.on { border-color: var(--red); color: var(--ink); background: var(--red-soft); }
-        .ad-toggle-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--gray-300); }
-        .ad-toggle.on .ad-toggle-dot { background: var(--red); }
+        .nzad-toggle.on { border-color: var(--red); color: var(--ink); background: var(--red-soft); }
+        .nzad-toggle-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--gray-300); }
+        .nzad-toggle.on .nzad-toggle-dot { background: var(--red); }
       `}</style>
     </button>
   );
 }
 
 function Loading() {
-  return <div className="ad-loading">Loading…<style jsx>{`
-    .ad-loading { padding: 40px; text-align: center; color: var(--gray-400); font-size: 14px; }
+  return <div className="nzad-loading">Loading…<style jsx>{`
+    .nzad-loading { padding: 40px; text-align: center; color: var(--gray-400); font-size: 14px; }
   `}</style></div>;
 }
 
 function ErrorBox({ msg }) {
-  return <div className="ad-errbox">{msg}<style jsx>{`
-    .ad-errbox {
+  return <div className="nzad-errbox">{msg}<style jsx>{`
+    .nzad-errbox {
       padding: 12px 14px; background: var(--red-soft); color: var(--red-deep);
       border-radius: var(--r-sm); font-size: 13px; font-weight: 600; margin-bottom: 16px;
     }
