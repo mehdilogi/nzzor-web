@@ -278,14 +278,19 @@ export default function HomeHero() {
         .nz-hero h1 .l1 { display: block; opacity: 0; animation: rise 1s cubic-bezier(0.16,1,0.3,1) 0.3s forwards; }
         .nz-hero h1 .l2 {
           display: block; opacity: 0; animation: rise 1s cubic-bezier(0.16,1,0.3,1) 0.42s forwards;
+          /* The gradient text below uses background-clip:text, so a normal
+             text-shadow has nothing to attach to. filter:drop-shadow on the
+             wrapping block applies to the rendered painted text, gradient
+             included — that's how we keep the brand accent readable. */
+          filter:
+            drop-shadow(0 1px 3px rgba(0, 0, 0, 0.65))
+            drop-shadow(0 2px 14px rgba(0, 0, 0, 0.55));
         }
-        /* The second line uses plain white text — clean and readable against
-           any background. The gradient version (white-to-red) was visually
-           interesting but didn't survive the move to a brighter background
-           image; it made "seconds" disappear into the painting's warm tones. */
         .nz-hero h1 .accent {
           white-space: nowrap;
-          color: #fff;
+          background: linear-gradient(120deg, #fff 30%, var(--red));
+          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+          background-clip: text;
         }
         .nz-hero p {
           font-size: 18px; color: #fff; max-width: 480px; line-height: 1.6;
