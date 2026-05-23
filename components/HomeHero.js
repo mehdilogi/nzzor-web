@@ -229,26 +229,24 @@ export default function HomeHero() {
           width: 100%; height: 100%; object-fit: cover;
           animation: kenburns 24s ease-out infinite alternate;
         }
-        /* Hero overlay. Two layers do different jobs:
-           1) A uniform dark wash across the entire image — this is what
-              gives the gradient headline contrast on every letter, not just
-              the left side. The painting is bright; we mute it so the
-              brand colors can read.
-           2) A bottom-anchored shade for any future content that might
-              spill toward the lower edge. */
+        /* Readability scrim — keeps the painting visible by darkening
+           primarily on the left where the text sits, fading toward the
+           right where the courtyard is the visual focus. */
         .nz-hero-photo::after {
           content: ''; position: absolute; inset: 0;
           background:
-            linear-gradient(to right,
-              rgba(15, 17, 26, 0.62) 0%,
-              rgba(15, 17, 26, 0.50) 50%,
-              rgba(15, 17, 26, 0.42) 100%
+            linear-gradient(105deg,
+              rgba(15, 17, 26, 0.72) 0%,
+              rgba(15, 17, 26, 0.55) 30%,
+              rgba(15, 17, 26, 0.25) 55%,
+              rgba(15, 17, 26, 0.05) 75%,
+              transparent 100%
             ),
             linear-gradient(to bottom,
-              rgba(15, 17, 26, 0.15) 0%,
-              transparent 25%,
-              transparent 70%,
-              rgba(15, 17, 26, 0.40) 100%
+              rgba(15, 17, 26, 0.25) 0%,
+              transparent 18%,
+              transparent 75%,
+              rgba(15, 17, 26, 0.45) 100%
             );
         }
         .nz-hero-inner {
@@ -271,9 +269,26 @@ export default function HomeHero() {
         .nz-hero h1 {
           font-size: clamp(50px, 7.5vw, 104px); line-height: 0.96; font-weight: 600;
           letter-spacing: -0.035em; color: #fff; margin-bottom: 26px; max-width: 900px;
-          text-shadow:
-            0 2px 30px rgba(0, 0, 0, 0.55),
-            0 1px 4px rgba(0, 0, 0, 0.45);
+          /* Position relative so the ::before halo can anchor to the
+             headline area without affecting the rest of the hero. */
+          position: relative;
+        }
+        /* Soft localized dark halo that sits behind only the headline text.
+           This is what gives the gradient enough contrast to read cleanly
+           without a heavy overlay on the whole image. The halo is huge
+           and blurred, so it fades out softly and doesn't look like a box. */
+        .nz-hero h1::before {
+          content: '';
+          position: absolute;
+          inset: -40px -60px;
+          background: radial-gradient(
+            ellipse at 30% 50%,
+            rgba(15, 17, 26, 0.55) 0%,
+            rgba(15, 17, 26, 0.35) 40%,
+            transparent 75%
+          );
+          z-index: -1;
+          pointer-events: none;
         }
         .nz-hero h1 .l1 {
           display: block; opacity: 0;
