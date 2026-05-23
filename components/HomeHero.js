@@ -229,11 +229,27 @@ export default function HomeHero() {
           width: 100%; height: 100%; object-fit: cover;
           animation: kenburns 24s ease-out infinite alternate;
         }
+        /* Readability scrim. The painting is bright with gold/cream tones, so
+           white text needs a strong dark anchor on the left where the text
+           actually sits — without ruining the right half of the image. Two
+           layered gradients: one horizontal (heavier left), one vertical
+           (mild top + bottom). */
         .nz-hero-photo::after {
           content: ''; position: absolute; inset: 0;
           background:
-            linear-gradient(to bottom, rgba(20,20,26,0.32) 0%, transparent 22%, transparent 50%, rgba(20,20,26,0.55) 100%),
-            linear-gradient(105deg, rgba(20,20,26,0.45) 0%, transparent 55%);
+            linear-gradient(105deg,
+              rgba(15, 17, 26, 0.72) 0%,
+              rgba(15, 17, 26, 0.55) 30%,
+              rgba(15, 17, 26, 0.25) 55%,
+              rgba(15, 17, 26, 0.05) 75%,
+              transparent 100%
+            ),
+            linear-gradient(to bottom,
+              rgba(15, 17, 26, 0.25) 0%,
+              transparent 18%,
+              transparent 75%,
+              rgba(15, 17, 26, 0.45) 100%
+            );
         }
         .nz-hero-inner {
           position: absolute; inset: 0; z-index: 10;
@@ -255,7 +271,9 @@ export default function HomeHero() {
         .nz-hero h1 {
           font-size: clamp(50px, 7.5vw, 104px); line-height: 0.96; font-weight: 600;
           letter-spacing: -0.035em; color: #fff; margin-bottom: 26px; max-width: 900px;
-          text-shadow: 0 2px 40px rgba(0,0,0,0.3);
+          text-shadow:
+            0 2px 30px rgba(0, 0, 0, 0.55),
+            0 1px 4px rgba(0, 0, 0, 0.45);
         }
         .nz-hero h1 .l1 { display: block; opacity: 0; animation: rise 1s cubic-bezier(0.16,1,0.3,1) 0.3s forwards; }
         .nz-hero h1 .l2 { display: block; opacity: 0; animation: rise 1s cubic-bezier(0.16,1,0.3,1) 0.42s forwards; }
@@ -266,8 +284,13 @@ export default function HomeHero() {
           background-clip: text;
         }
         .nz-hero p {
-          font-size: 18px; color: rgba(255,255,255,0.92); max-width: 480px; line-height: 1.6;
-          font-weight: 500; margin-bottom: 40px; text-shadow: 0 1px 20px rgba(0,0,0,0.3);
+          font-size: 18px; color: #fff; max-width: 480px; line-height: 1.6;
+          font-weight: 500; margin-bottom: 40px;
+          /* Stronger shadow for the subtitle — it's where readability
+             struggles most against the bright painted areas. */
+          text-shadow:
+            0 1px 16px rgba(0, 0, 0, 0.7),
+            0 1px 3px rgba(0, 0, 0, 0.5);
           opacity: 0; animation: rise 1s cubic-bezier(0.16,1,0.3,1) 0.55s forwards;
         }
 

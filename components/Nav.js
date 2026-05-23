@@ -74,6 +74,18 @@ export default function Nav({ overHero = false }) {
           >
             {user ? (user.firstName || t("nav.signin")) : t("nav.signin")}
           </button>
+          {/* Mobile-only language pill — single tap cycles through EN → FR → AR → EN
+              so language is always one tap away without opening the menu. */}
+          <button
+            className="nzn-lang-mobile"
+            onClick={() => {
+              const next = lang === "en" ? "fr" : lang === "fr" ? "ar" : "en";
+              setLang(next);
+            }}
+            aria-label="Change language"
+          >
+            {lang === "en" ? "EN" : lang === "fr" ? "FR" : "ع"}
+          </button>
           <button
             className="nzn-burger"
             onClick={() => setMenuOpen(true)}
@@ -180,6 +192,38 @@ export default function Nav({ overHero = false }) {
 
         .nzn-right { display: flex; align-items: center; gap: 12px; }
 
+        /* mobile-only language pill — tap to cycle EN → FR → AR */
+        .nzn-lang-mobile {
+          display: none;
+          align-items: center; justify-content: center;
+          min-width: 38px; height: 34px;
+          padding: 0 11px;
+          background: rgba(255,255,255,0.10);
+          border: 1px solid rgba(255,255,255,0.22);
+          color: #fff;
+          font-size: 12.5px; font-weight: 700;
+          letter-spacing: 0.04em;
+          border-radius: 980px;
+          cursor: pointer;
+          font-family: inherit;
+          backdrop-filter: blur(10px);
+          transition: background 0.18s, border-color 0.18s;
+        }
+        .nzn-lang-mobile:hover, .nzn-lang-mobile:active {
+          background: rgba(255,255,255,0.18);
+          border-color: rgba(255,255,255,0.35);
+        }
+        /* When Nav scrolls to its solid state (or on inner pages), it goes
+           white-bg, so the pill needs dark text for contrast. */
+        .nzn.solid .nzn-lang-mobile {
+          background: rgba(15, 17, 26, 0.06);
+          border-color: rgba(15, 17, 26, 0.12);
+          color: var(--ink);
+        }
+        .nzn.solid .nzn-lang-mobile:hover {
+          background: rgba(15, 17, 26, 0.12);
+        }
+
         /* language toggle */
         .nzn-lang {
           display: flex; gap: 2px; padding: 3px; border-radius: 980px;
@@ -276,6 +320,7 @@ export default function Nav({ overHero = false }) {
           .nzn-links { display: none; }
           .nzn-signin { display: none; }
           .nzn-lang { display: none; }
+          .nzn-lang-mobile { display: inline-flex; }
           .nzn-burger { display: flex; }
         }
       `}</style>
