@@ -231,17 +231,15 @@ export default function HomeHero() {
         }
         /* Readability scrim. The painting is bright with gold/cream tones, so
            white text needs a strong dark anchor on the left where the text
-           actually sits — without ruining the right half of the image. Two
-           layered gradients: one horizontal (heavier left), one vertical
-           (mild top + bottom). */
+           actually sits — without ruining the right half of the image. */
         .nz-hero-photo::after {
           content: ''; position: absolute; inset: 0;
           background:
-            linear-gradient(105deg,
-              rgba(15, 17, 26, 0.72) 0%,
-              rgba(15, 17, 26, 0.55) 30%,
-              rgba(15, 17, 26, 0.25) 55%,
-              rgba(15, 17, 26, 0.05) 75%,
+            linear-gradient(100deg,
+              rgba(15, 17, 26, 0.85) 0%,
+              rgba(15, 17, 26, 0.68) 28%,
+              rgba(15, 17, 26, 0.35) 52%,
+              rgba(15, 17, 26, 0.10) 72%,
               transparent 100%
             ),
             linear-gradient(to bottom,
@@ -275,20 +273,28 @@ export default function HomeHero() {
             0 2px 30px rgba(0, 0, 0, 0.55),
             0 1px 4px rgba(0, 0, 0, 0.45);
         }
-        .nz-hero h1 .l1 { display: block; opacity: 0; animation: rise 1s cubic-bezier(0.16,1,0.3,1) 0.3s forwards; }
+        .nz-hero h1 .l1 {
+          display: block; opacity: 0;
+          animation: rise 1s cubic-bezier(0.16,1,0.3,1) 0.3s forwards;
+        }
         .nz-hero h1 .l2 {
-          display: block; opacity: 0; animation: rise 1s cubic-bezier(0.16,1,0.3,1) 0.42s forwards;
-          /* The gradient text below uses background-clip:text, so a normal
-             text-shadow has nothing to attach to. filter:drop-shadow on the
-             wrapping block applies to the rendered painted text, gradient
-             included — that's how we keep the brand accent readable. */
+          display: block; opacity: 0;
+          animation: rise 1s cubic-bezier(0.16,1,0.3,1) 0.42s forwards;
+          /* Aggressive drop-shadow stack — the painting has bright warm
+             areas that defeat subtle shadows. Three layered shadows:
+             a tight sharp one for edge definition, a medium one for
+             body separation, a wide ambient one for atmospheric lift. */
           filter:
-            drop-shadow(0 1px 3px rgba(0, 0, 0, 0.65))
-            drop-shadow(0 2px 14px rgba(0, 0, 0, 0.55));
+            drop-shadow(0 1px 2px rgba(0, 0, 0, 0.85))
+            drop-shadow(0 2px 6px rgba(0, 0, 0, 0.65))
+            drop-shadow(0 6px 24px rgba(0, 0, 0, 0.55));
         }
         .nz-hero h1 .accent {
           white-space: nowrap;
-          background: linear-gradient(120deg, #fff 30%, var(--red));
+          /* Darker red endpoint so the gradient doesn't melt into the
+             painting's warm cream/gold tones. Was var(--red) (#E63946);
+             now a deeper brand-red that stays distinct against the image. */
+          background: linear-gradient(120deg, #fff 25%, #C42E3A 75%);
           -webkit-background-clip: text; -webkit-text-fill-color: transparent;
           background-clip: text;
         }
