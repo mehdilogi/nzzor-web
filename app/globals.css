@@ -30,12 +30,24 @@
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+
+/* Mobile horizontal overflow band-aid (added 2026-05-23)
+   Some element on the homepage renders wider than the viewport on
+   mobile, causing a white gutter and sideways scroll. Affects all
+   languages, so it's not an RTL bug. This hides the symptom; revisit
+   to find and fix the offending element (see README diagnostic). */
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+  max-width: 100%;
+}
 body {
   font-family: 'Manrope', system-ui, sans-serif;
   background: var(--white);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  max-width: 100%;
 }
 img { display: block; max-width: 100%; }
 a { color: inherit; text-decoration: none; }
