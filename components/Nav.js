@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import LogoMark from "./LogoMark";
 import { useLang } from "../lib/LangContext";
@@ -14,6 +14,25 @@ export default function Nav({ overHero = false }) {
   const router = useRouter();
   const [scrolled, setScrolled] = useState(!overHero);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [langOpen, setLangOpen] = useState(false);
+  const langRef = useRef(null);
+
+  // Close the language dropdown when clicking outside or pressing Escape
+  useEffect(() => {
+    if (!langOpen) return;
+    function onDocClick(e) {
+      if (langRef.current && !langRef.current.contains(e.target)) setLangOpen(false);
+    }
+    function onKey(e) { if (e.key === "Escape") setLangOpen(false); }
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("touchstart", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("touchstart", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [langOpen]);
 
   useEffect(() => {
     if (!overHero) return;
@@ -74,18 +93,52 @@ export default function Nav({ overHero = false }) {
           >
             {user ? (user.firstName || t("nav.signin")) : t("nav.signin")}
           </button>
-          {/* Mobile-only language pill — single tap cycles through EN → FR → AR → EN
-              so language is always one tap away without opening the menu. */}
-          <button
-            className="nzn-lang-mobile"
-            onClick={() => {
-              const next = lang === "en" ? "fr" : lang === "fr" ? "ar" : "en";
-              setLang(next);
-            }}
-            aria-label="Change language"
-          >
-            {lang === "en" ? "EN" : lang === "fr" ? "FR" : "ع"}
-          </button>
+          {/* Mobile-only language dropdown — tap to open, pick from EN/FR/AR */}
+          <div className="nzn-lang-mobile-wrap" ref={langRef}>
+            <button
+              className={`nzn-lang-mobile ${langOpen ? "open" : ""}`}
+              onClick={() => setLangOpen((v) => !v)}
+              aria-label="Change language"
+              aria-haspopup="listbox"
+              aria-expanded={langOpen}
+            >
+              <span>{lang === "en" ? "EN" : lang === "fr" ? "FR" : "ع"}</span>
+              <svg width="9" height="6" viewBox="0 0 9 6" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M1 1L4.5 4.5L8 1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            {langOpen && (
+              <div className="nzn-lang-menu" role="listbox">
+                <button
+                  role="option"
+                  aria-selected={lang === "en"}
+                  className={lang === "en" ? "on" : ""}
+                  onClick={() => { setLang("en"); setLangOpen(false); }}
+                >
+                  <span className="nzn-lang-code">EN</span>
+                  <span className="nzn-lang-name">English</span>
+                </button>
+                <button
+                  role="option"
+                  aria-selected={lang === "fr"}
+                  className={lang === "fr" ? "on" : ""}
+                  onClick={() => { setLang("fr"); setLangOpen(false); }}
+                >
+                  <span className="nzn-lang-code">FR</span>
+                  <span className="nzn-lang-name">Français</span>
+                </button>
+                <button
+                  role="option"
+                  aria-selected={lang === "ar"}
+                  className={lang === "ar" ? "on" : ""}
+                  onClick={() => { setLang("ar"); setLangOpen(false); }}
+                >
+                  <span className="nzn-lang-code">ع</span>
+                  <span className="nzn-lang-name">العربية</span>
+                </button>
+              </div>
+            )}
+          </div>
           <button
             className="nzn-burger"
             onClick={() => setMenuOpen(true)}
@@ -192,12 +245,12 @@ export default function Nav({ overHero = false }) {
 
         .nzn-right { display: flex; align-items: center; gap: 12px; }
 
-        /* mobile-only language pill — tap to cycle EN → FR → AR */
+        /* mobile-only language dropdown — tap to open EN/FR/AR options */
+        .nzn-lang-mobile-wrap { position: relative; display: none; }
         .nzn-lang-mobile {
-          display: none;
-          align-items: center; justify-content: center;
-          min-width: 38px; height: 34px;
-          padding: 0 11px;
+          display: inline-flex; align-items: center; gap: 5px;
+          min-width: 50px; height: 34px;
+          padding: 0 10px 0 12px;
           background: rgba(255,255,255,0.10);
           border: 1px solid rgba(255,255,255,0.22);
           color: #fff;
@@ -209,7 +262,9 @@ export default function Nav({ overHero = false }) {
           backdrop-filter: blur(10px);
           transition: background 0.18s, border-color 0.18s;
         }
-        .nzn-lang-mobile:hover, .nzn-lang-mobile:active {
+        .nzn-lang-mobile svg { transition: transform 0.2s; flex-shrink: 0; opacity: 0.85; }
+        .nzn-lang-mobile.open svg { transform: rotate(180deg); }
+        .nzn-lang-mobile:hover, .nzn-lang-mobile.open {
           background: rgba(255,255,255,0.18);
           border-color: rgba(255,255,255,0.35);
         }
@@ -220,8 +275,51 @@ export default function Nav({ overHero = false }) {
           border-color: rgba(15, 17, 26, 0.12);
           color: var(--ink);
         }
-        .nzn.solid .nzn-lang-mobile:hover {
+        .nzn.solid .nzn-lang-mobile:hover,
+        .nzn.solid .nzn-lang-mobile.open {
           background: rgba(15, 17, 26, 0.12);
+        }
+        /* Dropdown menu panel — anchored to the button, opens below */
+        .nzn-lang-menu {
+          position: absolute;
+          top: calc(100% + 8px);
+          right: 0;
+          min-width: 160px;
+          background: #fff;
+          border-radius: var(--r-sm);
+          box-shadow:
+            0 12px 32px -8px rgba(15, 17, 26, 0.25),
+            0 0 0 1px rgba(15, 17, 26, 0.06);
+          padding: 6px;
+          z-index: 1000;
+          animation: nzn-lang-rise 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .nzn-lang-menu button {
+          display: flex; align-items: center; gap: 12px;
+          width: 100%;
+          padding: 9px 12px;
+          background: none;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-family: inherit;
+          text-align: left;
+          transition: background 0.12s;
+        }
+        .nzn-lang-menu button:hover { background: var(--gray-100); }
+        .nzn-lang-menu button.on { background: var(--red-soft); }
+        .nzn-lang-code {
+          font-size: 12px; font-weight: 800; color: var(--gray-400);
+          letter-spacing: 0.04em;
+          min-width: 18px;
+        }
+        .nzn-lang-menu button.on .nzn-lang-code { color: var(--red); }
+        .nzn-lang-name {
+          font-size: 14px; font-weight: 600; color: var(--ink);
+        }
+        @keyframes nzn-lang-rise {
+          from { opacity: 0; transform: translateY(-6px); }
+          to { opacity: 1; transform: translateY(0); }
         }
 
         /* language toggle */
@@ -320,7 +418,7 @@ export default function Nav({ overHero = false }) {
           .nzn-links { display: none; }
           .nzn-signin { display: none; }
           .nzn-lang { display: none; }
-          .nzn-lang-mobile { display: inline-flex; }
+          .nzn-lang-mobile-wrap { display: block; }
           .nzn-burger { display: flex; }
         }
       `}</style>

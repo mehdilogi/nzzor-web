@@ -276,7 +276,16 @@ export default function HomeHero() {
             0 1px 4px rgba(0, 0, 0, 0.45);
         }
         .nz-hero h1 .l1 { display: block; opacity: 0; animation: rise 1s cubic-bezier(0.16,1,0.3,1) 0.3s forwards; }
-        .nz-hero h1 .l2 { display: block; opacity: 0; animation: rise 1s cubic-bezier(0.16,1,0.3,1) 0.42s forwards; }
+        .nz-hero h1 .l2 {
+          display: block; opacity: 0; animation: rise 1s cubic-bezier(0.16,1,0.3,1) 0.42s forwards;
+          /* The gradient-text below uses background-clip:text + transparent fill,
+             which means a normal text-shadow has nothing to attach to. The
+             trick is filter:drop-shadow on the outer block — that DOES apply
+             to the rendered painted text, gradient and all. */
+          filter:
+            drop-shadow(0 1px 3px rgba(0, 0, 0, 0.55))
+            drop-shadow(0 2px 12px rgba(0, 0, 0, 0.45));
+        }
         .nz-hero h1 .accent {
           white-space: nowrap;
           background: linear-gradient(120deg, #fff 30%, var(--red));
@@ -328,14 +337,18 @@ export default function HomeHero() {
         .nzs-submit:hover { background: var(--red-deep); }
 
         /* ---- AI / NATURAL-LANGUAGE SEARCH ---- */
+        /* The AI bar only has one input + submit, so the standard 820px
+           feels cramped. Let it breathe a little wider on desktop. */
+        .nz-search:has(.nz-ai-bar) { max-width: 960px; }
         .nz-ai-bar { align-items: stretch; }
         .nz-ai-input {
           flex: 1; display: flex; align-items: center; gap: 12px;
-          padding: 0 18px; min-width: 0;
+          padding: 0 22px; min-width: 0;
         }
         .nz-ai-input input {
           flex: 1; border: none; background: transparent; outline: none;
-          font-size: 15px; font-weight: 600; color: var(--ink); min-width: 0;
+          font-size: 15.5px; font-weight: 600; color: var(--ink); min-width: 0;
+          padding: 16px 0;
           font-family: inherit;
         }
         .nz-ai-input input::placeholder { color: var(--gray-300); font-weight: 500; }
