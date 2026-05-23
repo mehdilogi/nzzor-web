@@ -216,7 +216,10 @@ export default function HomeHero() {
           <span>✓ {t("hero.foot2")}</span>
           <span>✓ {t("hero.foot3")}</span>
         </div>
-        <div className="nz-hero-credit">Tassili n&apos;Ajjer, Djanet</div>
+        <div className="nz-hero-credit">
+          <span className="nz-hero-credit-title">{t("hero.credit_title")}</span>
+          <span className="nz-hero-credit-attr">{t("hero.credit_attr")}</span>
+        </div>
       </div>
 
       <style jsx>{`
@@ -392,8 +395,17 @@ export default function HomeHero() {
         .nz-hero-foot-trust { display: flex; gap: 26px; }
         .nz-hero-foot-trust span { font-size: 12.5px; color: rgba(255,255,255,0.85); font-weight: 600; }
         .nz-hero-credit {
-          font-size: 11px; color: rgba(255,255,255,0.65); letter-spacing: 0.06em;
-          text-transform: uppercase; font-weight: 600;
+          display: flex; flex-direction: column; align-items: flex-end;
+          gap: 2px;
+          text-align: right;
+        }
+        .nz-hero-credit-title {
+          font-size: 11px; color: rgba(255,255,255,0.85); letter-spacing: 0.02em;
+          font-weight: 600; font-style: italic;
+        }
+        .nz-hero-credit-attr {
+          font-size: 10px; color: rgba(255,255,255,0.55); letter-spacing: 0.06em;
+          font-weight: 500; text-transform: uppercase;
         }
 
         @media (max-width: 860px) {

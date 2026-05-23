@@ -518,6 +518,9 @@ html[dir="rtl"] .drp-dow { direction: ltr; }
 /* hero text block aligns right in Arabic */
 html[dir="rtl"] .nz-hero-inner { text-align: right; }
 
+/* hero photo credit aligns the other way in RTL */
+html[dir="rtl"] .nz-hero-credit { align-items: flex-start; text-align: left; }
+
 /* footer columns align right */
 html[dir="rtl"] .nz-fcol { text-align: right; }
 /* (WhatsApp button stays bottom-right in all languages — universally expected) */
