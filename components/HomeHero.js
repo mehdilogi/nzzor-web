@@ -229,24 +229,26 @@ export default function HomeHero() {
           width: 100%; height: 100%; object-fit: cover;
           animation: kenburns 24s ease-out infinite alternate;
         }
-        /* Readability scrim. The painting is bright with gold/cream tones, so
-           white text needs a strong dark anchor on the left where the text
-           actually sits — without ruining the right half of the image. */
+        /* Hero overlay. Two layers do different jobs:
+           1) A uniform dark wash across the entire image — this is what
+              gives the gradient headline contrast on every letter, not just
+              the left side. The painting is bright; we mute it so the
+              brand colors can read.
+           2) A bottom-anchored shade for any future content that might
+              spill toward the lower edge. */
         .nz-hero-photo::after {
           content: ''; position: absolute; inset: 0;
           background:
-            linear-gradient(100deg,
-              rgba(15, 17, 26, 0.85) 0%,
-              rgba(15, 17, 26, 0.68) 28%,
-              rgba(15, 17, 26, 0.35) 52%,
-              rgba(15, 17, 26, 0.10) 72%,
-              transparent 100%
+            linear-gradient(to right,
+              rgba(15, 17, 26, 0.62) 0%,
+              rgba(15, 17, 26, 0.50) 50%,
+              rgba(15, 17, 26, 0.42) 100%
             ),
             linear-gradient(to bottom,
-              rgba(15, 17, 26, 0.25) 0%,
-              transparent 18%,
-              transparent 75%,
-              rgba(15, 17, 26, 0.45) 100%
+              rgba(15, 17, 26, 0.15) 0%,
+              transparent 25%,
+              transparent 70%,
+              rgba(15, 17, 26, 0.40) 100%
             );
         }
         .nz-hero-inner {
@@ -283,16 +285,7 @@ export default function HomeHero() {
         }
         .nz-hero h1 .accent {
           white-space: nowrap;
-          /* Match the working reference: white → soft pink/coral middle → red.
-             The wider transition through pink keeps the whole word luminous
-             rather than muddying into a dark red against warm backgrounds. */
-          background: linear-gradient(120deg,
-            #fff 0%,
-            #fff 20%,
-            #F8B5BC 50%,
-            var(--red) 80%,
-            var(--red) 100%
-          );
+          background: linear-gradient(120deg, #fff 30%, var(--red));
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
