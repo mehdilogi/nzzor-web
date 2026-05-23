@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   getToken, clearToken, adminLogin, adminMe, adminDashboard,
   adminHotels, adminBookings, adminBookingDetail, adminUpdateBookingStatus,
   adminCreateHotel, adminUpdateHotel, adminDeleteHotel,
   adminAddRoom, adminUpdateRoom, adminDeleteRoom,
-  adminAddPhoto, adminDeletePhoto,
+  adminAddPhoto, adminUploadPhoto, adminDeletePhoto,
   adminHotelManagers, adminAddHotelManager, adminRemoveHotelManager, adminResetHotelManagerPassword,
   adminTags,
 } from "../../lib/adminApi";
@@ -790,19 +790,25 @@ function RoomsPanel({ hotelId, initialRooms }) {
 function PhotosPanel({ hotelId, initialPhotos }) {
   const [photos, setPhotos] = useState(initialPhotos);
   const [url, setUrl] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [showUrl, setShowUrl] = useState(false);
+  const [busyUrl, setBusyUrl] = useState(false);
   const [err, setErr] = useState("");
+  // Each upload row: { id, name, progress, error, done }
+  const [uploads, setUploads] = useState([]);
+  const [dragging, setDragging] = useState(false);
+  const fileInputRef = useRef(null);
 
-  async function add() {
+  async function addByUrl() {
     if (!url.trim()) return;
-    setErr(""); setBusy(true);
+    setErr(""); setBusyUrl(true);
     try {
       const p = await adminAddPhoto(hotelId, url.trim(), photos.length === 0);
       setPhotos((ps) => [...ps, p]);
       setUrl("");
     } catch (e) { setErr(e.message); }
-    finally { setBusy(false); }
+    finally { setBusyUrl(false); }
   }
+
   async function del(id) {
     try {
       await adminDeletePhoto(id);
@@ -810,55 +816,142 @@ function PhotosPanel({ hotelId, initialPhotos }) {
     } catch (e) { setErr(e.message); }
   }
 
+  function pickFiles() {
+    if (fileInputRef.current) fileInputRef.current.click();
+  }
+
+  function onFilesChosen(e) {
+    const files = Array.from(e.target.files || []);
+    if (files.length) handleFiles(files);
+    // reset so picking the same file twice still fires onChange
+    e.target.value = "";
+  }
+
+  function onDrop(e) {
+    e.preventDefault();
+    setDragging(false);
+    const files = Array.from(e.dataTransfer.files || []).filter((f) =>
+      f.type.startsWith("image/")
+    );
+    if (files.length) handleFiles(files);
+  }
+
+  async function handleFiles(files) {
+    setErr("");
+    // create one upload row per file and process them in sequence so the
+    // R2 free tier and Railway's CPU don't get hammered with parallel uploads
+    const rows = files.map((f) => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      name: f.name,
+      size: f.size,
+      progress: 0,
+      error: null,
+      done: false,
+    }));
+    setUploads((u) => [...u, ...rows]);
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const row = rows[i];
+      try {
+        const p = await adminUploadPhoto(hotelId, file, {
+          onProgress: (pct) => {
+            setUploads((u) => u.map((r) => (r.id === row.id ? { ...r, progress: pct } : r)));
+          },
+        });
+        setPhotos((ps) => [...ps, p]);
+        setUploads((u) => u.map((r) => (r.id === row.id ? { ...r, done: true, progress: 100 } : r)));
+        // drop the row after a short delay so the user sees the "done" tick
+        setTimeout(() => {
+          setUploads((u) => u.filter((r) => r.id !== row.id));
+        }, 1200);
+      } catch (e) {
+        setUploads((u) => u.map((r) => (r.id === row.id ? { ...r, error: e.message } : r)));
+      }
+    }
+  }
+
   return (
     <div className="nzad-panel">
       <h3>Photos</h3>
 
-      <div className="nzad-photo-banner">
-        <span className="nzad-photo-banner-icon">📷</span>
-        <div>
-          <strong>Photos by URL (interim)</strong>
-          <span>Direct file upload from your computer is coming soon — it needs Cloudflare R2 storage set up first. For now, host the image somewhere and paste its URL below.</span>
-        </div>
-      </div>
-
       {err && <ErrorBox msg={err} />}
 
-      <div className="nzad-photo-grid">
-        {photos.map((p) => (
-          <div className="nzad-photo" key={p.id}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={p.url} alt="" />
-            {p.isPrimary && <span className="nzad-photo-primary">Primary</span>}
-            <button className="nzad-photo-del" onClick={() => del(p.id)}>×</button>
-          </div>
-        ))}
+      {/* existing photos grid */}
+      {photos.length > 0 && (
+        <div className="nzad-photo-grid">
+          {photos.map((p) => (
+            <div className="nzad-photo" key={p.id}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={p.url} alt="" />
+              {p.isPrimary && <span className="nzad-photo-primary">Primary</span>}
+              <button className="nzad-photo-del" onClick={() => del(p.id)} title="Remove">×</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* drag-and-drop dropzone */}
+      <div
+        className={`nzad-drop ${dragging ? "active" : ""}`}
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+        onClick={pickFiles}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          style={{ display: "none" }}
+          onChange={onFilesChosen}
+        />
+        <div className="nzad-drop-icon">📷</div>
+        <div className="nzad-drop-title">Drag photos here, or click to choose</div>
+        <div className="nzad-drop-sub">JPG, PNG, or WEBP · up to 8 MB each</div>
       </div>
 
-      <div className="nzad-photo-add">
-        <input value={url} onChange={(e) => setUrl(e.target.value)}
-          placeholder="Paste an image URL — e.g. https://images.unsplash.com/photo-…"
-          onKeyDown={(e) => e.key === "Enter" && add()} />
-        <button className="nzad-btn-primary" onClick={add} disabled={busy}>
-          {busy ? "Adding…" : "Add photo"}
+      {/* in-progress uploads */}
+      {uploads.length > 0 && (
+        <div className="nzad-uploads">
+          {uploads.map((u) => (
+            <div key={u.id} className={`nzad-upload ${u.error ? "err" : u.done ? "done" : ""}`}>
+              <div className="nzad-upload-info">
+                <span className="nzad-upload-name">{u.name}</span>
+                <span className="nzad-upload-status">
+                  {u.error ? `Failed: ${u.error}` : u.done ? "✓ Done" : `${u.progress}%`}
+                </span>
+              </div>
+              {!u.error && (
+                <div className="nzad-upload-bar">
+                  <div className="nzad-upload-fill" style={{ width: `${u.progress}%` }} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* URL-paste — kept as a secondary option, collapsed by default */}
+      <div className="nzad-url-toggle">
+        <button onClick={() => setShowUrl((v) => !v)} type="button" className="nzad-link">
+          {showUrl ? "Hide URL option" : "Or add by URL"}
         </button>
       </div>
+      {showUrl && (
+        <div className="nzad-photo-add">
+          <input value={url} onChange={(e) => setUrl(e.target.value)}
+            placeholder="Paste an image URL — e.g. https://images.unsplash.com/photo-…"
+            onKeyDown={(e) => e.key === "Enter" && addByUrl()} />
+          <button className="nzad-btn-primary" onClick={addByUrl} disabled={busyUrl}>
+            {busyUrl ? "Adding…" : "Add by URL"}
+          </button>
+        </div>
+      )}
 
       <style jsx>{`
-        .nzad-photo-banner {
-          display: flex; gap: 12px; align-items: flex-start;
-          background: linear-gradient(135deg, #FFF7E6, #FFF4F4);
-          border: 1px solid #F5E0C8;
-          border-radius: var(--r-sm);
-          padding: 12px 14px;
-          margin-bottom: 16px;
-        }
-        .nzad-photo-banner-icon { font-size: 20px; flex-shrink: 0; line-height: 1.2; }
-        .nzad-photo-banner > div { display: flex; flex-direction: column; gap: 3px; }
-        .nzad-photo-banner strong { font-size: 12.5px; font-weight: 700; color: var(--ink); }
-        .nzad-photo-banner span { font-size: 12px; color: var(--gray-400); line-height: 1.5; }
-        .nzad-photo-hint { font-size: 12.5px; color: var(--gray-400); margin-bottom: 14px; }
-        .nzad-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
+        .nzad-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-bottom: 16px; }
         .nzad-photo { position: relative; height: 90px; border-radius: var(--r-sm); overflow: hidden; background: var(--gray-100); }
         .nzad-photo img { width: 100%; height: 100%; object-fit: cover; }
         .nzad-photo-primary {
@@ -870,7 +963,66 @@ function PhotosPanel({ hotelId, initialPhotos }) {
           border-radius: 50%; border: none; background: rgba(0,0,0,0.6); color: #fff;
           font-size: 14px; cursor: pointer; line-height: 1;
         }
-        .nzad-photo-add { display: flex; gap: 8px; }
+
+        /* dropzone */
+        .nzad-drop {
+          border: 2px dashed var(--gray-200);
+          border-radius: var(--r-sm);
+          padding: 32px 20px;
+          text-align: center;
+          cursor: pointer;
+          background: var(--gray-50, #FAFAFA);
+          transition: border-color .15s, background .15s;
+        }
+        .nzad-drop:hover { border-color: var(--gray-300); }
+        .nzad-drop.active {
+          border-color: var(--red);
+          background: var(--red-soft);
+        }
+        .nzad-drop-icon { font-size: 28px; margin-bottom: 6px; }
+        .nzad-drop-title { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 3px; }
+        .nzad-drop-sub { font-size: 11.5px; color: var(--gray-400); }
+
+        /* upload rows */
+        .nzad-uploads { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+        .nzad-upload {
+          padding: 9px 12px;
+          background: #fff;
+          border: 1px solid var(--gray-200);
+          border-radius: var(--r-sm);
+          transition: border-color .2s;
+        }
+        .nzad-upload.done { border-color: #B8E0C8; background: #F3FAF6; }
+        .nzad-upload.err { border-color: #F0C2C5; background: #FCF3F4; }
+        .nzad-upload-info {
+          display: flex; justify-content: space-between; align-items: center;
+          margin-bottom: 6px; gap: 12px;
+        }
+        .nzad-upload-name {
+          font-size: 12.5px; font-weight: 600; color: var(--ink);
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .nzad-upload-status {
+          font-size: 11.5px; font-weight: 700; color: var(--gray-400); flex-shrink: 0;
+        }
+        .nzad-upload.done .nzad-upload-status { color: var(--teal, #1B8A5A); }
+        .nzad-upload.err .nzad-upload-status { color: var(--red); }
+        .nzad-upload-bar { height: 4px; background: var(--gray-100); border-radius: 999px; overflow: hidden; }
+        .nzad-upload-fill {
+          height: 100%; background: var(--red);
+          transition: width .25s ease-out;
+        }
+        .nzad-upload.done .nzad-upload-fill { background: var(--teal, #1B8A5A); }
+
+        /* URL toggle */
+        .nzad-url-toggle { margin-top: 14px; text-align: center; }
+        .nzad-link {
+          background: none; border: none; padding: 0;
+          font-size: 12px; font-weight: 600; color: var(--gray-400);
+          text-decoration: underline; cursor: pointer; font-family: inherit;
+        }
+        .nzad-link:hover { color: var(--ink); }
+        .nzad-photo-add { display: flex; gap: 8px; margin-top: 10px; }
         .nzad-photo-add input {
           flex: 1; padding: 10px 12px; border: 1.5px solid var(--gray-200);
           border-radius: var(--r-sm); font-size: 13px; outline: none;
