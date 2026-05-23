@@ -280,22 +280,21 @@ export default function HomeHero() {
         .nz-hero h1 .l2 {
           display: block; opacity: 0;
           animation: rise 1s cubic-bezier(0.16,1,0.3,1) 0.42s forwards;
-          /* Aggressive drop-shadow stack — the painting has bright warm
-             areas that defeat subtle shadows. Three layered shadows:
-             a tight sharp one for edge definition, a medium one for
-             body separation, a wide ambient one for atmospheric lift. */
-          filter:
-            drop-shadow(0 1px 2px rgba(0, 0, 0, 0.85))
-            drop-shadow(0 2px 6px rgba(0, 0, 0, 0.65))
-            drop-shadow(0 6px 24px rgba(0, 0, 0, 0.55));
         }
         .nz-hero h1 .accent {
           white-space: nowrap;
-          /* Darker red endpoint so the gradient doesn't melt into the
-             painting's warm cream/gold tones. Was var(--red) (#E63946);
-             now a deeper brand-red that stays distinct against the image. */
-          background: linear-gradient(120deg, #fff 25%, #C42E3A 75%);
-          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+          /* Match the working reference: white → soft pink/coral middle → red.
+             The wider transition through pink keeps the whole word luminous
+             rather than muddying into a dark red against warm backgrounds. */
+          background: linear-gradient(120deg,
+            #fff 0%,
+            #fff 20%,
+            #F8B5BC 50%,
+            var(--red) 80%,
+            var(--red) 100%
+          );
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
           background-clip: text;
         }
         .nz-hero p {
