@@ -165,7 +165,8 @@ input, select, textarea { font-family: inherit; }
 }
 .nz-why-hero-inner {
   position: relative; z-index: 2;
-  padding: 90px 0;
+  padding-top: 90px;
+  padding-bottom: 90px;
   max-width: 760px;
 }
 .nz-why-hero-kicker {
