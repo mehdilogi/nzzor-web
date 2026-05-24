@@ -138,7 +138,7 @@ export default function CitiesTicker() {
         <p className="nz-cities-sub">{t("globe.sub")}</p>
       </div>
 
-      <div className="nz-cities-stage" aria-label="Cities across Algeria">
+      <div className="nz-cities-stage" aria-label="Cities across Algeria" dir="ltr">
         <TickerRow cities={row1} direction="right" speed={70} weight="faded"   lang={lang} fromLabel={fromLabel} />
         <TickerRow cities={row2} direction="left"  speed={50} weight="hero"    lang={lang} fromLabel={fromLabel} />
         <TickerRow cities={row3} direction="right" speed={60} weight="faded-r" lang={lang} fromLabel={fromLabel} />
