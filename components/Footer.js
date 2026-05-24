@@ -93,9 +93,10 @@ export default function Footer() {
             grid-template-columns: 1fr;
             gap: 32px;
             padding-bottom: 28px;
+            border-bottom: none;
           }
-          /* Hide the duplicate brand logo on mobile — the nav already shows it */
-          .nz-footer-logo { display: none; }
+          /* Logo stays — it grounds the footer */
+          .nz-footer-logo { margin-bottom: 18px; }
           .nz-footer-brand p {
             font-size: 14.5px;
             line-height: 1.65;
@@ -128,15 +129,33 @@ export default function Footer() {
             margin-bottom: 14px;
             padding: 2px 0;
           }
+          /* Centered closing block — feels like a finished signature, not trailing text */
           .nz-footer-bottom {
             flex-direction: column;
-            align-items: flex-start;
-            gap: 8px;
-            padding-top: 24px;
-            /* Bottom padding clears the floating chat bubble */
-            padding-bottom: 110px;
+            align-items: center;
+            text-align: center;
+            gap: 6px;
+            padding-top: 28px;
+            padding-bottom: 60px;
+            position: relative;
+          }
+          .nz-footer-bottom::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 2px;
+            background: var(--red);
+            border-radius: 2px;
           }
           .nz-footer-bottom span { font-size: 12.5px; line-height: 1.6; }
+          .nz-footer-bottom span:last-child {
+            font-size: 12px;
+            color: var(--gray-400);
+            max-width: 280px;
+          }
         }
       `}</style>
     </footer>
