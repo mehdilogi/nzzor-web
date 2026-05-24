@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import HotelCard from "./HotelCard";
 import Icon from "./Icon";
+import AlgeriaGlobe from "./AlgeriaGlobe";
 import { useLang } from "../lib/LangContext";
 
 // The text-bearing homepage sections. Receives featured hotels as a prop
@@ -78,8 +78,10 @@ export default function HomeSections({ featured }) {
           </div>
         </div>
 
-        {/* INLINE SPEED LINE — animated counter, triggers on scroll into view */}
-        <SpeedCounter label={t("why.speed_inline")} />
+        {/* ANIMATED GLOBE — replaces the previous 5-second counter line.
+            Dramatises Nzzor's Algeria coverage with a Cloudflare-style rotating
+            dotted sphere and city pins. Click to spin it faster for a beat. */}
+        <AlgeriaGlobe />
 
         {/* FOUR CLEAN FEATURE COLUMNS */}
         <div className="wrap nz-why-cols">
@@ -151,71 +153,5 @@ export default function HomeSections({ featured }) {
         </div>
       </div>
     </>
-  );
-}
-
-// =============================================================================
-// SpeedCounter — animated 0→5 counter that fires once when scrolled into view.
-// The animation itself takes about the same time as a real Nzzor confirmation:
-// it dramatises the "5 seconds" claim instead of just stating it.
-// =============================================================================
-function SpeedCounter({ label }) {
-  const ref = useRef(null);
-  const [n, setN] = useState(0);
-  const [done, setDone] = useState(false);
-  const fired = useRef(false);
-
-  // run the counter animation once
-  function runOnce() {
-    if (fired.current) return;
-    fired.current = true;
-    setDone(false);
-    const duration = 1100;
-    const start = performance.now();
-    function tick(now) {
-      const t = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setN(Math.round(eased * 5));
-      if (t < 1) requestAnimationFrame(tick);
-      else setDone(true);
-    }
-    requestAnimationFrame(tick);
-  }
-
-  // replay on hover (allow it to be rediscovered)
-  function replay() {
-    fired.current = false;
-    setN(0);
-    setDone(false);
-    // tiny delay so the CSS transition resets cleanly
-    requestAnimationFrame(() => runOnce());
-  }
-
-  useEffect(() => {
-    const node = ref.current;
-    if (!node) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) runOnce();
-        });
-      },
-      { threshold: 0.4 }
-    );
-    io.observe(node);
-    return () => io.disconnect();
-  }, []);
-
-  return (
-    <div ref={ref} className={`wrap nz-why-speed ${done ? "is-done" : ""}`} onMouseEnter={replay}>
-      <div className="nz-why-speed-num-wrap">
-        <span className="nz-why-speed-num display">{n}<em>s</em></span>
-        <span className="nz-why-speed-pulse" aria-hidden />
-      </div>
-      <span className="nz-why-speed-text">
-        {label}
-        <span className="nz-why-speed-underline" />
-      </span>
-    </div>
   );
 }
