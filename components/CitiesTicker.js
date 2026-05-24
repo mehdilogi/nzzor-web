@@ -130,20 +130,8 @@ export default function CitiesTicker() {
   const row2 = shuffleSeed(CITIES, 19);  // middle, fast, full opacity
   const row3 = shuffleSeed(CITIES, 31);  // bottom, medium, faded
 
-  // Click-to-accelerate: bump a state value that toggles the CSS class on
-  // the section. The CSS rule shortens animation-duration when this class
-  // is present.
-  const [sparked, setSparked] = useState(false);
-  function handleSpark() {
-    setSparked(true);
-    setTimeout(() => setSparked(false), 1600);
-  }
-
   return (
-    <section
-      className={`nz-cities-section ${sparked ? "is-sparked" : ""}`}
-      onClick={handleSpark}
-    >
+    <section className="nz-cities-section">
       <div className="wrap nz-cities-head">
         <div className="nz-cities-kicker">{t("globe.kicker")}</div>
         <h2 className="display nz-cities-title">{t("globe.title")}</h2>
@@ -156,16 +144,12 @@ export default function CitiesTicker() {
         <TickerRow cities={row3} direction="right" speed={60} weight="faded-r" lang={lang} fromLabel={fromLabel} />
       </div>
 
-      <div className="nz-cities-hint">{t("globe.hint")}</div>
-
       <style>{`
         .nz-cities-section {
-          padding: 80px 0 88px;
+          padding: 0 0 64px;
           background: var(--cream);
           position: relative;
           overflow: hidden;
-          cursor: pointer;
-          user-select: none;
         }
         .nz-cities-head {
           text-align: center;
@@ -208,20 +192,6 @@ export default function CitiesTicker() {
           );
         }
 
-        .nz-cities-hint {
-          text-align: center;
-          margin-top: 48px;
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: var(--gray-400);
-          opacity: 0.7;
-          pointer-events: none;
-          position: relative;
-          z-index: 3;
-        }
-
         /* A row holds one infinitely-scrolling track */
         .nz-ticker-row {
           overflow: hidden;
@@ -240,11 +210,6 @@ export default function CitiesTicker() {
           animation-timing-function: linear;
           animation-iteration-count: infinite;
           will-change: transform;
-          transition: animation-duration 0.6s ease-out;
-        }
-        /* Sparked: rows accelerate (animation-duration cut to ~35% via class) */
-        .nz-cities-section.is-sparked .nz-ticker-track {
-          animation-duration: 14s !important;
         }
 
         @keyframes nz-ticker-left {
@@ -361,7 +326,6 @@ export default function CitiesTicker() {
         /* Respect reduced-motion: stop the animation, let cities sit still */
         @media (prefers-reduced-motion: reduce) {
           .nz-ticker-track { animation: none; }
-          .nz-cities-section.is-sparked .nz-ticker-track { animation: none !important; }
         }
       `}</style>
     </section>
