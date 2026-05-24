@@ -2,7 +2,7 @@
 
 import HotelCard from "./HotelCard";
 import Icon from "./Icon";
-import AlgeriaGlobe from "./AlgeriaGlobe";
+import CitiesTicker from "./CitiesTicker";
 import { useLang } from "../lib/LangContext";
 
 // The text-bearing homepage sections. Receives featured hotels as a prop
@@ -78,10 +78,9 @@ export default function HomeSections({ featured }) {
           </div>
         </div>
 
-        {/* ANIMATED GLOBE — replaces the previous 5-second counter line.
-            Dramatises Nzzor's Algeria coverage with a Cloudflare-style rotating
-            dotted sphere and city pins. Click to spin it faster for a beat. */}
-        <AlgeriaGlobe />
+        {/* CITIES TICKER — three layered horizontal scrolling rows of our
+            8 launch cities. Replaces the animated globe iterations. */}
+        <CitiesTicker />
 
         {/* FOUR CLEAN FEATURE COLUMNS */}
         <div className="wrap nz-why-cols">
