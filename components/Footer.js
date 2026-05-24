@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import LogoMark from "./LogoMark";
+import Icon from "./Icon";
 import { useLang } from "../lib/LangContext";
 
 export default function Footer() {
@@ -21,7 +22,9 @@ export default function Footer() {
           <div className="nz-pay-wrap">
             <h5 className="nz-pay-label">{t("footer.weaccept") || "We accept"}</h5>
             <div className="nz-pay">
-              <span>CIB</span><span>Eddahabia</span><span>Bank transfer</span>
+              <span><Icon name="cib" size={18} strokeWidth={1.6} /> CIB</span>
+              <span><Icon name="edahabia" size={18} strokeWidth={1.6} /> Edahabia</span>
+              <span><Icon name="banktransfer" size={18} strokeWidth={1.6} /> Bank transfer</span>
             </div>
           </div>
         </div>
@@ -67,8 +70,12 @@ export default function Footer() {
         .nz-pay-label { display: none; }
         .nz-pay { display: flex; gap: 8px; flex-wrap: wrap; }
         .nz-pay span {
+          display: inline-flex; align-items: center; gap: 8px;
           background: var(--cream); border: 1px solid var(--gray-200);
           padding: 8px 13px; border-radius: 8px; font-size: 12px; font-weight: 700; color: var(--ink-2);
+        }
+        .nz-pay span :global(svg) {
+          color: var(--ink); flex-shrink: 0;
         }
         .nz-fcol h5 {
           font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
