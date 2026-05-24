@@ -256,14 +256,14 @@ input, select, textarea { font-family: inherit; }
 /* RESPONSIVE */
 @media (max-width: 960px) {
   .nz-why-cols { grid-template-columns: 1fr 1fr; gap: 32px 28px; }
-  .nz-why-hero-inner { padding: 60px 0; max-width: 100%; }
+  .nz-why-hero-inner { padding-top: 60px; padding-bottom: 60px; max-width: 100%; }
   .nz-why-hero { min-height: 360px; }
   .nz-why-close-stats { gap: 18px; }
 }
 @media (max-width: 560px) {
   .nz-why-v2 { padding-bottom: 64px; }
   .nz-why-hero { min-height: 320px; margin-bottom: 40px; }
-  .nz-why-hero-inner { padding: 50px 0; }
+  .nz-why-hero-inner { padding-top: 50px; padding-bottom: 50px; }
   .nz-why-hero-sub { font-size: 15px; }
   .nz-why-cols { grid-template-columns: 1fr; gap: 28px; }
   .nz-why-close { margin-top: 56px; padding-top: 40px; }
