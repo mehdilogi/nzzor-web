@@ -31,14 +31,25 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-/* Mobile horizontal overflow band-aid (added 2026-05-23)
+/* Mobile horizontal overflow band-aid (added 2026-05-23, updated 2026-05-26)
    Some element on the homepage renders wider than the viewport on
    mobile, causing a white gutter and sideways scroll. Affects all
-   languages, so it's not an RTL bug. This hides the symptom; revisit
-   to find and fix the offending element (see README diagnostic). */
+   languages, so it's not an RTL bug.
+
+   IMPORTANT — why `overflow-x: clip` and not `overflow-x: hidden`:
+   `hidden` creates a scroll container, which makes `position: sticky`
+   silently inert for EVERY descendant element on the page. That broke
+   the booking widget's stickiness on hotel detail pages.
+
+   `overflow-x: clip` clips overflow visually (same effect as `hidden`
+   for hiding the white gutter) WITHOUT establishing a scroll container,
+   so sticky positioning continues to work as expected. Browser support
+   is good: Chrome 90+, Safari 15.4+, Firefox 81+ — i.e. anything from
+   late 2021 onwards. Fallback browsers will fall through to default
+   (no clipping, the gutter would return) but that's a tiny minority. */
 html {
   scroll-behavior: smooth;
-  overflow-x: hidden;
+  overflow-x: clip;
   max-width: 100%;
 }
 body {
@@ -46,7 +57,7 @@ body {
   background: var(--white);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  overflow-x: clip;
   max-width: 100%;
 }
 img { display: block; max-width: 100%; }

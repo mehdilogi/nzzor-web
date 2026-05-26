@@ -7,6 +7,7 @@ import Icon, { AMENITY_ICON } from "./Icon";
 import Lightbox from "./Lightbox";
 import { formatPrice, formatPriceShort } from "../lib/format";
 import { useLang } from "../lib/LangContext";
+import { todayInAlgiers, validateBookingDates, localizeDateError } from "../lib/dates";
 
 export default function HotelDetail({ hotel }) {
   const router = useRouter();
@@ -18,6 +19,17 @@ export default function HotelDetail({ hotel }) {
   const [checkIn, setCheckIn] = useState(searchParams.get("checkIn") || "");
   const [checkOut, setCheckOut] = useState(searchParams.get("checkOut") || "");
   const [lightboxIndex, setLightboxIndex] = useState(null);
+
+  // ---- Date validation for the inline booking widget ----------------------
+  // The widget uses native <input type="date"> elements. Native inputs honor
+  // a `min` attribute but won't enforce client-side validation past that —
+  // a determined user could still paste a past date. So we also re-validate
+  // inside reserve() before navigating. If the URL was carried over from a
+  // stale search ("yesterday's dates") this also catches that on render.
+  const today = todayInAlgiers();
+  const dateError = checkIn && checkOut
+    ? validateBookingDates(checkIn, checkOut)
+    : null;
 
   // ---- Sticky scroll-spy tabs (item #4) ------------------------------------
   // The four sections (about, rooms, amenities, policies) are anchored by ID
@@ -92,13 +104,20 @@ export default function HotelDetail({ hotel }) {
 
   function reserve() {
     if (!selectedRoom) return;
+    // Block the navigation if dates are invalid — past, reversed, missing,
+    // or stay too long. The booking page also has its own guard (bundle 2),
+    // but failing earlier gives the user a much better UX: the error
+    // appears under the date inputs they just typed in, not after a route
+    // change to a generic error screen.
+    if (!checkIn || !checkOut) return; // CTA is disabled in this state too
+    if (dateError) return;             // CTA disabled and error visible
     const params = new URLSearchParams({
       hotel: hotel.slug,
       room: selectedRoom.id,
       nights: String(nights),
     });
-    if (checkIn) params.set("checkIn", checkIn);
-    if (checkOut) params.set("checkOut", checkOut);
+    params.set("checkIn", checkIn);
+    params.set("checkOut", checkOut);
     router.push(`/booking?${params.toString()}`);
   }
 
@@ -280,13 +299,41 @@ export default function HotelDetail({ hotel }) {
               <div className="nz-widget-dates">
                 <div className="wf">
                   <label>Check in</label>
-                  <input type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} />
+                  <input
+                    type="date"
+                    value={checkIn}
+                    min={today}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setCheckIn(v);
+                      // If the new check-in pushes past check-out, clear
+                      // check-out so the user doesn't end up with an
+                      // invalid reversed range carried over silently.
+                      if (checkOut && v && v >= checkOut) setCheckOut("");
+                    }}
+                  />
                 </div>
                 <div className="wf">
                   <label>Check out</label>
-                  <input type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
+                  <input
+                    type="date"
+                    value={checkOut}
+                    min={checkIn || today}
+                    onChange={(e) => setCheckOut(e.target.value)}
+                  />
                 </div>
               </div>
+
+              {/* Inline date error. Shows when the URL had stale dates or
+                  the user managed to enter an invalid range despite the
+                  min attributes (paste, devtools, etc). The Reserve button
+                  is disabled in this state so the user can't proceed. */}
+              {dateError && (
+                <div className="nz-widget-date-err" role="alert">
+                  <Icon name="shield" size={15} style={{ color: "var(--red)" }} />
+                  <span>{localizeDateError(dateError, t)}</span>
+                </div>
+              )}
 
               {selectedRoom && (
                 <div className="nz-widget-room">
@@ -307,7 +354,13 @@ export default function HotelDetail({ hotel }) {
                 </div>
               </div>
 
-              <button className="nz-widget-cta" onClick={reserve}>{t("detail.reserve")}</button>
+              <button
+                className="nz-widget-cta"
+                onClick={reserve}
+                disabled={!selectedRoom || !checkIn || !checkOut || !!dateError}
+              >
+                {t("detail.reserve")}
+              </button>
               <div className="nz-widget-reassure">
                 <Icon name="check" size={14} strokeWidth={2.5} />
                 {t("detail.reassure")}
@@ -531,7 +584,24 @@ function DetailStyles() {
         border-radius: var(--r-md); font-family: 'Clash Display', sans-serif;
         font-size: 16px; font-weight: 600; transition: background .2s, transform .15s;
       }
-      .nz-widget-cta:hover { background: var(--red-deep); transform: scale(1.01); }
+      .nz-widget-cta:hover:not(:disabled) { background: var(--red-deep); transform: scale(1.01); }
+      .nz-widget-cta:disabled {
+        background: var(--gray-200); color: var(--gray-400);
+        cursor: not-allowed; transform: none;
+      }
+
+      /* Inline date-error banner shown between the date inputs and the
+         booking breakdown. Tighter and more compact than the booking-page
+         banner because it sits inside the narrow widget column. */
+      .nz-widget-date-err {
+        display: flex; align-items: center; gap: 8px;
+        padding: 10px 12px; margin-bottom: 14px;
+        background: rgba(230, 57, 70, 0.08);
+        border: 1px solid rgba(230, 57, 70, 0.25);
+        border-left: 3px solid var(--red);
+        border-radius: var(--r-sm);
+        font-size: 12.5px; color: var(--ink); line-height: 1.4;
+      }
       .nz-widget-reassure {
         text-align: center; margin-top: 12px; font-size: 12px; color: var(--teal); font-weight: 700;
         display: flex; align-items: center; justify-content: center; gap: 6px;

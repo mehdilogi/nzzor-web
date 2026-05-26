@@ -231,11 +231,12 @@ export default function HomeHero() {
                   setCheckIn(ci);
                   setCheckOut(co);
                 }}
-                /* No onComplete handler — see pickCity for the reasoning.
-                   Auto-jumping to the guests step took control away from the
-                   user. The picker stays open after the range is selected
-                   (showing the "X nights selected" hint) and they choose
-                   when to move on. */
+                /* Close the picker once a full range is selected so the user
+                   sees their choice commit. We do NOT auto-advance to the
+                   guests panel — that nudge-the-user pattern was the bug
+                   we removed in bundle 3. Closing is feedback ("got it");
+                   auto-opening the next step takes control away. */
+                onComplete={() => setOpen(null)}
               />
             </div>
           )}
