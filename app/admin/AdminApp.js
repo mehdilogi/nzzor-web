@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  getToken, clearToken, adminLogin, adminMe, adminDashboard,
+  getToken, clearToken, adminLogin, adminMe, adminDashboard, adminToday,
   adminHotels, adminHotel, adminBookings, adminBookingDetail, adminUpdateBookingStatus,
   adminCreateHotel, adminUpdateHotel, adminDeleteHotel,
   adminAddRoom, adminUpdateRoom, adminDeleteRoom,
@@ -255,6 +255,8 @@ function Overview() {
     <div>
       <PageHead title="Overview" subtitle="Your platform at a glance" />
 
+      <TodayPanel />
+
       <OpsPanel />
 
       <div className="nzad-stats">
@@ -312,6 +314,172 @@ function Overview() {
       `}</style>
     </div>
   );
+}
+
+// =============================================================================
+// TODAY PANEL — what happened on the platform today, in Algiers local time
+// -----------------------------------------------------------------------------
+// Item #7 from the polish queue. Shows four count chips (created / confirmed
+// / cancelled / revenue locked in today) plus a short recent-events feed so
+// the Allouni team can scan the day's activity without opening the full
+// bookings list.
+//
+// We poll every 60s — no websocket plumbing for an admin-only surface that's
+// only viewed during business hours. Simpler is fine here.
+// =============================================================================
+function TodayPanel() {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      adminToday()
+        .then((d) => { if (!cancelled) setData(d); })
+        .catch((e) => { if (!cancelled) setErr(e.message); });
+    };
+    load();
+    const id = setInterval(load, 60_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
+  if (err) return <ErrorBox msg={err} />;
+  if (!data) return null; // silent loading — overview shows other things alongside
+
+  const c = data.counts || {};
+  const hasActivity = (c.created || 0) + (c.confirmed || 0) + (c.cancelled || 0) > 0;
+
+  return (
+    <div className="nzad-panel nzad-today">
+      <div className="nzad-today-head">
+        <h3>Today</h3>
+        <span className="nzad-today-sub">Algiers local time</span>
+      </div>
+
+      <div className="nzad-today-counts">
+        <TodayChip label="New bookings" value={c.created || 0} tone="ink" />
+        <TodayChip label="Confirmed" value={c.confirmed || 0} tone="teal" />
+        <TodayChip label="Cancelled / rejected" value={c.cancelled || 0} tone="red" />
+        <TodayChip label="Revenue confirmed" value={fmt(c.revenueConfirmed || 0)} tone="ink" />
+      </div>
+
+      {!hasActivity && (
+        <span className="nzad-empty-inline">No activity yet today. New events will appear here.</span>
+      )}
+
+      {data.events && data.events.length > 0 && (
+        <ul className="nzad-today-feed">
+          {data.events.map((ev) => (
+            <li key={ev.id} className={`nzad-today-row k-${ev.event?.kind || "created"}`}>
+              <span className="nzad-today-time">
+                {ev.event?.at ? formatTimeAlgiers(ev.event.at) : "—"}
+              </span>
+              <span className="nzad-today-kind">{ev.event?.kind || "created"}</span>
+              <span className="nzad-today-ref"><strong>{ev.reference}</strong></span>
+              <span className="nzad-today-meta">
+                {ev.hotel?.name || "—"} · {ev.guest?.firstName} {ev.guest?.lastName}
+              </span>
+              <span className="nzad-today-amt">{fmt(ev.pricing?.total)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <style jsx>{`
+        .nzad-today { margin-bottom: 20px; }
+        .nzad-today-head {
+          display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px;
+        }
+        .nzad-today-head h3 { margin: 0; }
+        .nzad-today-sub {
+          font-size: 11.5px; color: var(--gray-400); font-weight: 600;
+          letter-spacing: 0.04em; text-transform: uppercase;
+        }
+        .nzad-today-counts {
+          display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+          margin-bottom: 16px;
+        }
+        .nzad-today-feed {
+          list-style: none; margin: 0; padding: 0;
+          display: flex; flex-direction: column; gap: 4px;
+          max-height: 320px; overflow-y: auto;
+        }
+        .nzad-today-row {
+          display: grid;
+          grid-template-columns: 60px 90px 110px 1fr auto;
+          gap: 10px; align-items: center;
+          padding: 8px 10px; border-radius: var(--r-sm);
+          background: var(--cream);
+          font-size: 13px;
+        }
+        .nzad-today-time {
+          font-family: ui-monospace, SFMono-Regular, monospace;
+          font-size: 12px; color: var(--gray-400); font-weight: 600;
+        }
+        .nzad-today-kind {
+          font-size: 11px; font-weight: 700;
+          padding: 2px 8px; border-radius: 980px;
+          text-transform: uppercase; letter-spacing: 0.04em;
+          text-align: center;
+        }
+        .k-created   .nzad-today-kind { background: rgba(22,22,26,0.07); color: var(--ink); }
+        .k-confirmed .nzad-today-kind { background: var(--teal-soft); color: var(--teal); }
+        .k-cancelled .nzad-today-kind { background: var(--red-soft); color: var(--red-deep); }
+        .k-rejected  .nzad-today-kind { background: var(--red-soft); color: var(--red-deep); }
+        .nzad-today-ref strong { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12.5px; }
+        .nzad-today-meta { color: var(--gray-400); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .nzad-today-amt { font-weight: 700; }
+        .nzad-empty-inline { color: var(--gray-400); font-size: 13px; }
+        @media (max-width: 720px) {
+          .nzad-today-counts { grid-template-columns: 1fr 1fr; }
+          .nzad-today-row {
+            grid-template-columns: 60px 80px 1fr auto;
+          }
+          .nzad-today-meta { display: none; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// Small chip used in the Today counts grid.
+function TodayChip({ label, value, tone = "ink" }) {
+  return (
+    <div className={`nzad-today-chip tone-${tone}`}>
+      <strong>{value}</strong>
+      <span>{label}</span>
+      <style jsx>{`
+        .nzad-today-chip {
+          padding: 14px 18px; background: var(--cream);
+          border: 1px solid var(--gray-200);
+          border-radius: var(--r-md);
+          display: flex; flex-direction: column; gap: 4px;
+        }
+        .nzad-today-chip.tone-teal { border-left: 3px solid var(--teal); }
+        .nzad-today-chip.tone-red  { border-left: 3px solid var(--red); }
+        .nzad-today-chip.tone-ink  { border-left: 3px solid var(--ink); }
+        .nzad-today-chip strong { font-size: 22px; font-weight: 800; color: var(--ink); }
+        .nzad-today-chip span {
+          font-size: 11.5px; color: var(--gray-400); font-weight: 600;
+          letter-spacing: 0.02em;
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// Format an ISO timestamp as "HH:MM" in Algiers local time. Used by the
+// Today feed so the team sees times that match their wall clock.
+function formatTimeAlgiers(iso) {
+  try {
+    return new Date(iso).toLocaleTimeString("en-GB", {
+      timeZone: "Africa/Algiers",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "";
+  }
 }
 
 // =============================================================================
@@ -1527,14 +1695,44 @@ function BookingsManager() {
   const [err, setErr] = useState("");
   const [selected, setSelected] = useState(null); // booking id for the detail panel
 
+  // ---- Filter state -------------------------------------------------------
+  // Each filter is a simple controlled value. `searchInput` is what the
+  // user is typing; `search` is the debounced value actually sent to the
+  // API (so we don't fire a request on every keystroke).
+  const [status, setStatus] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+
+  // Debounce the search box — 300ms after the user stops typing, we promote
+  // searchInput to search, which triggers a re-fetch via the load callback.
+  useEffect(() => {
+    const id = setTimeout(() => setSearch(searchInput.trim()), 300);
+    return () => clearTimeout(id);
+  }, [searchInput]);
+
   const load = useCallback(() => {
-    adminBookings({ limit: 50 }).then((r) => setData(r.data || [])).catch((e) => setErr(e.message));
-  }, []);
+    const params = { limit: 50 };
+    if (status) params.status = status;
+    if (paymentStatus) params.paymentStatus = paymentStatus;
+    if (from) params.from = from;
+    if (to) params.to = to;
+    if (search) params.search = search;
+    adminBookings(params).then((r) => setData(r.data || [])).catch((e) => setErr(e.message));
+  }, [status, paymentStatus, from, to, search]);
   useEffect(() => { load(); }, [load]);
 
-  async function setStatus(id, status) {
+  const hasFilters = !!(status || paymentStatus || from || to || search);
+  function clearFilters() {
+    setStatus(""); setPaymentStatus(""); setFrom(""); setTo("");
+    setSearchInput(""); setSearch("");
+  }
+
+  async function setBookingStatus(id, newStatus) {
     try {
-      await adminUpdateBookingStatus(id, status);
+      await adminUpdateBookingStatus(id, newStatus);
       load();
     } catch (e) { setErr(e.message); }
   }
@@ -1543,14 +1741,60 @@ function BookingsManager() {
     <div>
       <PageHead title="Bookings" subtitle="All reservations across every hotel" />
       {err && <ErrorBox msg={err} />}
+
+      {/* ---- Filter bar ---- */}
+      <div className="nzad-filters">
+        <input
+          type="text"
+          className="nzad-filter-search"
+          placeholder="Search reference, name, or email…"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+        />
+        <select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">All statuses</option>
+          {["PENDING", "CONFIRMED", "REJECTED", "CANCELLED", "COMPLETED", "NO_SHOW", "REFUNDED"].map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+        <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)}>
+          <option value="">All payments</option>
+          {["PENDING", "PAID", "FAILED", "REFUNDED", "PARTIALLY_REFUNDED"].map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+        <label className="nzad-filter-date">
+          <span>From</span>
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </label>
+        <label className="nzad-filter-date">
+          <span>To</span>
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        </label>
+        {hasFilters && (
+          <button className="nzad-btn-ghost nzad-filter-clear" onClick={clearFilters}>
+            Clear
+          </button>
+        )}
+      </div>
+
       {!data && !err && <Loading />}
 
       {data && data.length === 0 && (
-        <div className="nzad-panel"><span className="nzad-empty-inline">No bookings yet.</span></div>
+        <div className="nzad-panel">
+          <span className="nzad-empty-inline">
+            {hasFilters
+              ? "No bookings match these filters. Try clearing them or widening the search."
+              : "No bookings yet."}
+          </span>
+        </div>
       )}
 
       {data && data.length > 0 && (
         <div className="nzad-panel">
+          <div className="nzad-result-count">
+            {data.length} booking{data.length === 1 ? "" : "s"}{hasFilters ? " (filtered)" : ""}
+          </div>
           <table className="nzad-table">
             <thead>
               <tr><th>Reference</th><th>Guest</th><th>Hotel</th><th>Dates</th><th>Total</th><th>Status</th><th></th></tr>
@@ -1565,7 +1809,7 @@ function BookingsManager() {
                   <td>{fmt(b.pricing?.total)}</td>
                   <td><span className={`ad-bstatus s-${b.status}`}>{b.status}</span></td>
                   <td onClick={(e) => e.stopPropagation()}>
-                    <select value={b.status} onChange={(e) => setStatus(b.id, e.target.value)}>
+                    <select value={b.status} onChange={(e) => setBookingStatus(b.id, e.target.value)}>
                       {["PENDING", "CONFIRMED", "REJECTED", "CANCELLED", "COMPLETED", "NO_SHOW", "REFUNDED"].map((s) => (
                         <option key={s} value={s}>{s}</option>
                       ))}
@@ -1587,6 +1831,28 @@ function BookingsManager() {
       )}
 
       <style jsx>{`
+        .nzad-filters {
+          display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+          padding: 14px; background: var(--cream); border-radius: var(--r-md);
+          margin-bottom: 18px;
+        }
+        .nzad-filters input[type="text"],
+        .nzad-filters select,
+        .nzad-filters input[type="date"] {
+          padding: 9px 12px; border: 1.5px solid var(--gray-200);
+          border-radius: var(--r-sm); font-size: 13px; font-family: inherit;
+          background: white;
+        }
+        .nzad-filter-search { flex: 1; min-width: 240px; }
+        .nzad-filter-date {
+          display: flex; align-items: center; gap: 6px;
+          font-size: 12px; color: var(--gray-400); font-weight: 600;
+        }
+        .nzad-filter-clear { padding: 9px 14px; }
+        .nzad-result-count {
+          font-size: 12px; color: var(--gray-400); font-weight: 600;
+          margin-bottom: 12px;
+        }
         .nzad-brow { cursor: pointer; }
         .nzad-brow:hover { background: var(--gray-100); }
         .nzad-dim { color: var(--gray-400); font-size: 12px; }
@@ -1596,6 +1862,10 @@ function BookingsManager() {
         .s-PENDING { background: #FFF4E0; color: #9A6700; }
         .s-REJECTED, .s-CANCELLED, .s-NO_SHOW, .s-REFUNDED { background: var(--red-soft); color: var(--red-deep); }
         select { padding: 6px 8px; border: 1.5px solid var(--gray-200); border-radius: var(--r-sm); font-size: 12px; }
+        @media (max-width: 720px) {
+          .nzad-filters { flex-direction: column; align-items: stretch; }
+          .nzad-filter-search { min-width: 0; }
+        }
       `}</style>
     </div>
   );

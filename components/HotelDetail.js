@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Icon, { AMENITY_ICON } from "./Icon";
@@ -18,6 +18,69 @@ export default function HotelDetail({ hotel }) {
   const [checkIn, setCheckIn] = useState(searchParams.get("checkIn") || "");
   const [checkOut, setCheckOut] = useState(searchParams.get("checkOut") || "");
   const [lightboxIndex, setLightboxIndex] = useState(null);
+
+  // ---- Sticky scroll-spy tabs (item #4) ------------------------------------
+  // The four sections (about, rooms, amenities, policies) are anchored by ID
+  // so the tab bar can scroll-link to them. An IntersectionObserver watches
+  // which section currently sits in the upper viewport and highlights that
+  // tab. On click, we set the active tab AND smooth-scroll — the IO will
+  // confirm the selection once the scroll lands.
+  //
+  // We use a one-shot `lockSpyUntil` timestamp to ignore IO updates for
+  // ~600ms after a click. Without this, the intermediate sections passing
+  // through the viewport during the scroll cause the underline to flicker.
+  const TABS = [
+    { id: "about",     labelKey: "detail.tab_overview"  },
+    { id: "rooms",     labelKey: "detail.tab_rooms"     },
+    { id: "amenities", labelKey: "detail.tab_amenities" },
+    { id: "policies",  labelKey: "detail.tab_policies"  },
+  ];
+  const [activeTab, setActiveTab] = useState("about");
+  const lockSpyUntil = useRef(0);
+
+  useEffect(() => {
+    // Only the four section IDs we care about. Margin on top pushes the
+    // detection line just below the sticky tab bar so the tab flips as a
+    // section's heading crosses under the tabs, not as it leaves the screen.
+    const sectionIds = TABS.map((t) => t.id);
+    const elements = sectionIds
+      .map((id) => document.getElementById(id))
+      .filter(Boolean);
+    if (!elements.length) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (Date.now() < lockSpyUntil.current) return;
+        // Pick the topmost section currently intersecting.
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible.length) {
+          setActiveTab(visible[0].target.id);
+        }
+      },
+      {
+        // Detection line: 140px from the top of the viewport, accounting for
+        // the nav (~90px) plus the sticky tab bar (~52px). Bottom margin is
+        // negative so a section only "counts" while its top is visible.
+        rootMargin: "-140px 0px -60% 0px",
+        threshold: 0,
+      }
+    );
+    elements.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function jumpToTab(id) {
+    setActiveTab(id);
+    lockSpyUntil.current = Date.now() + 600; // suppress flicker during scroll
+    const el = document.getElementById(id);
+    if (!el) return;
+    // Manual scroll so we control the offset (account for nav + tab bar)
+    const top = el.getBoundingClientRect().top + window.scrollY - 132;
+    window.scrollTo({ top, behavior: "smooth" });
+  }
 
   // nights — default to 3 for preview if dates not set
   let nights = 3;
@@ -108,14 +171,28 @@ export default function HotelDetail({ hotel }) {
             </div>
           </div>
 
+          {/* Sticky scroll-spy tabs — click to jump, underline tracks scroll */}
+          <nav className="nz-dtabs">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                className={`nz-dtab ${activeTab === tab.id ? "active" : ""}`}
+                onClick={() => jumpToTab(tab.id)}
+                aria-current={activeTab === tab.id ? "true" : undefined}
+              >
+                {t(tab.labelKey)}
+              </button>
+            ))}
+          </nav>
+
           {/* about */}
-          <section className="nz-dsection">
+          <section id="about" className="nz-dsection">
             <h2 className="display">{t("detail.about")}</h2>
             <p className="nz-about">{hotel.description}</p>
           </section>
 
           {/* rooms */}
-          <section className="nz-dsection">
+          <section id="rooms" className="nz-dsection">
             <h2 className="display">{t("detail.choose_room")}</h2>
             <div className="nz-rooms">
               {rooms.map((r) => {
@@ -157,7 +234,7 @@ export default function HotelDetail({ hotel }) {
           </section>
 
           {/* amenities */}
-          <section className="nz-dsection">
+          <section id="amenities" className="nz-dsection">
             <h2 className="display">{t("detail.offers")}</h2>
             <div className="nz-amenities">
               {(hotel.amenities || []).map((a) => (
@@ -170,7 +247,7 @@ export default function HotelDetail({ hotel }) {
           </section>
 
           {/* policies */}
-          <section className="nz-dsection">
+          <section id="policies" className="nz-dsection">
             <h2 className="display">{t("detail.policies")}</h2>
             <div className="nz-policies">
               <Policy icon="clock" label={t("detail.checkin")} value={`${t("detail.from")} ${hotel.checkInTime}`} />
@@ -328,6 +405,56 @@ function DetailStyles() {
       .nz-hotel-sub .rtext { font-size: 13px; color: var(--gray-400); font-weight: 600; }
       .nz-hotel-sub .rtext strong { color: var(--ink); }
 
+      /* ---- Sticky scroll-spy tabs ---- */
+      /* Sits below the global nav (which is ~90px tall when sticky) and
+         tracks the four sections as the user scrolls. The underline slides
+         left/right based on which section the IntersectionObserver picks. */
+      .nz-dtabs {
+        position: sticky;
+        top: 80px;
+        z-index: 5;
+        display: flex;
+        gap: 4px;
+        margin: 0 -16px 28px;
+        padding: 0 16px;
+        background: var(--white);
+        border-bottom: 1px solid var(--gray-200);
+        /* Slight backdrop blur so content scrolling underneath doesn't
+           bleed through (e.g. if the user has a complex theme). */
+        backdrop-filter: saturate(180%) blur(8px);
+        -webkit-backdrop-filter: saturate(180%) blur(8px);
+      }
+      .nz-dtab {
+        position: relative;
+        padding: 16px 18px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 14.5px;
+        font-weight: 600;
+        color: var(--gray-400);
+        transition: color 0.15s ease;
+      }
+      .nz-dtab::after {
+        content: "";
+        position: absolute;
+        left: 18px; right: 18px; bottom: -1px;
+        height: 2px;
+        background: var(--red);
+        border-radius: 1px;
+        transform: scaleX(0);
+        transform-origin: center;
+        transition: transform 0.22s ease;
+      }
+      .nz-dtab:hover { color: var(--ink); }
+      .nz-dtab.active {
+        color: var(--ink);
+      }
+      .nz-dtab.active::after {
+        transform: scaleX(1);
+      }
+
       .nz-dsection { margin-bottom: 44px; }
       .nz-dsection h2 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 18px; }
       .nz-about { font-size: 15.5px; line-height: 1.75; color: var(--ink-2); }
@@ -443,6 +570,19 @@ function DetailStyles() {
         .nz-detail-layout { padding-top: 24px; gap: 0; padding-bottom: 90px; }
         .nz-hotel-head h1 { font-size: 28px; }
         .nz-hotel-sub { gap: 12px; }
+        .nz-dtabs {
+          /* Allow horizontal scroll if tabs overflow on small screens */
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: none;
+        }
+        .nz-dtabs::-webkit-scrollbar { display: none; }
+        .nz-dtab {
+          padding: 14px 12px;
+          font-size: 13.5px;
+          white-space: nowrap;
+        }
+        .nz-dtab::after { left: 12px; right: 12px; }
         .nz-dsection { margin-bottom: 32px; }
         .nz-dsection h2 { font-size: 21px; }
         .nz-about { font-size: 14.5px; }

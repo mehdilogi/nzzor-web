@@ -17,6 +17,7 @@ import { useAuth } from "../lib/AuthContext";
 import { formatPrice } from "../lib/format";
 import { validateCoupon, couponDiscount } from "../lib/coupons";
 import { createBooking } from "../lib/api";
+import { validateBookingDates, localizeDateError } from "../lib/dates";
 
 export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) {
   const { t } = useLang();
@@ -51,6 +52,15 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
 
   // confirmation
   const [reference, setReference] = useState("");
+  // ---- Booking submission error state -------------------------------------
+  // When the API rejects a booking (past dates, hotel inactive, payment
+  // gateway error, etc.) we keep the user on the payment step and show the
+  // error inline. Previously the UI would synthesize a fake booking
+  // reference on any error and pretend the booking succeeded — a serious
+  // bug because the customer believes they have a reservation that doesn't
+  // exist in any database. The `bookingError` slot holds either null
+  // (no error) or { message, code? }.
+  const [bookingError, setBookingError] = useState(null);
 
   // ---- guard: missing booking context -------------------------------------
   if (!hotel || !room) {
@@ -60,6 +70,38 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
         <h1 className="display">{t("bk.missing")}</h1>
         <p>{t("bk.missing_sub")}</p>
         <Link href="/hotels" className="bk-missing-btn">{t("bk.view_hotels")}</Link>
+        <style jsx>{`
+          .bk-missing {
+            max-width: 480px; margin: 80px auto; padding: 0 24px; text-align: center;
+            display: flex; flex-direction: column; align-items: center; gap: 12px;
+          }
+          .bk-missing h1 { font-size: 26px; font-weight: 600; color: var(--ink); }
+          .bk-missing p { color: var(--gray-400); font-size: 15px; }
+          .bk-missing-btn {
+            margin-top: 12px; background: var(--ink); color: #fff;
+            padding: 13px 26px; border-radius: 980px; font-weight: 700;
+            font-size: 14px; text-decoration: none;
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  // ---- guard: dates are invalid (past, reversed, or missing) ---------------
+  // Catches the "old shared booking link" case — a customer clicks a link
+  // for dates that have since passed, or for a checkin >= checkout. Render
+  // a clear error with a way back to the hotel page rather than letting them
+  // submit a request the backend will reject with a generic 400.
+  const dateError = validateBookingDates(checkIn, checkOut);
+  if (dateError) {
+    return (
+      <div className="bk-missing">
+        <Icon name="shield" size={40} style={{ color: "var(--gray-300)" }} />
+        <h1 className="display">{t("bk.dates_invalid") || "Those dates won't work"}</h1>
+        <p>{localizeDateError(dateError, t)}</p>
+        <Link href={`/hotels/${hotel.slug}`} className="bk-missing-btn">
+          {t("bk.pick_new_dates") || "Pick new dates"}
+        </Link>
         <style jsx>{`
           .bk-missing {
             max-width: 480px; margin: 80px auto; padding: 0 24px; text-align: center;
@@ -120,6 +162,7 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
   // ---- confirm -------------------------------------------------------------
   async function payNow() {
     setProcessing(true);
+    setBookingError(null);
     // split the full name into first / last for the backend
     const parts = name.trim().split(/\s+/);
     const firstName = parts[0] || name.trim();
@@ -154,15 +197,21 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
       setStep(3);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
-      // never dead-end the user, even on an API error
-      const fallback =
-        "NZR-" +
-        Math.random().toString(36).slice(2, 6).toUpperCase() +
-        "-" +
-        Math.random().toString(36).slice(2, 6).toUpperCase();
-      setReference(fallback);
-      setStep(3);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      // Real error from the backend. We surface it to the user on the
+      // current step (payment) so they understand what happened and can
+      // act on it — either fix something (re-pick dates, change payment
+      // method, retry) or contact us.
+      //
+      // We DO NOT invent a synthetic booking reference and pretend success.
+      // That was the previous behavior and it was actively dangerous —
+      // a customer believing they had a confirmed reservation that didn't
+      // exist in any database would show up at the hotel to no record.
+      setBookingError({
+        message: result.error || t("bk.err_generic"),
+        code: result.code || null,
+      });
+      // Don't auto-scroll — the error renders just above the pay button
+      // in the same viewport position the user is already looking at.
     }
   }
 
@@ -321,6 +370,27 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
                 {promoError && <span className="bk-err">{t("bk.promo_invalid")}</span>}
               </div>
 
+              {/* Surfaces backend errors when a booking creation request is
+                  rejected. Replaces the previous "show fake confirmation"
+                  behavior which silently lied to users about successful
+                  reservations that didn't exist. We try to localize the
+                  message via the error code; if the code isn't in our
+                  strings table (or wasn't provided), we fall back to the
+                  raw English message from the backend. */}
+              {bookingError && (
+                <div className="bk-booking-err" role="alert">
+                  <Icon name="shield" size={18} style={{ color: "var(--red)" }} />
+                  <div>
+                    <strong>{t("bk.err_could_not_create")}</strong>
+                    <p>
+                      {bookingError.code && t(`errors.dates.${bookingError.code}`) !== `errors.dates.${bookingError.code}`
+                        ? t(`errors.dates.${bookingError.code}`)
+                        : bookingError.message}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <button className="bk-cta" onClick={payNow} disabled={processing}>
                 {processing ? t("bk.processing") : `${t("bk.pay_now")} · ${formatPrice(total)}`}
               </button>
@@ -475,6 +545,26 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
         .bk-field input.err { border-color: var(--red); }
         .bk-field textarea { resize: vertical; }
         .bk-err { display: block; color: var(--red); font-size: 12.5px; font-weight: 600; margin-top: 6px; }
+
+        /* Booking-creation error banner — appears above the Pay button when
+           the backend rejects a booking. Designed to be visible without
+           being alarming: red accent + clear heading, but tucked into the
+           existing form flow rather than a modal interruption. */
+        .bk-booking-err {
+          display: flex; gap: 12px;
+          padding: 14px 16px;
+          margin: 14px 0 16px;
+          background: rgba(230, 57, 70, 0.06);
+          border: 1px solid rgba(230, 57, 70, 0.25);
+          border-left: 3px solid var(--red);
+          border-radius: var(--r-sm);
+        }
+        .bk-booking-err strong {
+          display: block; font-size: 13.5px; color: var(--ink); margin-bottom: 4px;
+        }
+        .bk-booking-err p {
+          margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.45;
+        }
 
         .bk-check {
           display: flex; align-items: center; gap: 10px; margin: 6px 0 24px;
