@@ -3,10 +3,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   getToken, clearToken, adminLogin, adminMe, adminDashboard,
-  adminHotels, adminBookings, adminBookingDetail, adminUpdateBookingStatus,
+  adminHotels, adminHotel, adminBookings, adminBookingDetail, adminUpdateBookingStatus,
   adminCreateHotel, adminUpdateHotel, adminDeleteHotel,
   adminAddRoom, adminUpdateRoom, adminDeleteRoom,
   adminAddPhoto, adminUploadPhoto, adminDeletePhoto,
+  adminAddRoomPhoto, adminUploadRoomPhoto, adminDeleteRoomPhoto,
   adminHotelManagers, adminAddHotelManager, adminRemoveHotelManager, adminResetHotelManagerPassword,
   adminTags,
 } from "../../lib/adminApi";
@@ -431,12 +432,36 @@ function HotelsManager() {
   const [hotels, setHotels] = useState(null);
   const [err, setErr] = useState("");
   const [editing, setEditing] = useState(null); // hotel object, or "new", or null
+  // Track per-row "opening" state so the user gets feedback while we fetch the
+  // detail endpoint (which carries the raw multilingual fields the editor needs).
+  const [openingId, setOpeningId] = useState(null);
 
   const load = useCallback(() => {
     setHotels(null);
     adminHotels().then(setHotels).catch((e) => setErr(e.message));
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  // CRITICAL: clicking Manage must NOT pass the list-item (which is run
+  // through formatHotel on the backend and loses the multilingual nameFr/Ar,
+  // descFr/Ar, cityFr/Ar, regionFr/Ar fields). Instead we fetch the detail
+  // endpoint which returns the raw Prisma object with every language preserved.
+  // Without this step, the editor's FR/AR boxes appear empty even when the DB
+  // has correct translations — and any "save" then writes whatever the user
+  // typed (often nothing) into the persisted record, making the bug appear
+  // to be "AR/FR don't save" when actually the load was the broken side.
+  async function openEditor(h) {
+    setErr("");
+    setOpeningId(h.id);
+    try {
+      const detail = await adminHotel(h.id);
+      setEditing(detail);
+    } catch (e) {
+      setErr(`Failed to load hotel details: ${e.message}`);
+    } finally {
+      setOpeningId(null);
+    }
+  }
 
   if (editing) {
     return <HotelEditor hotel={editing === "new" ? null : editing}
@@ -473,7 +498,13 @@ function HotelsManager() {
                   {"★".repeat(h.stars)} · {h.city} · {h.rooms?.length || 0} room types · from {fmt(h.priceFrom)}
                 </div>
               </div>
-              <button className="nzad-btn-ghost" onClick={() => setEditing(h)}>Manage</button>
+              <button
+                className="nzad-btn-ghost"
+                disabled={openingId === h.id}
+                onClick={() => openEditor(h)}
+              >
+                {openingId === h.id ? "Opening…" : "Manage"}
+              </button>
             </div>
           ))}
         </div>
@@ -735,13 +766,12 @@ function RoomsPanel({ hotelId, initialRooms }) {
       )}
 
       {rooms.map((r) => (
-        <div className="nzad-room-row" key={r.id}>
-          <div>
-            <strong>{r.typeEn || r.type}</strong>
-            <span> · {r.capacity} guests · {r.bedType} · {fmt(r.basePrice ?? r.price)}/night</span>
-          </div>
-          <button className="nzad-btn-mini-danger" onClick={() => delRoom(r.id)}>Remove</button>
-        </div>
+        <RoomCard
+          key={r.id}
+          room={r}
+          onDelete={() => delRoom(r.id)}
+          onRoomChange={(updated) => setRooms((rs) => rs.map((x) => (x.id === updated.id ? updated : x)))}
+        />
       ))}
 
       {adding && (
@@ -779,6 +809,283 @@ function RoomsPanel({ hotelId, initialRooms }) {
         .nzad-editor-actions { display: flex; gap: 10px; margin-top: 14px; }
         .nzad-empty-inline { color: var(--gray-400); font-size: 13px; }
         @media (max-width: 720px) { .nzad-grid3 { grid-template-columns: 1fr; } }
+      `}</style>
+    </div>
+  );
+}
+
+// =============================================================================
+// ROOM CARD — one collapsed row that expands to show room photos
+// =============================================================================
+// We render rooms as cards (not flat rows) because each room now owns its
+// own photo gallery. The header stays compact (one line) and clicking
+// "Photos" reveals the gallery so the panel doesn't get visually overwhelming
+// when a hotel has many room types.
+//
+// IMPORTANT: rooms come from the detail endpoint, so they carry typeEn/Fr/Ar
+// fields directly. The display prefers typeEn (admin-facing UI is English)
+// with a fallback to the legacy localized `type` field for rooms that were
+// loaded before the editor refactor.
+function RoomCard({ room, onDelete, onRoomChange }) {
+  const [showPhotos, setShowPhotos] = useState(false);
+  const photoCount = (room.photos || []).length;
+  const displayName = room.typeEn || room.type || "(unnamed room)";
+
+  return (
+    <div className="nzad-room-card">
+      <div className="nzad-room-head">
+        <div className="nzad-room-meta">
+          <strong>{displayName}</strong>
+          <span>· {room.capacity} guests · {room.bedType} · {fmt(room.basePrice ?? room.price)}/night</span>
+        </div>
+        <div className="nzad-room-actions">
+          <button
+            className="nzad-btn-mini"
+            onClick={() => setShowPhotos((s) => !s)}
+            title="Photos for this room type"
+          >
+            📷 Photos ({photoCount}) {showPhotos ? "▴" : "▾"}
+          </button>
+          <button className="nzad-btn-mini-danger" onClick={onDelete}>Remove</button>
+        </div>
+      </div>
+      {showPhotos && (
+        <div className="nzad-room-photos-wrap">
+          <RoomPhotos
+            room={room}
+            onPhotosChange={(photos) => onRoomChange({ ...room, photos })}
+          />
+        </div>
+      )}
+      <style jsx>{`
+        .nzad-room-card {
+          background: var(--cream);
+          border-radius: var(--r-sm);
+          margin-bottom: 8px;
+          overflow: hidden;
+        }
+        .nzad-room-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 14px;
+          gap: 12px;
+        }
+        .nzad-room-meta strong { font-size: 14px; }
+        .nzad-room-meta span { font-size: 12.5px; color: var(--gray-400); font-weight: 600; margin-left: 6px; }
+        .nzad-room-actions { display: flex; gap: 8px; align-items: center; }
+        .nzad-room-photos-wrap {
+          padding: 14px 14px 16px;
+          border-top: 1px solid var(--gray-100);
+          background: white;
+        }
+        @media (max-width: 720px) {
+          .nzad-room-head { flex-direction: column; align-items: stretch; }
+          .nzad-room-actions { justify-content: flex-end; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// =============================================================================
+// ROOM PHOTOS — gallery + drag-and-drop upload, scoped to one room
+// =============================================================================
+// Mirrors PhotosPanel but for room-level photos. Differences from PhotosPanel:
+//   - No isPrimary flag — room photos are just an ordered gallery
+//   - Uses /api/admin/rooms/:roomId/photos endpoints
+//   - Files are stored in R2 under hotels/{slug}/rooms/{roomId}/
+function RoomPhotos({ room, onPhotosChange }) {
+  const initialPhotos = room.photos || [];
+  const [photos, setPhotosLocal] = useState(initialPhotos);
+  const [err, setErr] = useState("");
+  const [uploads, setUploads] = useState([]);
+  const [dragging, setDragging] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // Helper that updates BOTH local state AND bubbles up to RoomsPanel so the
+  // parent's `rooms` array stays in sync. Without this, the photo count badge
+  // on the card header (which reads room.photos.length) goes stale.
+  const setPhotos = (updater) => {
+    setPhotosLocal((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      onPhotosChange(next);
+      return next;
+    });
+  };
+
+  async function del(id) {
+    try {
+      await adminDeleteRoomPhoto(id);
+      setPhotos((ps) => ps.filter((x) => x.id !== id));
+    } catch (e) { setErr(e.message); }
+  }
+
+  function pickFiles() {
+    if (fileInputRef.current) fileInputRef.current.click();
+  }
+
+  function onFilesChosen(e) {
+    const files = Array.from(e.target.files || []);
+    if (files.length) handleFiles(files);
+    e.target.value = "";
+  }
+
+  function onDrop(e) {
+    e.preventDefault();
+    setDragging(false);
+    const files = Array.from(e.dataTransfer.files || []).filter((f) =>
+      f.type.startsWith("image/")
+    );
+    if (files.length) handleFiles(files);
+  }
+
+  async function handleFiles(files) {
+    setErr("");
+    const rows = files.map((f) => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      name: f.name,
+      size: f.size,
+      progress: 0,
+      error: null,
+      done: false,
+    }));
+    setUploads((u) => [...u, ...rows]);
+
+    // Sequential — same throttling rationale as hotel photos.
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const row = rows[i];
+      try {
+        const p = await adminUploadRoomPhoto(room.id, file, {
+          onProgress: (pct) => {
+            setUploads((u) => u.map((r) => (r.id === row.id ? { ...r, progress: pct } : r)));
+          },
+        });
+        setPhotos((ps) => [...ps, p]);
+        setUploads((u) => u.map((r) => (r.id === row.id ? { ...r, done: true, progress: 100 } : r)));
+        setTimeout(() => {
+          setUploads((u) => u.filter((r) => r.id !== row.id));
+        }, 1200);
+      } catch (e) {
+        setUploads((u) => u.map((r) => (r.id === row.id ? { ...r, error: e.message } : r)));
+      }
+    }
+  }
+
+  return (
+    <div>
+      {err && <ErrorBox msg={err} />}
+
+      {photos.length > 0 && (
+        <div className="nzad-room-photo-grid">
+          {photos.map((p) => (
+            <div className="nzad-room-photo" key={p.id}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={p.url} alt="" />
+              <button className="nzad-room-photo-del" onClick={() => del(p.id)} title="Remove">×</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div
+        className={`nzad-room-drop ${dragging ? "active" : ""}`}
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+        onClick={pickFiles}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          style={{ display: "none" }}
+          onChange={onFilesChosen}
+        />
+        <div className="nzad-room-drop-icon">📷</div>
+        <div className="nzad-room-drop-title">Drop room photos here, or click</div>
+        <div className="nzad-room-drop-sub">JPG, PNG, or WEBP · up to 8 MB each</div>
+      </div>
+
+      {uploads.length > 0 && (
+        <div className="nzad-uploads">
+          {uploads.map((u) => (
+            <div key={u.id} className={`nzad-upload ${u.error ? "err" : u.done ? "done" : ""}`}>
+              <div className="nzad-upload-info">
+                <span className="nzad-upload-name">{u.name}</span>
+                <span className="nzad-upload-size">{Math.round((u.size || 0) / 1024)} KB</span>
+              </div>
+              {u.error ? (
+                <span className="nzad-upload-err">{u.error}</span>
+              ) : (
+                <div className="nzad-upload-bar">
+                  <div className="nzad-upload-fill" style={{ width: `${u.progress}%` }} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <style jsx>{`
+        .nzad-room-photo-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+          gap: 8px;
+          margin-bottom: 12px;
+        }
+        .nzad-room-photo {
+          position: relative;
+          aspect-ratio: 4 / 3;
+          border-radius: var(--r-sm);
+          overflow: hidden;
+          background: var(--cream);
+        }
+        .nzad-room-photo img {
+          width: 100%; height: 100%; object-fit: cover; display: block;
+        }
+        .nzad-room-photo-del {
+          position: absolute; top: 4px; right: 4px;
+          width: 22px; height: 22px;
+          border: none; border-radius: 50%;
+          background: rgba(0,0,0,0.6); color: white;
+          font-size: 14px; line-height: 1; cursor: pointer;
+        }
+        .nzad-room-photo-del:hover { background: var(--red); }
+        .nzad-room-drop {
+          border: 2px dashed var(--gray-300);
+          border-radius: var(--r-sm);
+          padding: 24px 12px;
+          text-align: center;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .nzad-room-drop:hover, .nzad-room-drop.active {
+          border-color: var(--red);
+          background: rgba(230, 57, 70, 0.04);
+        }
+        .nzad-room-drop-icon { font-size: 24px; margin-bottom: 4px; }
+        .nzad-room-drop-title { font-size: 13px; font-weight: 600; color: var(--ink); }
+        .nzad-room-drop-sub { font-size: 11.5px; color: var(--gray-400); margin-top: 2px; }
+        .nzad-uploads { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+        .nzad-upload {
+          padding: 8px 10px; background: var(--cream); border-radius: var(--r-sm);
+          font-size: 12px;
+        }
+        .nzad-upload.err { background: rgba(230, 57, 70, 0.08); }
+        .nzad-upload.done { background: rgba(27, 138, 90, 0.08); }
+        .nzad-upload-info { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .nzad-upload-name { font-weight: 600; }
+        .nzad-upload-size { color: var(--gray-400); }
+        .nzad-upload-bar {
+          height: 3px; background: var(--gray-100); border-radius: 2px; overflow: hidden;
+        }
+        .nzad-upload-fill {
+          height: 100%; background: var(--red); transition: width 0.2s ease;
+        }
+        .nzad-upload-err { color: var(--red); font-size: 11.5px; }
       `}</style>
     </div>
   );
