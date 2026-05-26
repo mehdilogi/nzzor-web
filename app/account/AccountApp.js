@@ -11,7 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../lib/AuthContext";
 import { useLang } from "../../lib/LangContext";
-import { myBookings, myBookingDetail, userUpdateProfile, userChangePassword } from "../../lib/accountApi";
+import { myBookings, myBookingDetail, userUpdateProfile, userChangePassword, cancelMyBooking } from "../../lib/accountApi";
 import { formatPrice } from "../../lib/format";
 import { openVoucher } from "../../lib/voucher";
 
@@ -115,7 +115,19 @@ function MyBookingsPanel() {
         </button>
       ))}
 
-      {selected && <BookingDetailModal id={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <BookingDetailModal
+          id={selected}
+          onClose={() => setSelected(null)}
+          onCancelled={() => {
+            // refresh the list so the cancelled booking shows new status,
+            // then close the modal (the success state was visible inside
+            // the modal for a moment before this callback fires).
+            load();
+            setSelected(null);
+          }}
+        />
+      )}
 
       <style jsx>{`
         .mb-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
@@ -138,12 +150,56 @@ function MyBookingsPanel() {
   );
 }
 
-function BookingDetailModal({ id, onClose }) {
+function BookingDetailModal({ id, onClose, onCancelled }) {
   const { t, lang } = useLang();
   const [b, setB] = useState(null);
   const [err, setErr] = useState("");
+  // ---- Cancellation state -------------------------------------------------
+  // Two-step UX: clicking Cancel first reveals a confirmation row with a
+  // reason textarea (optional) and Confirm/Back buttons. This avoids
+  // accidental cancellation from a misclick on the primary action.
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelErr, setCancelErr] = useState(null);   // { code, message, details? }
+  const [cancelDone, setCancelDone] = useState(false);
 
   useEffect(() => { myBookingDetail(id, lang).then(setB).catch((e) => setErr(e.message)); }, [id, lang]);
+
+  // Pre-compute cancellation eligibility client-side so we can disable
+  // the button immediately. The backend re-checks authoritatively — this
+  // is just for the UI. "Within 48h" means we KNOW the backend will
+  // refuse, so we show the support-contact path instead.
+  const isCancellable = b && (b.status === "PENDING" || b.status === "CONFIRMED");
+  const hoursUntilCheckIn = b && b.checkIn
+    ? (new Date(b.checkIn).getTime() - Date.now()) / (1000 * 60 * 60)
+    : null;
+  const within48h = hoursUntilCheckIn != null && hoursUntilCheckIn < 48;
+
+  async function doCancel() {
+    setCancelBusy(true);
+    setCancelErr(null);
+    try {
+      await cancelMyBooking(id, cancelReason.trim() || undefined);
+      setCancelDone(true);
+      // Give the user 1.5s to read "Cancelled" before refreshing the
+      // list (which closes this modal via onCancelled).
+      setTimeout(() => { if (onCancelled) onCancelled(); }, 1500);
+    } catch (e) {
+      setCancelErr({
+        code: e.code || null,
+        message: e.message,
+        details: e.details || null,
+      });
+    }
+    setCancelBusy(false);
+  }
+
+  // WhatsApp deep-link to support, with the booking ref pre-populated in
+  // the message body so the agent can look it up immediately.
+  const waNumber = (typeof process !== "undefined" && process.env.NEXT_PUBLIC_WHATSAPP) || "213XXXXXXXXX";
+  const waMessage = b ? encodeURIComponent(`Hi, I need help cancelling booking ${b.reference}.`) : "";
+  const waUrl = `https://wa.me/${waNumber}?text=${waMessage}`;
 
   return (
     <div className="md-back" onClick={onClose}>
@@ -199,6 +255,91 @@ function BookingDetailModal({ id, onClose }) {
             {(b.status === "CONFIRMED" || b.status === "COMPLETED") && (
               <button className="md-voucher" onClick={() => openVoucher(b)}>{t("vch.download")}</button>
             )}
+
+            {/* ---- Cancellation area ---- */}
+            {isCancellable && !cancelDone && (
+              <div className="md-cancel-zone">
+                {!showCancelConfirm ? (
+                  // Initial state — show the Cancel button (disabled if
+                  // within 48h) and the WhatsApp fallback link.
+                  <>
+                    <button
+                      className="md-cancel-btn"
+                      onClick={() => setShowCancelConfirm(true)}
+                      disabled={within48h}
+                    >
+                      {t("acc.cancel_booking")}
+                    </button>
+                    {within48h && (
+                      <div className="md-cancel-window">
+                        <div className="md-cancel-window-title">
+                          {t("acc.cancellation_window_title")}
+                        </div>
+                        <div className="md-cancel-window-body">
+                          {t("acc.cancellation_window_msg")}
+                        </div>
+                        <a
+                          href={waUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="md-cancel-wa"
+                        >
+                          {t("acc.contact_support_wa")}
+                        </a>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  // Confirmation step — optional reason + Confirm/Back.
+                  <div className="md-cancel-confirm">
+                    <div className="md-cancel-confirm-title">{t("acc.cancel_confirm_title")}</div>
+                    <div className="md-cancel-confirm-body">{t("acc.cancel_confirm_body")}</div>
+                    <label>{t("acc.cancel_reason")}</label>
+                    <textarea
+                      rows={3}
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                      placeholder={t("acc.cancel_reason_ph")}
+                    />
+                    {cancelErr && (
+                      <div className="md-cancel-err">
+                        {/* Localize known error codes; fall back to the
+                            backend message. WITHIN_CANCELLATION_WINDOW
+                            shouldn't happen here (we disabled the button)
+                            but if it does we show the WhatsApp option. */}
+                        {cancelErr.code === "WITHIN_CANCELLATION_WINDOW"
+                          ? t("acc.cancellation_window_msg")
+                          : cancelErr.message}
+                      </div>
+                    )}
+                    <div className="md-cancel-actions">
+                      <button
+                        type="button"
+                        className="md-cancel-back"
+                        onClick={() => { setShowCancelConfirm(false); setCancelErr(null); }}
+                        disabled={cancelBusy}
+                      >
+                        ← {t("acc.cancel_back")}
+                      </button>
+                      <button
+                        type="button"
+                        className="md-cancel-confirm-btn"
+                        onClick={doCancel}
+                        disabled={cancelBusy}
+                      >
+                        {cancelBusy ? t("acc.cancelling") : t("acc.cancel_confirm_action")}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {cancelDone && (
+              <div className="md-cancel-done" role="status">
+                ✓ {t("acc.cancelled")}
+              </div>
+            )}
           </>
         )}
 
@@ -220,6 +361,158 @@ function BookingDetailModal({ id, onClose }) {
           .s-PENDING { background: #FFF4E0; color: #9A6700; }
           .s-CONFIRMED, .s-COMPLETED { background: var(--teal-soft); color: var(--teal); }
           .s-REJECTED, .s-CANCELLED, .s-NO_SHOW, .s-REFUNDED { background: var(--red-soft); color: var(--red-deep); }
+
+          /* ---- Cancellation styles ---- */
+          .md-cancel-zone {
+            margin-top: 22px;
+            padding-top: 18px;
+            border-top: 1px solid var(--gray-100);
+          }
+          .md-cancel-btn {
+            width: 100%;
+            padding: 13px;
+            background: transparent;
+            color: var(--red-deep);
+            border: 1.5px solid var(--red);
+            border-radius: var(--r-sm);
+            font-size: 13.5px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background .15s, color .15s;
+          }
+          .md-cancel-btn:hover:not(:disabled) {
+            background: var(--red);
+            color: #fff;
+          }
+          .md-cancel-btn:disabled {
+            border-color: var(--gray-200);
+            color: var(--gray-400);
+            cursor: not-allowed;
+          }
+          .md-cancel-window {
+            margin-top: 14px;
+            padding: 14px 16px;
+            background: var(--cream);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--r-sm);
+          }
+          .md-cancel-window-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--ink);
+            margin-bottom: 6px;
+          }
+          .md-cancel-window-body {
+            font-size: 12.5px;
+            line-height: 1.55;
+            color: var(--ink-2);
+            margin-bottom: 12px;
+          }
+          .md-cancel-wa {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 16px;
+            background: #25D366;
+            color: #fff;
+            border-radius: 980px;
+            font-size: 13px;
+            font-weight: 700;
+            text-decoration: none;
+          }
+          .md-cancel-wa:hover { background: #1FB855; }
+
+          .md-cancel-confirm {
+            padding: 16px 18px;
+            background: var(--red-soft);
+            border: 1px solid rgba(230,57,70,0.25);
+            border-radius: var(--r-sm);
+          }
+          .md-cancel-confirm-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--red-deep);
+            margin-bottom: 6px;
+          }
+          .md-cancel-confirm-body {
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--ink-2);
+            margin-bottom: 14px;
+          }
+          .md-cancel-confirm label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--ink-2);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+          }
+          .md-cancel-confirm textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1.5px solid var(--gray-200);
+            border-radius: var(--r-sm);
+            font-size: 13.5px;
+            font-family: inherit;
+            outline: none;
+            resize: vertical;
+            background: #fff;
+          }
+          .md-cancel-confirm textarea:focus { border-color: var(--ink); }
+          .md-cancel-err {
+            margin-top: 10px;
+            padding: 10px 12px;
+            background: #fff;
+            color: var(--red-deep);
+            border-radius: var(--r-sm);
+            font-size: 12.5px;
+            font-weight: 600;
+          }
+          .md-cancel-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-top: 14px;
+          }
+          .md-cancel-back {
+            background: none;
+            border: none;
+            color: var(--ink-2);
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+          }
+          .md-cancel-back:disabled { opacity: 0.5; cursor: default; }
+          .md-cancel-confirm-btn {
+            padding: 11px 22px;
+            background: var(--red);
+            color: #fff;
+            border: none;
+            border-radius: var(--r-sm);
+            font-size: 13.5px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+          }
+          .md-cancel-confirm-btn:disabled {
+            background: var(--gray-300);
+            cursor: default;
+          }
+          .md-cancel-done {
+            margin-top: 22px;
+            padding: 14px;
+            background: var(--teal-soft);
+            color: var(--teal);
+            border-radius: var(--r-sm);
+            font-size: 14px;
+            font-weight: 700;
+            text-align: center;
+          }
         `}</style>
       </div>
     </div>

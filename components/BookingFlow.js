@@ -18,11 +18,12 @@ import { formatPrice } from "../lib/format";
 import { validateCoupon, couponDiscount } from "../lib/coupons";
 import { createBooking } from "../lib/api";
 import { validateBookingDates, localizeDateError } from "../lib/dates";
+import { setUserToken } from "../lib/accountApi";
 
 export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) {
   const { t } = useLang();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, refresh: refreshAuth } = useAuth();
 
   const [step, setStep] = useState(1);
 
@@ -32,6 +33,10 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [createAccount, setCreateAccount] = useState(false);
+  // The password is only collected when createAccount is checked. When
+  // submitted to the backend, the booking route hashes it and creates the
+  // user as part of the same request (no separate signup needed).
+  const [accountPassword, setAccountPassword] = useState("");
   const [errors, setErrors] = useState({});
 
   // prefill the form when a signed-in user starts a booking
@@ -131,6 +136,15 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) e.email = t("bk.err_email");
     const digits = phone.replace(/\D/g, "");
     if (digits.length < 9) e.phone = t("bk.err_phone");
+    // If the user opted to create an account, require a password of at
+    // least 8 chars (matches backend Zod min and the password reset min).
+    // We don't validate password complexity beyond length — same policy
+    // as register.
+    if (createAccount && !user) {
+      if (!accountPassword || accountPassword.length < 8) {
+        e.accountPassword = t("auth.password_too_short");
+      }
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -186,13 +200,30 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
       specialRequests: notes.trim() || undefined,
       paymentMethod: methodCode,
       lang: "en",
-      // extra context the backend can ignore safely if it doesn't use it
+      // Account creation at booking time. The backend hashes the password
+      // and creates a user IF createAccount is true, password is provided,
+      // and no account with that email already exists. If the email is
+      // already registered the backend silently skips account creation
+      // (we don't want to leak account existence, and we don't want a
+      // failed signup to fail the booking either).
       createAccount,
+      password: createAccount && !user ? accountPassword : undefined,
       promoCode: coupon?.code || undefined,
     };
     const result = await createBooking(payload);
     setProcessing(false);
     if (result.ok) {
+      // If the backend just created an account for this booking, it
+      // returns an auth token. Persist it and refresh AuthContext so the
+      // confirmation page (step 3) shows the customer as signed in.
+      // If no account was created (already existed, didn't ask for one)
+      // result.account will be null and we skip this branch.
+      if (result.account && result.account.token) {
+        setUserToken(result.account.token);
+        // refreshAuth re-fetches /api/auth/me which will return the new
+        // user. We await so the UI doesn't briefly show "signed out" state.
+        await refreshAuth();
+      }
       setReference(result.data.reference);
       setStep(3);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -296,10 +327,34 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
                   <input
                     type="checkbox"
                     checked={createAccount}
-                    onChange={(e) => setCreateAccount(e.target.checked)}
+                    onChange={(e) => {
+                      setCreateAccount(e.target.checked);
+                      if (!e.target.checked) setAccountPassword(""); // clear if unchecked
+                    }}
                   />
                   <span>{t("bk.account_offer")}</span>
                 </label>
+              )}
+
+              {/* Password field appears only when createAccount is on.
+                  Min 8 chars matches the backend Zod schema. We do not
+                  send the password down a payment-method route — only the
+                  /bookings POST handles it, and only when this checkbox
+                  is true. */}
+              {createAccount && !user && (
+                <div className="bk-field">
+                  <label htmlFor="bk-account-pw">{t("auth.password")}</label>
+                  <input
+                    id="bk-account-pw"
+                    type="password"
+                    value={accountPassword}
+                    onChange={(e) => setAccountPassword(e.target.value)}
+                    minLength={8}
+                    placeholder={t("auth.password_hint")}
+                    autoComplete="new-password"
+                  />
+                  {errors.accountPassword && <span className="bk-err">{errors.accountPassword}</span>}
+                </div>
               )}
 
               <button className="bk-cta" onClick={goToPayment}>
