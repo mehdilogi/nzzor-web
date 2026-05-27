@@ -366,6 +366,16 @@ input, select, textarea { font-family: inherit; }
   font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
 }
 
+/* Hover-to-reveal "Make primary" button on hotel photo cards.
+   This rule lives in globals.css rather than in AdminApp.js's
+   styled-jsx block because styled_jsx 0.73.10 (bundled with Next
+   14.2.x) panics in visitor.rs:597 when it encounters a :hover
+   pseudo-class followed by a descendant combinator. The button
+   class itself is hashed-scoped by styled-jsx, but a global
+   selector targeting the same class name still works because both
+   resolve to the same DOM elements at render time. */
+.nzad-photo:hover .nzad-photo-make-primary { opacity: 1; }
+
 /* =============================================================================
    Admin dashboard — mobile
    ============================================================================= */
