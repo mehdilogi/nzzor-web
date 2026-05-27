@@ -67,6 +67,17 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
   // (no error) or { message, code? }.
   const [bookingError, setBookingError] = useState(null);
 
+  // Copy-to-clipboard state for the confirmation step's reference. After
+  // the user clicks Copy, we flash a "Copied!" label for 2 seconds.
+  const [copied, setCopied] = useState(false);
+  function copyReference() {
+    if (typeof navigator === "undefined" || !navigator.clipboard) return;
+    navigator.clipboard.writeText(reference).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => { /* clipboard permission denied — fail silently */ });
+  }
+
   // ---- guard: missing booking context -------------------------------------
   if (!hotel || !room) {
     return (
@@ -275,6 +286,27 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
             <div className="bk-card">
               <h2 className="display">{t("bk.guest_details")}</h2>
 
+              {/* Prominent sign-in prompt at the top of step 1, only for
+                  unauthenticated users. The link includes ?next= so they
+                  return to the booking flow after signing in (their form
+                  data won't persist through the round-trip — but they'll
+                  pre-fill from their profile in the new flow). */}
+              {!user && (
+                <div className="bk-have-account">
+                  <Icon name="user" size={16} style={{ color: "var(--ink-2)" }} />
+                  <div>
+                    <strong>{t("bk.have_account_q")}</strong>
+                    <Link
+                      href={`/signin?next=${encodeURIComponent(
+                        typeof window !== "undefined" ? window.location.pathname + window.location.search : "/account"
+                      )}`}
+                    >
+                      {t("bk.signin_to_prefill")} →
+                    </Link>
+                  </div>
+                </div>
+              )}
+
               <div className="bk-field">
                 <label>{t("bk.full_name")} <span className="bk-req">*</span></label>
                 <input
@@ -298,6 +330,12 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
                     className={errors.email ? "err" : ""}
                   />
                   {errors.email && <span className="bk-err">{errors.email}</span>}
+                  {!user && !errors.email && email && (
+                    /* Reassures the user that their booking will surface
+                       under any existing account with this email — without
+                       confirming whether one exists (anti-enumeration). */
+                    <span className="bk-field-hint">{t("bk.email_link_hint")}</span>
+                  )}
                 </div>
                 <div className="bk-field">
                   <label>{t("bk.phone")} <span className="bk-req">*</span></label>
@@ -464,39 +502,119 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
 
           {/* ================= STEP 3 — CONFIRMATION ================= */}
           {step === 3 && (
-            <div className="bk-card bk-confirm">
-              <div className="bk-confirm-seal">
-                <Icon name="check" size={34} strokeWidth={3} style={{ color: "#fff" }} />
-              </div>
-              <h2 className="display">{t("bk.pending_title")}</h2>
-              <p className="bk-confirm-sub">{t("bk.pending_sub")}</p>
+            <div className="bk-confirm-wrap">
+              {/* ---- HERO — seal + headline + reference ---- */}
+              <div className="bk-confirm-hero">
+                <div className="bk-confirm-glow" aria-hidden="true" />
+                <div className="bk-confirm-seal">
+                  <Icon name="check" size={42} strokeWidth={3} style={{ color: "#fff" }} />
+                </div>
+                <h2 className="bk-confirm-title display">{t("bk.pending_title")}</h2>
+                <p className="bk-confirm-sub">{t("bk.pending_sub")}</p>
 
-              <div className="bk-ref">
-                <span className="bk-ref-label">{t("bk.your_ref")}</span>
-                <span className="bk-ref-code">{reference}</span>
+                {/* Reference card with copy-to-clipboard. The ref is the
+                    artifact the user will share with the hotel and use to
+                    look up their booking — making it copy-able is small
+                    but actually useful. */}
+                <div className="bk-confirm-ref">
+                  <span className="bk-confirm-ref-label">{t("bk.your_ref")}</span>
+                  <div className="bk-confirm-ref-row">
+                    <span className="bk-confirm-ref-code">{reference}</span>
+                    <button
+                      type="button"
+                      className="bk-confirm-copy"
+                      onClick={copyReference}
+                      aria-label={copied ? t("bk.copied") : t("bk.copy")}
+                    >
+                      {copied ? t("bk.copied") : t("bk.copy")}
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div className="bk-next">
+              {/* ---- TRIP RECAP — what they actually booked ----
+                  The user might be paying attention or might be skim-
+                  reading this page. Showing the hotel + dates + total
+                  once more reassures them and reduces "wait did I book
+                  the right hotel?" anxiety. */}
+              <div className="bk-confirm-trip">
+                {(room.photos?.[0] || hotel.primaryPhoto) && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={room.photos?.[0] || hotel.primaryPhoto}
+                    alt={hotel.name}
+                    className="bk-confirm-trip-img"
+                  />
+                )}
+                <div className="bk-confirm-trip-body">
+                  <div className="bk-confirm-trip-hotel">{hotel.name}</div>
+                  <div className="bk-confirm-trip-room">{room.type}</div>
+                  <div className="bk-confirm-trip-dates">
+                    {fmt(checkIn)} → {fmt(checkOut)} · {nights} {nights === 1 ? t("bk.night") : t("bk.nights")}
+                  </div>
+                  <div className="bk-confirm-trip-total">{formatPrice(total)}</div>
+                </div>
+              </div>
+
+              {/* ---- WHAT HAPPENS NEXT — visual timeline ---- */}
+              <div className="bk-confirm-next">
                 <h3>{t("bk.next_title")}</h3>
-                <ol>
-                  <li><span>1</span>{t("bk.next1")}</li>
-                  <li><span>2</span>{t("bk.next2")}</li>
-                  <li><span>3</span>{t("bk.next3")}</li>
+                <ol className="bk-confirm-timeline">
+                  <li>
+                    <span className="bk-confirm-step">1</span>
+                    <div>
+                      <strong>{t("bk.next1_title")}</strong>
+                      <em>{t("bk.next1")}</em>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="bk-confirm-step">2</span>
+                    <div>
+                      <strong>{t("bk.next2_title")}</strong>
+                      <em>{t("bk.next2")}</em>
+                    </div>
+                  </li>
+                  <li>
+                    <span className="bk-confirm-step">3</span>
+                    <div>
+                      <strong>{t("bk.next3_title")}</strong>
+                      <em>{t("bk.next3")}</em>
+                    </div>
+                  </li>
                 </ol>
               </div>
 
+              {/* ---- ACTIONS ---- */}
               <div className="bk-confirm-actions">
-                {createAccount && !user ? (
+                {/* Primary CTA varies based on auth state. If the user is
+                    signed in (or just had an account created at booking
+                    time), the most useful next action is "view my booking
+                    in /account." Otherwise, suggest browsing more hotels. */}
+                {user ? (
+                  <Link href="/account" className="bk-confirm-primary">
+                    {t("bk.view_my_booking")}
+                  </Link>
+                ) : createAccount ? (
+                  // Guest who asked to create an account but the email was
+                  // already registered (silent skip on backend). Send them
+                  // to sign-in to access the booking we just attached by
+                  // email-ownership rule.
                   <Link
-                    href={`/signup?email=${encodeURIComponent(email)}&firstName=${encodeURIComponent(name.split(/\s+/)[0] || "")}&next=/account`}
-                    className="bk-confirm-home"
+                    href={`/signin?email=${encodeURIComponent(email)}&next=/account`}
+                    className="bk-confirm-primary"
                   >
-                    {t("auth.signup")}
+                    {t("bk.signin_to_view")}
                   </Link>
                 ) : (
-                  <Link href="/" className="bk-confirm-home">{t("bk.back_home")}</Link>
+                  <Link href="/hotels" className="bk-confirm-primary">
+                    {t("bk.browse_more")}
+                  </Link>
                 )}
-                <Link href="/hotels" className="bk-confirm-hotels">{t("bk.view_hotels")}</Link>
+                <Link href="/" className="bk-confirm-secondary">{t("bk.back_home")}</Link>
+              </div>
+
+              <div className="bk-confirm-tip">
+                {t("bk.confirm_email_tip")} <strong>{email}</strong>
               </div>
             </div>
           )}
@@ -708,39 +826,297 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
           line-height: 1.5; text-align: center;
         }
 
-        /* confirmation */
-        .bk-confirm { text-align: center; }
+        /* =====================================================
+           CONFIRMATION STEP — full redesign 2026-05-26
+           =====================================================
+           Replaces the previous plain white card with a richer,
+           more celebratory layout: hero block with a glow behind
+           the seal, a copy-able reference, a trip recap card with
+           the hotel photo, a visual timeline for "what happens
+           next", and clearer dual CTAs. The goal is to make the
+           post-booking moment feel like a small win rather than
+           a transactional acknowledgment.
+        */
+        .bk-confirm-wrap {
+          max-width: 580px;
+          margin: 0 auto;
+          padding: 0;
+        }
+
+        /* ---- Hero with glow ---- */
+        .bk-confirm-hero {
+          position: relative;
+          background: #fff;
+          border-radius: var(--r-lg);
+          padding: 48px 36px 36px;
+          margin-bottom: 16px;
+          text-align: center;
+          overflow: hidden;
+          border: 1px solid var(--gray-100);
+        }
+        .bk-confirm-glow {
+          position: absolute;
+          top: 0; left: 50%;
+          width: 320px; height: 320px;
+          transform: translateX(-50%) translateY(-50%);
+          background: radial-gradient(closest-side, rgba(27,138,90,0.18), rgba(27,138,90,0));
+          pointer-events: none;
+        }
         .bk-confirm-seal {
-          width: 72px; height: 72px; border-radius: 50%; background: var(--teal);
-          display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;
-        }
-        .bk-confirm h2 { margin-bottom: 8px; }
-        .bk-confirm-sub { color: var(--gray-400); font-size: 15px; max-width: 420px; margin: 0 auto 24px; line-height: 1.6; }
-        .bk-ref {
-          background: var(--cream); border: 1px dashed var(--gray-300); border-radius: var(--r-sm);
-          padding: 18px; margin-bottom: 28px;
-        }
-        .bk-ref-label { display: block; font-size: 12px; font-weight: 700; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
-        .bk-ref-code { font-size: 26px; font-weight: 800; color: var(--ink); letter-spacing: 0.04em; }
-        .bk-next { text-align: left; margin-bottom: 28px; }
-        .bk-next h3 { font-size: 15px; font-weight: 700; color: var(--ink); margin-bottom: 14px; }
-        .bk-next ol { list-style: none; display: flex; flex-direction: column; gap: 12px; }
-        .bk-next li {
-          display: flex; align-items: flex-start; gap: 12px;
-          font-size: 13.5px; color: var(--ink-2); font-weight: 500; line-height: 1.5;
-        }
-        .bk-next li span {
-          width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
-          background: var(--ink); color: #fff; font-size: 12px; font-weight: 700;
+          position: relative;
+          width: 84px; height: 84px;
+          border-radius: 50%;
+          background: var(--teal);
           display: flex; align-items: center; justify-content: center;
+          margin: 0 auto 24px;
+          box-shadow: 0 12px 30px rgba(27,138,90,0.28);
+          animation: seal-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .bk-confirm-actions { display: flex; gap: 10px; }
-        .bk-confirm-home, .bk-confirm-hotels {
-          flex: 1; padding: 14px; border-radius: var(--r-sm); font-size: 14px;
-          font-weight: 700; text-decoration: none; text-align: center;
+        @keyframes seal-pop {
+          0% { opacity: 0; transform: scale(0.5); }
+          60% { transform: scale(1.08); }
+          100% { opacity: 1; transform: scale(1); }
         }
-        .bk-confirm-home { background: var(--ink); color: #fff; }
-        .bk-confirm-hotels { background: var(--gray-100); color: var(--ink); }
+        .bk-confirm-title {
+          font-size: 28px;
+          font-weight: 600;
+          letter-spacing: -0.025em;
+          color: var(--ink);
+          margin-bottom: 10px;
+          position: relative;
+        }
+        .bk-confirm-sub {
+          color: var(--gray-400);
+          font-size: 14.5px;
+          max-width: 420px;
+          margin: 0 auto 28px;
+          line-height: 1.6;
+          position: relative;
+        }
+
+        /* ---- Reference card with copy ---- */
+        .bk-confirm-ref {
+          background: var(--cream);
+          border: 1px dashed var(--gray-300);
+          border-radius: var(--r-md);
+          padding: 18px 20px;
+          position: relative;
+        }
+        .bk-confirm-ref-label {
+          display: block;
+          font-size: 10.5px;
+          font-weight: 700;
+          color: var(--gray-400);
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          margin-bottom: 10px;
+        }
+        .bk-confirm-ref-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .bk-confirm-ref-code {
+          font-size: 22px;
+          font-weight: 800;
+          color: var(--ink);
+          letter-spacing: 0.04em;
+          font-family: ui-monospace, SFMono-Regular, monospace;
+          word-break: break-all;
+        }
+        .bk-confirm-copy {
+          flex-shrink: 0;
+          background: #fff;
+          border: 1.5px solid var(--gray-200);
+          border-radius: 980px;
+          padding: 6px 14px;
+          font-size: 11.5px;
+          font-weight: 700;
+          color: var(--ink);
+          cursor: pointer;
+          font-family: inherit;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .bk-confirm-copy:hover {
+          border-color: var(--ink);
+        }
+        .bk-confirm-copy:active {
+          background: var(--ink);
+          color: #fff;
+        }
+
+        /* ---- Trip recap (what you booked) ---- */
+        .bk-confirm-trip {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          background: #fff;
+          border: 1px solid var(--gray-100);
+          border-radius: var(--r-lg);
+          padding: 14px;
+          margin-bottom: 16px;
+        }
+        .bk-confirm-trip-img {
+          width: 96px;
+          height: 96px;
+          object-fit: cover;
+          border-radius: var(--r-sm);
+          flex-shrink: 0;
+        }
+        .bk-confirm-trip-body { flex: 1; min-width: 0; }
+        .bk-confirm-trip-hotel {
+          font-size: 15px;
+          font-weight: 700;
+          color: var(--ink);
+          letter-spacing: -0.01em;
+          margin-bottom: 2px;
+        }
+        .bk-confirm-trip-room {
+          font-size: 12.5px;
+          color: var(--gray-400);
+          font-weight: 600;
+          margin-bottom: 6px;
+        }
+        .bk-confirm-trip-dates {
+          font-size: 12.5px;
+          color: var(--ink-2);
+          font-weight: 600;
+          margin-bottom: 4px;
+        }
+        .bk-confirm-trip-total {
+          font-size: 14px;
+          font-weight: 800;
+          color: var(--ink);
+        }
+
+        /* ---- What happens next — visual timeline ---- */
+        .bk-confirm-next {
+          background: #fff;
+          border: 1px solid var(--gray-100);
+          border-radius: var(--r-lg);
+          padding: 22px 24px;
+          margin-bottom: 18px;
+        }
+        .bk-confirm-next h3 {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: var(--gray-400);
+          margin-bottom: 16px;
+        }
+        .bk-confirm-timeline {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+          position: relative;
+        }
+        /* Vertical line that visually connects the numbered steps. */
+        .bk-confirm-timeline::before {
+          content: "";
+          position: absolute;
+          left: 13px;
+          top: 24px;
+          bottom: 24px;
+          width: 2px;
+          background: var(--gray-100);
+          z-index: 0;
+        }
+        .bk-confirm-timeline li {
+          display: flex;
+          align-items: flex-start;
+          gap: 14px;
+          position: relative;
+          z-index: 1;
+        }
+        .bk-confirm-step {
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          flex-shrink: 0;
+          background: var(--ink);
+          color: #fff;
+          font-size: 12px;
+          font-weight: 700;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 3px solid #fff;
+        }
+        .bk-confirm-timeline li strong {
+          display: block;
+          font-size: 13.5px;
+          font-weight: 700;
+          color: var(--ink);
+          margin-bottom: 2px;
+        }
+        .bk-confirm-timeline li em {
+          font-style: normal;
+          display: block;
+          font-size: 12.5px;
+          color: var(--ink-2);
+          line-height: 1.5;
+        }
+
+        /* ---- Actions ---- */
+        .bk-confirm-actions {
+          display: flex;
+          gap: 10px;
+          margin-bottom: 14px;
+        }
+        .bk-confirm-primary, .bk-confirm-secondary {
+          flex: 1;
+          padding: 15px;
+          border-radius: var(--r-sm);
+          font-size: 14px;
+          font-weight: 700;
+          text-decoration: none;
+          text-align: center;
+          transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+        .bk-confirm-primary {
+          background: var(--ink);
+          color: #fff;
+        }
+        .bk-confirm-primary:hover { background: var(--red); }
+        .bk-confirm-secondary {
+          background: #fff;
+          color: var(--ink);
+          border: 1.5px solid var(--gray-200);
+        }
+        .bk-confirm-secondary:hover { border-color: var(--ink); }
+
+        /* ---- Email tip ---- */
+        .bk-confirm-tip {
+          text-align: center;
+          font-size: 12px;
+          color: var(--gray-400);
+          line-height: 1.5;
+          padding: 4px 8px;
+        }
+
+        /* ---- Mobile tightening ---- */
+        @media (max-width: 560px) {
+          .bk-confirm-hero { padding: 36px 22px 28px; }
+          .bk-confirm-title { font-size: 24px; }
+          .bk-confirm-ref { padding: 14px 16px; }
+          .bk-confirm-ref-code { font-size: 18px; }
+          .bk-confirm-ref-row {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+          }
+          .bk-confirm-trip-img { width: 80px; height: 80px; }
+          .bk-confirm-trip-hotel { font-size: 14px; }
+          .bk-confirm-actions { flex-direction: column; gap: 8px; }
+          .bk-confirm-next { padding: 18px 18px; }
+        }
 
         /* summary sidebar */
         .bk-summary {

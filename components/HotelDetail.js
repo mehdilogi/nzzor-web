@@ -440,6 +440,21 @@ function DetailStyles() {
         display: grid; grid-template-columns: 1fr 380px; gap: 48px;
         align-items: start; padding-top: 36px; padding-bottom: 60px;
       }
+      /* The aside must STRETCH to the full grid track height so the widget
+         has room to "scroll within" — that's what makes position:sticky
+         actually stick. Without align-self:stretch the aside is exactly
+         the widget's height and sticky becomes a no-op. We use align-self
+         on the aside specifically rather than removing align-items:start
+         from the parent because the start alignment is correct for the
+         main column (we want it to size to its content, not stretch).
+
+         z-index keeps the widget above the sticky scroll-spy tabs that
+         sit at top:80px in the main column. */
+      .nz-detail-layout > aside {
+        align-self: stretch;
+        position: relative;
+        z-index: 2;
+      }
       .nz-hotel-head { margin-bottom: 32px; }
       .nz-hotel-badges { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
       .nz-badge {

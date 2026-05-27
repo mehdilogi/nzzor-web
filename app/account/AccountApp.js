@@ -209,44 +209,78 @@ function BookingDetailModal({ id, onClose, onCancelled }) {
         {!b && !err && <div className="md-load">…</div>}
         {b && (
           <>
+            {/* ---- HEADER ----
+                Reference is the dominant element (visual anchor). Status pill
+                sits underneath. Total is right-aligned and substantial — the
+                user wants to see what they're paying at a glance. */}
             <div className="md-head">
-              <div>
+              <div className="md-head-left">
+                <div className="md-ref-label">{t("bk.your_ref")}</div>
                 <div className="md-ref">{b.reference}</div>
-                <span className={`mb-st s-${b.status}`}>{b.status}</span>
+                <span className={`md-st s-${b.status}`}>{b.status}</span>
               </div>
-              <div className="md-total">
-                <span>Total</span>
-                <strong>{formatPrice(b.pricing?.total)}</strong>
+              <div className="md-head-right">
+                <div className="md-total-label">{t("detail.total")}</div>
+                <div className="md-total">{formatPrice(b.pricing?.total)}</div>
               </div>
             </div>
 
-            <Section title="Stay">
-              <Row label="Hotel" value={b.hotel?.name} />
-              <Row label="City" value={b.hotel?.city} />
-              <Row label="Check-in" value={(b.checkIn || "").slice(0, 10)} />
-              <Row label="Check-out" value={(b.checkOut || "").slice(0, 10)} />
-              <Row label="Nights" value={b.nights} />
-            </Section>
+            {/* ---- HOTEL HERO ----
+                Single prominent line for the hotel name + city. Keeps the
+                user's eye on the destination, not the metadata. */}
+            <div className="md-hotel">
+              <div className="md-hotel-name">{b.hotel?.name}</div>
+              <div className="md-hotel-city">{b.hotel?.city}</div>
+            </div>
 
-            <Section title="Rooms">
-              {(b.rooms || []).map((r, i) => (
-                <Row key={i} label={r.type} value={`× ${r.quantity}`} />
-              ))}
-            </Section>
+            {/* ---- TRIP DATES ----
+                Three big stat boxes: check-in, check-out, nights. More
+                scannable than label/value rows for the most-important info. */}
+            <div className="md-trip">
+              <div className="md-trip-cell">
+                <div className="md-trip-k">{t("bk.checkin")}</div>
+                <div className="md-trip-v">{(b.checkIn || "").slice(0, 10)}</div>
+              </div>
+              <div className="md-trip-cell">
+                <div className="md-trip-k">{t("bk.checkout")}</div>
+                <div className="md-trip-v">{(b.checkOut || "").slice(0, 10)}</div>
+              </div>
+              <div className="md-trip-cell">
+                <div className="md-trip-k">{b.nights === 1 ? t("bk.night") : t("bk.nights")}</div>
+                <div className="md-trip-v">{b.nights}</div>
+              </div>
+            </div>
 
-            <Section title="Pricing">
-              <Row label="Subtotal" value={formatPrice(b.pricing?.subtotal)} />
-              {b.pricing?.discount > 0 && <Row label="Discount" value={`− ${formatPrice(b.pricing.discount)}`} />}
-              <Row label="Total" value={formatPrice(b.pricing?.total)} strong />
-            </Section>
+            {/* ---- ROOMS + PAYMENT side-by-side ---- */}
+            <div className="md-2col">
+              <Section title={t("acc.section_rooms")}>
+                {(b.rooms || []).map((r, i) => (
+                  <Row key={i} label={r.type} value={`× ${r.quantity}`} />
+                ))}
+              </Section>
+              <Section title={t("acc.section_payment")}>
+                <Row label={t("acc.payment_method")} value={b.payment?.method} />
+                {/* Status removed — already shown as a pill in the header
+                    above. No need to duplicate it inside the modal body. */}
+              </Section>
+            </div>
 
-            <Section title="Payment">
-              <Row label="Method" value={b.payment?.method} />
-              <Row label="Status" value={b.payment?.status} />
+            {/* ---- PRICING ----
+                Subtotal hidden when it equals total (no discount). The user
+                doesn't need to see "Subtotal: 70k DZD / Total: 70k DZD" —
+                it's noise. Only break it out when there's actual nuance. */}
+            <Section title={t("acc.section_pricing")}>
+              {b.pricing?.discount > 0 && (
+                <>
+                  <Row label={t("acc.subtotal")} value={formatPrice(b.pricing?.subtotal)} />
+                  <Row label={t("acc.discount")} value={`− ${formatPrice(b.pricing.discount)}`} />
+                </>
+              )}
+              <Row label={t("detail.total")} value={formatPrice(b.pricing?.total)} strong />
             </Section>
 
             {b.specialRequests && (
-              <Section title="Special requests">
+              <Section title={t("acc.section_requests")}>
                 <p className="md-notes">{b.specialRequests}</p>
               </Section>
             )}
@@ -344,25 +378,198 @@ function BookingDetailModal({ id, onClose, onCancelled }) {
         )}
 
         <style jsx>{`
-          .md-back { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; padding: 24px; overflow-y: auto; }
-          .md-panel { position: relative; background: #fff; border-radius: var(--r-lg); max-width: 600px; width: 100%; max-height: 92vh; overflow-y: auto; padding: 28px 30px; }
-          .md-close { position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--gray-100); font-size: 22px; line-height: 1; cursor: pointer; }
-          .md-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid var(--gray-100); }
-          .md-ref { font-size: 22px; font-weight: 800; letter-spacing: 0.02em; margin-bottom: 8px; color: var(--ink); }
-          .md-total { text-align: right; }
-          .md-total span { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gray-400); margin-bottom: 4px; }
-          .md-total strong { font-size: 20px; font-weight: 800; color: var(--ink); }
-          .md-err { background: var(--red-soft); color: var(--red-deep); padding: 12px; border-radius: var(--r-sm); }
-          .md-load { padding: 30px; text-align: center; color: var(--gray-400); }
-          .md-notes { font-size: 14px; line-height: 1.6; color: var(--ink-2); white-space: pre-wrap; background: var(--cream); padding: 12px 14px; border-radius: var(--r-sm); }
-          .md-voucher { width: 100%; margin-top: 22px; padding: 14px; background: var(--ink); color: #fff; border: none; border-radius: var(--r-sm); font-size: 14.5px; font-weight: 700; cursor: pointer; font-family: inherit; }
-          .md-voucher:hover { background: var(--red); }
-          .mb-st { font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 980px; }
+          /* Modal backdrop — significantly darker than before. The 0.45
+             opacity over cream was too light to read as "modal" — looked
+             like a flow card. 0.7 + a blur gives a proper modal feel. */
+          .md-back {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: saturate(160%) blur(6px);
+            -webkit-backdrop-filter: saturate(160%) blur(6px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            overflow-y: auto;
+            animation: md-fade 0.18s ease-out;
+          }
+          @keyframes md-fade {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          .md-panel {
+            position: relative;
+            background: #fff;
+            border-radius: var(--r-lg);
+            max-width: 680px;
+            width: 100%;
+            max-height: 92vh;
+            overflow-y: auto;
+            padding: 34px 38px;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+            animation: md-rise 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+          }
+          @keyframes md-rise {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .md-close {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: var(--gray-100);
+            font-size: 22px;
+            line-height: 1;
+            cursor: pointer;
+            transition: background 0.15s;
+          }
+          .md-close:hover { background: var(--gray-200); }
+
+          /* ---- HEADER ---- */
+          .md-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 24px;
+            margin-bottom: 24px;
+            padding-bottom: 22px;
+            border-bottom: 1px solid var(--gray-100);
+          }
+          .md-head-left { flex: 1; min-width: 0; }
+          .md-head-right { text-align: right; flex-shrink: 0; }
+          .md-ref-label, .md-total-label {
+            font-size: 10.5px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--gray-400);
+            margin-bottom: 6px;
+          }
+          .md-ref {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            color: var(--ink);
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            margin-bottom: 8px;
+            word-break: break-all;
+          }
+          .md-total {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--ink);
+            white-space: nowrap;
+          }
+          .md-st {
+            display: inline-block;
+            font-size: 10.5px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 980px;
+            letter-spacing: 0.04em;
+          }
           .s-PENDING { background: #FFF4E0; color: #9A6700; }
           .s-CONFIRMED, .s-COMPLETED { background: var(--teal-soft); color: var(--teal); }
           .s-REJECTED, .s-CANCELLED, .s-NO_SHOW, .s-REFUNDED { background: var(--red-soft); color: var(--red-deep); }
 
-          /* ---- Cancellation styles ---- */
+          /* ---- HOTEL HERO ---- */
+          .md-hotel {
+            margin-bottom: 20px;
+          }
+          .md-hotel-name {
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            color: var(--ink);
+            line-height: 1.2;
+            margin-bottom: 4px;
+          }
+          .md-hotel-city {
+            font-size: 13.5px;
+            color: var(--gray-400);
+            font-weight: 600;
+          }
+
+          /* ---- TRIP DATES (3-cell stat row) ---- */
+          .md-trip {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 24px;
+          }
+          .md-trip-cell {
+            background: var(--cream);
+            border: 1px solid var(--gray-100);
+            border-radius: var(--r-sm);
+            padding: 14px 16px;
+          }
+          .md-trip-k {
+            font-size: 10.5px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--gray-400);
+            margin-bottom: 6px;
+          }
+          .md-trip-v {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--ink);
+            font-family: ui-monospace, SFMono-Regular, monospace;
+          }
+
+          /* ---- 2-COL SECTIONS (rooms + payment) ---- */
+          .md-2col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 4px;
+          }
+
+          .md-err {
+            background: var(--red-soft);
+            color: var(--red-deep);
+            padding: 12px;
+            border-radius: var(--r-sm);
+          }
+          .md-load {
+            padding: 40px;
+            text-align: center;
+            color: var(--gray-400);
+          }
+          .md-notes {
+            font-size: 13.5px;
+            line-height: 1.6;
+            color: var(--ink-2);
+            white-space: pre-wrap;
+            background: var(--cream);
+            padding: 12px 14px;
+            border-radius: var(--r-sm);
+            margin: 0;
+          }
+          .md-voucher {
+            width: 100%;
+            margin-top: 18px;
+            padding: 14px;
+            background: var(--ink);
+            color: #fff;
+            border: none;
+            border-radius: var(--r-sm);
+            font-size: 14.5px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.15s;
+          }
+          .md-voucher:hover { background: var(--red); }
+
+          /* ---- Cancellation styles (unchanged from before) ---- */
           .md-cancel-zone {
             margin-top: 22px;
             padding-top: 18px;
@@ -512,6 +719,30 @@ function BookingDetailModal({ id, onClose, onCancelled }) {
             font-size: 14px;
             font-weight: 700;
             text-align: center;
+          }
+
+          /* ---- MOBILE ---- */
+          @media (max-width: 600px) {
+            .md-panel { padding: 26px 22px; }
+            .md-head {
+              flex-direction: column;
+              align-items: flex-start;
+            }
+            .md-head-right { text-align: left; }
+            .md-ref { font-size: 20px; }
+            .md-total { font-size: 22px; }
+            .md-trip {
+              grid-template-columns: 1fr;
+              gap: 6px;
+            }
+            .md-trip-cell {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              padding: 10px 14px;
+            }
+            .md-trip-k { margin-bottom: 0; }
+            .md-2col { grid-template-columns: 1fr; gap: 12px; }
           }
         `}</style>
       </div>
