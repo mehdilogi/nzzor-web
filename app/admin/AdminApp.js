@@ -6,7 +6,7 @@ import {
   adminHotels, adminHotel, adminBookings, adminBookingDetail, adminUpdateBookingStatus,
   adminCreateHotel, adminUpdateHotel, adminDeleteHotel,
   adminAddRoom, adminUpdateRoom, adminDeleteRoom,
-  adminAddPhoto, adminUploadPhoto, adminDeletePhoto, adminSetPrimaryPhoto,
+  adminAddPhoto, adminUploadPhoto, adminDeletePhoto,
   adminAddRoomPhoto, adminUploadRoomPhoto, adminDeleteRoomPhoto,
   adminHotelManagers, adminAddHotelManager, adminRemoveHotelManager, adminResetHotelManagerPassword,
   adminTags,
@@ -738,35 +738,6 @@ const BLANK_HOTEL = {
 
 function HotelEditor({ hotel, onClose, onSaved }) {
   const isNew = !hotel;
-
-  // ---- Authoritative hotel data ------------------------------------------
-  // We keep `hotelData` as the source of truth for photos and rooms. The
-  // `hotel` prop is only the initial seed. After any mutation (delete photo,
-  // add room, set primary, etc.) the child panel calls `refreshHotelData()`
-  // which re-fetches the detail endpoint and updates this slot, which in
-  // turn re-renders the child panels with fresh data.
-  //
-  // This eliminates the class of bugs where:
-  //   1. User deletes a photo
-  //   2. PhotosPanel optimistically updates local state
-  //   3. User closes editor, reopens it
-  //   4. Editor receives stale `hotel.photos` from initial load
-  //   5. Photo appears to be back even though it was actually deleted
-  //
-  // With refresh-on-mutate, the truth is always the database.
-  const [hotelData, setHotelData] = useState(hotel);
-  const refreshHotelData = useCallback(async () => {
-    if (!hotel?.id) return;
-    try {
-      const fresh = await adminHotel(hotel.id);
-      setHotelData(fresh);
-    } catch (e) {
-      // Don't block the UI on a failed refresh — log it and continue with
-      // whatever data we have.
-      console.error("Failed to refresh hotel data:", e);
-    }
-  }, [hotel?.id]);
-
   const [form, setForm] = useState(() => {
     if (!hotel) return { ...BLANK_HOTEL };
     return {
@@ -903,18 +874,10 @@ function HotelEditor({ hotel, onClose, onSaved }) {
       </div>
 
       {savedId && (
-        <RoomsPanel
-          hotelId={savedId}
-          initialRooms={hotelData?.rooms || []}
-          refresh={refreshHotelData}
-        />
+        <RoomsPanel hotelId={savedId} initialRooms={hotel?.rooms || []} />
       )}
       {savedId && (
-        <PhotosPanel
-          hotelId={savedId}
-          initialPhotos={hotelData?.photos || []}
-          refresh={refreshHotelData}
-        />
+        <PhotosPanel hotelId={savedId} initialPhotos={hotel?.photos || []} />
       )}
       {savedId && (
         <ManagersPanel hotelId={savedId} />
@@ -943,25 +906,17 @@ const BLANK_ROOM = {
   basePrice: 20000, totalUnits: 5, isActive: true,
 };
 
-function RoomsPanel({ hotelId, initialRooms, refresh }) {
+function RoomsPanel({ hotelId, initialRooms }) {
   const [rooms, setRooms] = useState(initialRooms);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState(BLANK_ROOM);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const [note, setNote] = useState(""); // soft-delete feedback message
-
-  // Resync local state when the parent passes a different initialRooms
-  // (happens after refresh()). Without this useEffect, the panel would
-  // capture initialRooms only on first mount and ignore later updates.
-  useEffect(() => {
-    setRooms(initialRooms);
-  }, [initialRooms]);
 
   const set = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
 
   async function addRoom() {
-    setErr(""); setNote(""); setBusy(true);
+    setErr(""); setBusy(true);
     try {
       const payload = {
         ...draft,
@@ -970,13 +925,10 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
         basePrice: Number(draft.basePrice),
         totalUnits: Number(draft.totalUnits),
       };
-      await adminAddRoom(hotelId, payload);
+      const created = await adminAddRoom(hotelId, payload);
+      setRooms((r) => [...r, created]);
       setDraft(BLANK_ROOM);
       setAdding(false);
-      // Refetch from the server — the new room comes back with its id and
-      // any server-side defaults applied. More reliable than appending the
-      // POST response directly.
-      if (refresh) await refresh();
     } catch (e) {
       setErr(e.message);
     } finally { setBusy(false); }
@@ -984,19 +936,9 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
 
   async function delRoom(id) {
     if (!confirm("Remove this room type?")) return;
-    setErr(""); setNote("");
     try {
-      const result = await adminDeleteRoom(id);
-      // Smart-delete backend returns { deleteMode: "hard" | "soft",
-      // bookingRefs }. When soft, the room stays in the DB (because
-      // bookings reference it) but is filtered out of the editor. Show
-      // an informational note so the admin understands what happened.
-      if (result?.deleteMode === "soft") {
-        setNote(
-          `Room archived — ${result.bookingRefs} existing booking${result.bookingRefs === 1 ? "" : "s"} reference it, so it can't be permanently deleted.`
-        );
-      }
-      if (refresh) await refresh();
+      await adminDeleteRoom(id);
+      setRooms((r) => r.filter((x) => x.id !== id));
     } catch (e) { setErr(e.message); }
   }
 
@@ -1007,30 +949,6 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
         {!adding && <button className="nzad-btn-ghost" onClick={() => setAdding(true)}>+ Add room</button>}
       </div>
       {err && <ErrorBox msg={err} />}
-      {note && (
-        /* Informational note (not an error): explains why a room delete
-           became an archive instead of a hard delete. Auto-dismissable
-           by clicking the ×. */
-        <div className="nzad-info-note" role="status">
-          <span>{note}</span>
-          <button type="button" onClick={() => setNote("")} aria-label="Dismiss">×</button>
-          <style jsx>{`
-            .nzad-info-note {
-              display: flex; align-items: center; gap: 12px;
-              padding: 10px 14px; margin: 10px 0 14px;
-              background: #FFF4E0; color: #9A6700;
-              border-radius: var(--r-sm);
-              font-size: 13px;
-            }
-            .nzad-info-note span { flex: 1; }
-            .nzad-info-note button {
-              background: none; border: none; font-size: 18px;
-              line-height: 1; cursor: pointer; color: #9A6700;
-              padding: 0 4px;
-            }
-          `}</style>
-        </div>
-      )}
 
       {rooms.length === 0 && !adding && (
         <span className="nzad-empty-inline">No rooms yet. Add at least one room type.</span>
@@ -1365,7 +1283,7 @@ function RoomPhotos({ room, onPhotosChange }) {
 // =============================================================================
 // PHOTOS PANEL
 // =============================================================================
-function PhotosPanel({ hotelId, initialPhotos, refresh }) {
+function PhotosPanel({ hotelId, initialPhotos }) {
   const [photos, setPhotos] = useState(initialPhotos);
   const [url, setUrl] = useState("");
   const [showUrl, setShowUrl] = useState(false);
@@ -1374,67 +1292,24 @@ function PhotosPanel({ hotelId, initialPhotos, refresh }) {
   // Each upload row: { id, name, progress, error, done }
   const [uploads, setUploads] = useState([]);
   const [dragging, setDragging] = useState(false);
-  // Per-photo "busy" set so we can disable buttons during async ops without
-  // a global lock. Storing as a Set in state — replaced rather than mutated.
-  const [busyPhotoIds, setBusyPhotoIds] = useState(new Set());
   const fileInputRef = useRef(null);
-
-  // Resync local state when parent passes a different initialPhotos
-  // (happens after refresh() — e.g. after delete/add/setPrimary). Without
-  // this, the panel would only ever see the photos array it was mounted
-  // with, and "delete photo → photo reappears on reopen" type bugs would
-  // persist.
-  useEffect(() => {
-    setPhotos(initialPhotos);
-  }, [initialPhotos]);
-
-  function markBusy(id, busy) {
-    setBusyPhotoIds((prev) => {
-      const next = new Set(prev);
-      if (busy) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-  }
 
   async function addByUrl() {
     if (!url.trim()) return;
     setErr(""); setBusyUrl(true);
     try {
-      await adminAddPhoto(hotelId, url.trim(), photos.length === 0);
+      const p = await adminAddPhoto(hotelId, url.trim(), photos.length === 0);
+      setPhotos((ps) => [...ps, p]);
       setUrl("");
-      // Refetch from server — gets the new photo with its id and resolved
-      // isPrimary state. More reliable than appending the POST response.
-      if (refresh) await refresh();
     } catch (e) { setErr(e.message); }
     finally { setBusyUrl(false); }
   }
 
   async function del(id) {
-    setErr("");
-    markBusy(id, true);
     try {
       await adminDeletePhoto(id);
-      // Refetch instead of optimistically filtering — the backend may have
-      // also promoted a successor to primary (when the deleted photo was
-      // the primary), and we want the refreshed photos list to reflect
-      // that immediately.
-      if (refresh) await refresh();
+      setPhotos((ps) => ps.filter((x) => x.id !== id));
     } catch (e) { setErr(e.message); }
-    finally { markBusy(id, false); }
-  }
-
-  // Promote a non-primary photo to primary. The backend transactionally
-  // clears the flag on all sibling photos and sets it on this one, so we
-  // always have exactly one primary photo per hotel.
-  async function setPrimary(id) {
-    setErr("");
-    markBusy(id, true);
-    try {
-      await adminSetPrimaryPhoto(id);
-      if (refresh) await refresh();
-    } catch (e) { setErr(e.message); }
-    finally { markBusy(id, false); }
   }
 
   function pickFiles() {
@@ -1480,9 +1355,6 @@ function PhotosPanel({ hotelId, initialPhotos, refresh }) {
             setUploads((u) => u.map((r) => (r.id === row.id ? { ...r, progress: pct } : r)));
           },
         });
-        // Optimistically show the new photo immediately so multi-file
-        // uploads feel responsive. We'll call refresh() at the end of
-        // the loop to reconcile with server truth.
         setPhotos((ps) => [...ps, p]);
         setUploads((u) => u.map((r) => (r.id === row.id ? { ...r, done: true, progress: 100 } : r)));
         // drop the row after a short delay so the user sees the "done" tick
@@ -1493,10 +1365,6 @@ function PhotosPanel({ hotelId, initialPhotos, refresh }) {
         setUploads((u) => u.map((r) => (r.id === row.id ? { ...r, error: e.message } : r)));
       }
     }
-    // Reconcile with the server after the batch. Picks up any server-side
-    // changes (e.g. the first uploaded photo being auto-promoted to primary
-    // when the hotel had no photos before).
-    if (refresh) await refresh();
   }
 
   return (
@@ -1508,35 +1376,14 @@ function PhotosPanel({ hotelId, initialPhotos, refresh }) {
       {/* existing photos grid */}
       {photos.length > 0 && (
         <div className="nzad-photo-grid">
-          {photos.map((p) => {
-            const isBusy = busyPhotoIds.has(p.id);
-            return (
-              <div className={`nzad-photo${isBusy ? " busy" : ""}`} key={p.id}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.url} alt="" />
-                {p.isPrimary && <span className="nzad-photo-primary">Primary</span>}
-                <button
-                  className="nzad-photo-del"
-                  onClick={() => del(p.id)}
-                  disabled={isBusy}
-                  title="Remove"
-                >×</button>
-                {/* "Make primary" overlay button — only shown for non-primary
-                    photos. Positioned at the bottom so it doesn't compete
-                    visually with the × delete button at the top-right. */}
-                {!p.isPrimary && (
-                  <button
-                    className="nzad-photo-make-primary"
-                    onClick={() => setPrimary(p.id)}
-                    disabled={isBusy}
-                    title="Set as primary photo"
-                  >
-                    ★ Make primary
-                  </button>
-                )}
-              </div>
-            );
-          })}
+          {photos.map((p) => (
+            <div className="nzad-photo" key={p.id}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={p.url} alt="" />
+              {p.isPrimary && <span className="nzad-photo-primary">Primary</span>}
+              <button className="nzad-photo-del" onClick={() => del(p.id)} title="Remove">×</button>
+            </div>
+          ))}
         </div>
       )}
 
@@ -1603,10 +1450,6 @@ function PhotosPanel({ hotelId, initialPhotos, refresh }) {
         .nzad-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-bottom: 16px; }
         .nzad-photo { position: relative; height: 90px; border-radius: var(--r-sm); overflow: hidden; background: var(--gray-100); }
         .nzad-photo img { width: 100%; height: 100%; object-fit: cover; }
-        /* Visually dim the card while an action is in flight (delete or
-           set-primary), so the user gets feedback that something is
-           happening. */
-        .nzad-photo.busy { opacity: 0.55; pointer-events: none; }
         .nzad-photo-primary {
           position: absolute; bottom: 4px; left: 4px; background: var(--red); color: #fff;
           font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 980px;
@@ -1616,29 +1459,6 @@ function PhotosPanel({ hotelId, initialPhotos, refresh }) {
           border-radius: 50%; border: none; background: rgba(0,0,0,0.6); color: #fff;
           font-size: 14px; cursor: pointer; line-height: 1;
         }
-        .nzad-photo-del:hover { background: var(--red); }
-        /* "Make primary" overlay — appears on hover at the bottom of the
-           photo. Subtle until hovered so it doesn't clutter the gallery
-           but is discoverable when the admin moves the mouse around. */
-        .nzad-photo-make-primary {
-          position: absolute;
-          bottom: 4px; right: 4px;
-          background: rgba(0,0,0,0.7);
-          color: #fff;
-          border: none;
-          border-radius: 980px;
-          padding: 4px 10px;
-          font-size: 10.5px;
-          font-weight: 700;
-          cursor: pointer;
-          opacity: 0;
-          transition: opacity 0.15s, background 0.15s;
-          font-family: inherit;
-          letter-spacing: 0.03em;
-        }
-        .nzad-photo:hover .nzad-photo-make-primary { opacity: 1; }
-        .nzad-photo-make-primary:hover { background: var(--red); }
-        .nzad-photo-make-primary:disabled { opacity: 0.5; cursor: default; }
 
         /* dropzone */
         .nzad-drop {
@@ -2022,11 +1842,10 @@ function BookingsManager() {
   const [search, setSearch] = useState("");
 
   // ---- Pagination state ---------------------------------------------------
-  // Page is 1-indexed (matches the backend's pagination shape).
-  // pageSize is admin-controlled via a dropdown (10 / 25 / 50 / 100) so
-  // power users can scan large volumes without paging through them.
-  // total/totalPages come from the backend response on every load.
-  const [pageSize, setPageSize] = useState(25);
+  // Page is 1-indexed (matches the backend's pagination shape). limit is
+  // fixed at 25 — gives a tidy UI without long scrolls. total/totalPages
+  // come from the backend response on every load.
+  const PAGE_SIZE = 25;
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -2038,15 +1857,14 @@ function BookingsManager() {
     return () => clearTimeout(id);
   }, [searchInput]);
 
-  // Whenever filters OR pageSize change, reset to page 1. Otherwise a user
-  // on page 5 who applies a new filter (or switches from 25 to 100 per
-  // page) would land on "page 5 of 1" — meaningless.
+  // Whenever any filter changes, reset to page 1. Otherwise a user on page
+  // 5 who applies a new filter would land on "page 5 of 1" — meaningless.
   useEffect(() => {
     setPage(1);
-  }, [status, paymentStatus, from, to, search, pageSize]);
+  }, [status, paymentStatus, from, to, search]);
 
   const load = useCallback(() => {
-    const params = { page, limit: pageSize };
+    const params = { page, limit: PAGE_SIZE };
     if (status) params.status = status;
     if (paymentStatus) params.paymentStatus = paymentStatus;
     if (from) params.from = from;
@@ -2058,7 +1876,7 @@ function BookingsManager() {
       setTotal(r.pagination?.total ?? (r.data || []).length);
       setTotalPages(r.pagination?.totalPages ?? 1);
     }).catch((e) => setErr(e.message));
-  }, [status, paymentStatus, from, to, search, page, pageSize]);
+  }, [status, paymentStatus, from, to, search, page]);
   useEffect(() => { load(); }, [load]);
 
   const hasFilters = !!(status || paymentStatus || from || to || search);
@@ -2129,21 +1947,10 @@ function BookingsManager() {
 
       {data && data.length > 0 && (
         <div className="nzad-panel">
-          <div className="nzad-result-row">
-            <div className="nzad-result-count">
-              {total === 0
-                ? `0 bookings${hasFilters ? " (filtered)" : ""}`
-                : `Showing ${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, total)} of ${total}${hasFilters ? " (filtered)" : ""}`}
-            </div>
-            <label className="nzad-page-size">
-              <span>Show</span>
-              <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
-                {[10, 25, 50, 100].map((n) => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
-              <span>per page</span>
-            </label>
+          <div className="nzad-result-count">
+            {total === 0
+              ? `0 bookings${hasFilters ? " (filtered)" : ""}`
+              : `Showing ${(page - 1) * PAGE_SIZE + 1}-${Math.min(page * PAGE_SIZE, total)} of ${total}${hasFilters ? " (filtered)" : ""}`}
           </div>
           <table className="nzad-table">
             <thead>
@@ -2211,30 +2018,10 @@ function BookingsManager() {
           font-size: 12px; color: var(--gray-400); font-weight: 600;
         }
         .nzad-filter-clear { padding: 9px 14px; }
-        .nzad-result-row {
-          display: flex; justify-content: space-between; align-items: center;
-          gap: 16px; margin-bottom: 12px; flex-wrap: wrap;
-        }
         .nzad-result-count {
           font-size: 12px; color: var(--gray-400); font-weight: 600;
-          margin-bottom: 0;
+          margin-bottom: 12px;
         }
-        .nzad-page-size {
-          display: inline-flex; align-items: center; gap: 8px;
-          font-size: 12px; color: var(--gray-400); font-weight: 600;
-        }
-        .nzad-page-size select {
-          padding: 5px 8px;
-          border: 1.5px solid var(--gray-200);
-          border-radius: var(--r-sm);
-          font-size: 12.5px;
-          font-weight: 700;
-          background: #fff;
-          color: var(--ink);
-          font-family: inherit;
-          cursor: pointer;
-        }
-        .nzad-page-size select:hover { border-color: var(--ink); }
         .nzad-brow { cursor: pointer; }
         .nzad-brow:hover { background: var(--gray-100); }
         .nzad-dim { color: var(--gray-400); font-size: 12px; }
@@ -2428,7 +2215,7 @@ function CustomersManager() {
   const [selected, setSelected] = useState(null);
 
   // Search + pagination — same pattern as BookingsManager for consistency.
-  const [pageSize, setPageSize] = useState(25);
+  const PAGE_SIZE = 25;
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -2439,18 +2226,17 @@ function CustomersManager() {
     const id = setTimeout(() => setSearch(searchInput.trim()), 300);
     return () => clearTimeout(id);
   }, [searchInput]);
-  // Reset to page 1 when search OR pageSize changes.
-  useEffect(() => { setPage(1); }, [search, pageSize]);
+  useEffect(() => { setPage(1); }, [search]);
 
   const load = useCallback(() => {
-    const params = { page, limit: pageSize };
+    const params = { page, limit: PAGE_SIZE };
     if (search) params.search = search;
     adminUsers(params).then((r) => {
       setData(r.data || []);
       setTotal(r.pagination?.total ?? (r.data || []).length);
       setTotalPages(r.pagination?.totalPages ?? 1);
     }).catch((e) => setErr(e.message));
-  }, [search, page, pageSize]);
+  }, [search, page]);
   useEffect(() => { load(); }, [load]);
 
   function clearSearch() {
@@ -2488,21 +2274,10 @@ function CustomersManager() {
 
       {data && data.length > 0 && (
         <div>
-          <div className="nzad-result-row">
-            <div className="nzad-result-count">
-              {total === 0
-                ? "0 customers"
-                : `Showing ${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, total)} of ${total}${search ? " (filtered)" : ""}`}
-            </div>
-            <label className="nzad-page-size">
-              <span>Show</span>
-              <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
-                {[10, 25, 50, 100].map((n) => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
-              <span>per page</span>
-            </label>
+          <div className="nzad-result-count">
+            {total === 0
+              ? "0 customers"
+              : `Showing ${(page - 1) * PAGE_SIZE + 1}-${Math.min(page * PAGE_SIZE, total)} of ${total}${search ? " (filtered)" : ""}`}
           </div>
           <table className="nzad-table">
             <thead>
@@ -2563,27 +2338,7 @@ function CustomersManager() {
           border-radius: 980px; padding: 7px 14px; font-size: 12px; font-weight: 700;
           cursor: pointer; font-family: inherit;
         }
-        .nzad-result-row {
-          display: flex; justify-content: space-between; align-items: center;
-          gap: 16px; margin-bottom: 10px; flex-wrap: wrap;
-        }
-        .nzad-result-count { font-size: 12.5px; color: var(--gray-400); margin-bottom: 0; font-weight: 600; }
-        .nzad-page-size {
-          display: inline-flex; align-items: center; gap: 8px;
-          font-size: 12px; color: var(--gray-400); font-weight: 600;
-        }
-        .nzad-page-size select {
-          padding: 5px 8px;
-          border: 1.5px solid var(--gray-200);
-          border-radius: var(--r-sm);
-          font-size: 12.5px;
-          font-weight: 700;
-          background: #fff;
-          color: var(--ink);
-          font-family: inherit;
-          cursor: pointer;
-        }
-        .nzad-page-size select:hover { border-color: var(--ink); }
+        .nzad-result-count { font-size: 12.5px; color: var(--gray-400); margin-bottom: 10px; font-weight: 600; }
         .nzad-err { background: var(--red-soft); color: var(--red-deep); padding: 12px 14px; border-radius: var(--r-sm); margin-bottom: 14px; font-size: 13.5px; }
         .nzad-load, .nzad-empty { padding: 40px; text-align: center; color: var(--gray-400); font-size: 14px; }
       `}</style>
