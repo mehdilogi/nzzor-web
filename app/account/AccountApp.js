@@ -7,6 +7,7 @@
 // =============================================================================
 
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../lib/AuthContext";
@@ -164,6 +165,29 @@ function BookingDetailModal({ id, onClose, onCancelled }) {
   const [cancelErr, setCancelErr] = useState(null);   // { code, message, details? }
   const [cancelDone, setCancelDone] = useState(false);
 
+  // Portal mounting — `document` doesn't exist server-side, so we only
+  // enable the portal after the component has mounted on the client.
+  // Without this, Next.js's SSR pass crashes.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+  // ESC closes the modal (standard modal behavior). The listener runs on
+  // window so it catches keypresses regardless of focus location.
+  useEffect(() => {
+    function onKey(e) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // Lock body scroll while the modal is open so the page behind doesn't
+  // jump or scroll. We save and restore the user's previous overflow
+  // value to avoid stomping any other component's scroll-locking.
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previous; };
+  }, []);
+
   useEffect(() => { myBookingDetail(id, lang).then(setB).catch((e) => setErr(e.message)); }, [id, lang]);
 
   // Pre-compute cancellation eligibility client-side so we can disable
@@ -201,7 +225,12 @@ function BookingDetailModal({ id, onClose, onCancelled }) {
   const waMessage = b ? encodeURIComponent(`Hi, I need help cancelling booking ${b.reference}.`) : "";
   const waUrl = `https://wa.me/${waNumber}?text=${waMessage}`;
 
-  return (
+  // Portal not yet mounted (SSR pass or first render before useEffect):
+  // return nothing rather than rendering inline, which would create the
+  // exact bug we're trying to fix (modal showing as flow content).
+  if (!mounted) return null;
+
+  return createPortal(
     <div className="md-back" onClick={onClose}>
       <div className="md-panel" onClick={(e) => e.stopPropagation()}>
         <button className="md-close" onClick={onClose} aria-label={t("auth.close")}>×</button>
@@ -377,20 +406,34 @@ function BookingDetailModal({ id, onClose, onCancelled }) {
           </>
         )}
 
-        <style jsx>{`
-          /* Modal backdrop — significantly darker than before. The 0.45
-             opacity over cream was too light to read as "modal" — looked
-             like a flow card. 0.7 + a blur gives a proper modal feel. */
+        <style jsx global>{`
+          /* The modal positioning styles use 'global' rather than scoped
+             jsx because we hit a class of bugs where the scoped styles
+             didn't apply at runtime (likely a styled-jsx scoping edge
+             case with conditional rendering). Global guarantees the
+             styles win regardless of any hash-matching issues. The
+             selectors are prefixed enough (.md-*) that there's no risk
+             of bleeding into unrelated components. */
+
+          /* Modal backdrop — fixed full-viewport overlay with a dark
+             background and a blur. Using !important on the positioning
+             properties as belt-and-braces against any inherited overrides. */
           .md-back {
-            position: fixed;
-            inset: 0;
-            z-index: 100;
-            background: rgba(0, 0, 0, 0.7);
+            position: fixed !important;
+            inset: 0 !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 1000 !important;
+            background: rgba(0, 0, 0, 0.72) !important;
             backdrop-filter: saturate(160%) blur(6px);
             -webkit-backdrop-filter: saturate(160%) blur(6px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
             padding: 24px;
             overflow-y: auto;
             animation: md-fade 0.18s ease-out;
@@ -402,7 +445,7 @@ function BookingDetailModal({ id, onClose, onCancelled }) {
           .md-panel {
             position: relative;
             background: #fff;
-            border-radius: var(--r-lg);
+            border-radius: 16px;
             max-width: 680px;
             width: 100%;
             max-height: 92vh;
@@ -428,6 +471,7 @@ function BookingDetailModal({ id, onClose, onCancelled }) {
             line-height: 1;
             cursor: pointer;
             transition: background 0.15s;
+            z-index: 1;
           }
           .md-close:hover { background: var(--gray-200); }
 
@@ -474,9 +518,9 @@ function BookingDetailModal({ id, onClose, onCancelled }) {
             border-radius: 980px;
             letter-spacing: 0.04em;
           }
-          .s-PENDING { background: #FFF4E0; color: #9A6700; }
-          .s-CONFIRMED, .s-COMPLETED { background: var(--teal-soft); color: var(--teal); }
-          .s-REJECTED, .s-CANCELLED, .s-NO_SHOW, .s-REFUNDED { background: var(--red-soft); color: var(--red-deep); }
+          .md-st.s-PENDING { background: #FFF4E0; color: #9A6700; }
+          .md-st.s-CONFIRMED, .md-st.s-COMPLETED { background: var(--teal-soft); color: var(--teal); }
+          .md-st.s-REJECTED, .md-st.s-CANCELLED, .md-st.s-NO_SHOW, .md-st.s-REFUNDED { background: var(--red-soft); color: var(--red-deep); }
 
           /* ---- HOTEL HERO ---- */
           .md-hotel {
@@ -569,7 +613,7 @@ function BookingDetailModal({ id, onClose, onCancelled }) {
           }
           .md-voucher:hover { background: var(--red); }
 
-          /* ---- Cancellation styles (unchanged from before) ---- */
+          /* ---- Cancellation styles ---- */
           .md-cancel-zone {
             margin-top: 22px;
             padding-top: 18px;
@@ -746,7 +790,8 @@ function BookingDetailModal({ id, onClose, onCancelled }) {
           }
         `}</style>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

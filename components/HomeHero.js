@@ -8,10 +8,7 @@ import { MOCK_CITIES } from "../lib/mockData";
 import { useLang } from "../lib/LangContext";
 import { parseQuery } from "../lib/nlSearch";
 
-// Search bar steps: city → dates → guests. Steps no longer auto-advance —
-// each panel closes after a selection and the user chooses when to open
-// the next step. AI mode (natural-language) shares the same date/guest
-// fields so users can mix free-text mood with structured constraints.
+// search bar steps: city -> dates -> guests, with auto-advance
 export default function HomeHero() {
   const { t } = useLang();
   const router = useRouter();
@@ -42,27 +39,18 @@ export default function HomeHero() {
     router.push(qs ? `/hotels?${qs}` : "/hotels");
   }
 
-  // Natural-language search — parse the sentence locally, then hand the
-  // resulting structured filter to the results page as URL params. We ALSO
-  // merge in the explicit dates and guests fields that now sit beside the
-  // free-text input (item #3 from the polish pass) — those are more
-  // reliable than trying to extract them from sentences.
+  // natural-language search — parse the sentence locally, then hand the
+  // resulting structured filter to the results page as URL params.
   function aiSearch() {
     const q = aiQuery.trim();
-    if (!q && !city && !checkIn && !checkOut) return;
-    const { filter } = q ? parseQuery(q) : { filter: {} };
+    if (!q) return;
+    const { filter } = parseQuery(q);
     const params = new URLSearchParams();
     if (filter.city) params.set("city", filter.city);
     if (filter.minStars) params.set("stars", String(filter.minStars));
     if (filter.maxPrice) params.set("maxPrice", String(filter.maxPrice));
     if (filter.minPrice) params.set("minPrice", String(filter.minPrice));
     if (filter.tags && filter.tags.length) params.set("tags", filter.tags.join(","));
-    // Explicit date & guest fields override anything the parser might have
-    // inferred from the natural-language text. These come from the dates/
-    // guests pickers that now sit beside the AI prompt.
-    if (checkIn) params.set("checkIn", checkIn);
-    if (checkOut) params.set("checkOut", checkOut);
-    if (guests) params.set("guests", String(guests));
     params.set("q", q); // keep the raw query so the results page can echo it
     params.set("ai", "1");
     router.push(`/hotels?${params.toString()}`);
@@ -70,12 +58,7 @@ export default function HomeHero() {
 
   function pickCity(c) {
     setCity(c);
-    // Close the picker but DO NOT auto-advance to the dates step.
-    // Auto-advance felt clever in design but in practice it nudged users
-    // forward before they were ready to think about dates — the picker
-    // jumping under their cursor is unsettling. Now the user explicitly
-    // clicks "Dates" when they're ready.
-    setOpen(null);
+    setOpen("dates"); // auto-advance
   }
 
   const dateLabel =
@@ -83,7 +66,7 @@ export default function HomeHero() {
       ? `${fmtDate(checkIn)} — ${fmtDate(checkOut)}`
       : checkIn
       ? `${fmtDate(checkIn)} — …`
-      : t("search.dates_ph"); // "Add dates" / "Ajouter des dates" / "أضف التواريخ"
+      : "Add dates";
 
   return (
     <header className="nz-hero">
@@ -113,48 +96,23 @@ export default function HomeHero() {
           {open && <div className="nzs-backdrop" onClick={() => setOpen(null)} />}
 
           {aiMode ? (
-            /* ---- NATURAL-LANGUAGE SEARCH ---- */
-            /* Two stacked rows:
-                 1) the free-text prompt — for the vibe / city / style
-                 2) explicit dates + guests + search button
-               Item #3 from the polish pass: trying to extract dates and
-               guest counts from natural-language sentences is unreliable
-               and frustrating when it gets it wrong. Explicit pickers
-               beside the prompt are dramatically more dependable. */
-            <div className="nz-ai-wrap">
-              <div className="nz-search-bar nz-ai-bar">
-                <div className="nz-ai-input">
-                  <Icon name="search" size={18} style={{ color: "var(--gray-400)" }} />
-                  <input
-                    type="text"
-                    value={aiQuery}
-                    onChange={(e) => setAiQuery(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") aiSearch(); }}
-                    placeholder={t("ai.placeholder")}
-                    aria-label={t("ai.toggle")}
-                  />
-                </div>
+            /* ---- NATURAL-LANGUAGE SEARCH BOX ---- */
+            <div className="nz-search-bar nz-ai-bar">
+              <div className="nz-ai-input">
+                <Icon name="search" size={18} style={{ color: "var(--gray-400)" }} />
+                <input
+                  type="text"
+                  value={aiQuery}
+                  onChange={(e) => setAiQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") aiSearch(); }}
+                  placeholder={t("ai.placeholder")}
+                  aria-label={t("ai.toggle")}
+                />
               </div>
-              <div className="nz-search-bar nz-ai-fields">
-                <button
-                  className={`nzs-field ${open === "dates" ? "active" : ""}`}
-                  onClick={() => setOpen(open === "dates" ? null : "dates")}
-                >
-                  <span className="nzs-label">{t("search.dates")}</span>
-                  <span className={`nzs-value ${checkIn ? "" : "ph"}`}>{dateLabel}</span>
-                </button>
-                <button
-                  className={`nzs-field ${open === "guests" ? "active" : ""}`}
-                  onClick={() => setOpen(open === "guests" ? null : "guests")}
-                >
-                  <span className="nzs-label">{t("search.guests")}</span>
-                  <span className="nzs-value">{guests} {guests === 1 ? t("search.guest") : t("search.guests_plural")}</span>
-                </button>
-                <button className="nzs-submit" onClick={aiSearch}>
-                  <Icon name="search" size={18} strokeWidth={2.4} />
-                  <span>{t("ai.search")}</span>
-                </button>
-              </div>
+              <button className="nzs-submit" onClick={aiSearch}>
+                <Icon name="search" size={18} strokeWidth={2.4} />
+                <span>{t("ai.search")}</span>
+              </button>
             </div>
           ) : (
             /* ---- STRUCTURED SEARCH BAR ---- */
@@ -219,10 +177,7 @@ export default function HomeHero() {
             </div>
           )}
 
-          {/* Dates panel is shared between structured AND AI modes — both
-              have explicit date pickers (in AI mode the city is part of
-              the natural-language prompt, so no city panel there). */}
-          {open === "dates" && (
+          {!aiMode && open === "dates" && (
             <div className="nzs-panel">
               <DateRangePicker
                 checkIn={checkIn}
@@ -231,17 +186,12 @@ export default function HomeHero() {
                   setCheckIn(ci);
                   setCheckOut(co);
                 }}
-                /* Close the picker once a full range is selected so the user
-                   sees their choice commit. We do NOT auto-advance to the
-                   guests panel — that nudge-the-user pattern was the bug
-                   we removed in bundle 3. Closing is feedback ("got it");
-                   auto-opening the next step takes control away. */
-                onComplete={() => setOpen(null)}
+                onComplete={() => setOpen("guests")}
               />
             </div>
           )}
 
-          {open === "guests" && (
+          {!aiMode && open === "guests" && (
             <div className="nzs-panel">
               <div className="nzs-panel-title">{t("search.how_many")}</div>
               <div className="nzs-guests">
@@ -252,10 +202,7 @@ export default function HomeHero() {
                   <button onClick={() => setGuests((g) => Math.min(10, g + 1))} disabled={guests >= 10}>+</button>
                 </div>
               </div>
-              <button
-                className="nzs-done"
-                onClick={() => { setOpen(null); aiMode ? aiSearch() : search(); }}
-              >
+              <button className="nzs-done" onClick={() => { setOpen(null); search(); }}>
                 {t("search.search_hotels")}
               </button>
             </div>
@@ -352,11 +299,29 @@ export default function HomeHero() {
           animation: rise 1s cubic-bezier(0.16,1,0.3,1) 0.42s forwards;
         }
         .nz-hero h1 .accent {
+          /* Keep nowrap in English (the headline rhythm of 3 lines depends
+             on "Booked in seconds." being a single line, which it always
+             is). But French "Réservé en secondes." at clamp() max font
+             is too wide for the viewport — let it wrap naturally. */
           white-space: nowrap;
           background: linear-gradient(120deg, #fff 30%, var(--red));
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
+        }
+        /* Locale-specific override: French and Arabic translations are
+           longer than English. The <html lang="..."> attribute is set
+           dynamically by LangContext, so :lang() matches at runtime. */
+        :global(html[lang="fr"]) .nz-hero h1 .accent,
+        :global(html[lang="ar"]) .nz-hero h1 .accent {
+          white-space: normal;
+        }
+        /* Slightly smaller max font in FR/AR so the headline doesn't
+           dominate the hero at very wide viewports where the wrapped
+           accent could push the layout taller than intended. */
+        :global(html[lang="fr"]) .nz-hero h1,
+        :global(html[lang="ar"]) .nz-hero h1 {
+          font-size: clamp(46px, 6.4vw, 88px);
         }
         .nz-hero p {
           font-size: 18px; color: #fff; max-width: 480px; line-height: 1.6;
@@ -403,14 +368,10 @@ export default function HomeHero() {
         .nzs-submit:hover { background: var(--red-deep); }
 
         /* ---- AI / NATURAL-LANGUAGE SEARCH ---- */
-        /* The AI bar is now two stacked rows: a free-text prompt up top,
-           then dates + guests + search in a structured row underneath. */
-        .nz-search:has(.nz-ai-wrap) { max-width: 960px; }
-        .nz-ai-wrap {
-          display: flex; flex-direction: column; gap: 10px;
-        }
+        /* The AI bar only has one input + submit, so the standard 820px
+           feels cramped. Let it breathe a little wider on desktop. */
+        .nz-search:has(.nz-ai-bar) { max-width: 960px; }
         .nz-ai-bar { align-items: stretch; }
-        .nz-ai-fields { padding: 6px; }
         .nz-ai-input {
           flex: 1; display: flex; align-items: center; gap: 12px;
           padding: 0 22px; min-width: 0;

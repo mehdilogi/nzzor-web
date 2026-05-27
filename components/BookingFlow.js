@@ -279,7 +279,7 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
         </div>
       </div>
 
-      <div className="wrap bk-body">
+      <div className={`wrap bk-body${step === 3 ? " bk-body-confirm" : ""}`}>
         <div className="bk-main">
           {/* ================= STEP 1 — DETAILS ================= */}
           {step === 1 && (
@@ -694,6 +694,16 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
         .bk-body {
           display: grid; grid-template-columns: 1fr 360px; gap: 28px;
           padding-top: 32px; align-items: start;
+        }
+        /* When we're on step 3 (confirmation), the right-column summary
+           sidebar is removed. The grid still reserves the 360px track
+           though, which leaves the confirmation card centered within
+           a narrower-than-page left column — looks left-aligned to the
+           user. Switching to a single column with the confirmation wrap
+           handling its own max-width + auto margins gives proper page
+           centering. */
+        .bk-body-confirm {
+          grid-template-columns: 1fr;
         }
         .bk-card {
           background: #fff; border: 1px solid var(--gray-200); border-radius: var(--r-lg);
