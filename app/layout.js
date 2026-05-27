@@ -1,5 +1,6 @@
 import "./globals.css";
 import Providers from "./Providers";
+import AnalyticsBeacon from "./components/AnalyticsBeacon";
 
 export const metadata = {
   title: "Nzzor — Premium Hotel Booking in Algeria",
@@ -23,6 +24,12 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
+        {/* AnalyticsBeacon listens for Next.js route changes and fires a
+            pageview to /api/analytics/beacon on every navigation. It renders
+            nothing visually and is internally wrapped in <Suspense> so it
+            won't opt static routes out of prerendering (the documented
+            useSearchParams gotcha). */}
+        <AnalyticsBeacon />
         <Providers>{children}</Providers>
       </body>
     </html>
