@@ -10,6 +10,7 @@ import {
   adminAddRoomPhoto, adminUploadRoomPhoto, adminDeleteRoomPhoto,
   adminHotelManagers, adminAddHotelManager, adminRemoveHotelManager, adminResetHotelManagerPassword,
   adminTags,
+  adminUsers, adminUserDetail,
 } from "../../lib/adminApi";
 
 const fmt = (n) => Number(n || 0).toLocaleString("en") + " DZD";
@@ -169,6 +170,7 @@ function Dashboard({ user, onLogout }) {
             ["overview", "Overview"],
             ["hotels", "Hotels"],
             ["bookings", "Bookings"],
+            ["customers", "Customers"],
           ].map(([k, label]) => (
             <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
               {label}
@@ -188,13 +190,25 @@ function Dashboard({ user, onLogout }) {
         {tab === "overview" && <Overview />}
         {tab === "hotels" && <HotelsManager />}
         {tab === "bookings" && <BookingsManager />}
+        {tab === "customers" && <CustomersManager />}
       </main>
 
       <style jsx>{`
-        .nzad-shell { display: flex; min-height: 100vh; background: var(--cream); }
+        .nzad-shell { display: flex; min-height: 100vh; background: var(--cream); align-items: flex-start; }
         .nzad-sidebar {
           width: 240px; flex-shrink: 0; background: var(--ink); color: #fff;
           display: flex; flex-direction: column; padding: 24px 16px;
+          /* Sticky to viewport top so the sidebar stays visible as the
+             admin scrolls through long content (booking lists, hotel
+             managers). align-items: flex-start on the shell prevents
+             grid/flex from stretching the aside vertically, which would
+             defeat sticky. The 100vh height lets the inner nav fill
+             the viewport; if the nav ever gets too tall it scrolls
+             internally rather than pushing the foot off-screen. */
+          position: sticky;
+          top: 0;
+          height: 100vh;
+          overflow-y: auto;
         }
         .nzad-side-brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 28px; }
         .nzad-logo-mark { width: 32px; height: 32px; border-radius: 50%; background: var(--red); flex-shrink: 0; position: relative; }
@@ -222,10 +236,17 @@ function Dashboard({ user, onLogout }) {
           font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
         }
         .nzad-logout:hover { background: rgba(255,255,255,0.14); }
-        .nzad-main { flex: 1; padding: 32px 40px; overflow-x: hidden; }
+        .nzad-main { flex: 1; min-width: 0; padding: 32px 40px; overflow-x: clip; }
         @media (max-width: 720px) {
-          .nzad-shell { flex-direction: column; }
-          .nzad-sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 12px 16px; }
+          .nzad-shell { flex-direction: column; align-items: stretch; }
+          /* On mobile, the sidebar collapses to a horizontal bar at the top
+             — sticky positioning would keep it pinned and waste vertical
+             space. position: static + height: auto lets it scroll away
+             naturally, which is the right pattern for mobile admin work. */
+          .nzad-sidebar {
+            width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 12px 16px;
+            position: static; height: auto; overflow: visible;
+          }
           .nzad-side-brand { padding: 0; }
           .nzad-sidebar nav { flex-direction: row; flex: 0; gap: 4px; }
           .nzad-side-foot { border: none; padding: 0; display: flex; align-items: center; gap: 8px; }
@@ -1690,6 +1711,120 @@ function ManagersPanel({ hotelId }) {
 // =============================================================================
 // BOOKINGS MANAGER
 // =============================================================================
+// =============================================================================
+// Pagination — compact numbered-page control
+// -----------------------------------------------------------------------------
+// Reusable for any list that uses offset/limit pagination. Shows first,
+// last, and a window around the current page with ellipses where ranges
+// are skipped:
+//
+//   1 … 5 [6] 7 … 24
+//
+// Props:
+//   - page: current 1-indexed page
+//   - totalPages: total number of pages
+//   - onChange: (newPage) => void
+// =============================================================================
+function Pagination({ page, totalPages, onChange }) {
+  if (totalPages <= 1) return null;
+
+  // Build the list of page numbers to render with ellipsis placeholders.
+  // Strategy: always show 1 and totalPages; show page ± 1 if in range; use
+  // "…" sentinel where there's a gap.
+  function pagesList() {
+    const out = new Set([1, totalPages, page, page - 1, page + 1]);
+    const valid = [...out].filter((p) => p >= 1 && p <= totalPages).sort((a, b) => a - b);
+    const result = [];
+    let prev = 0;
+    for (const p of valid) {
+      if (prev && p - prev > 1) result.push("…");
+      result.push(p);
+      prev = p;
+    }
+    return result;
+  }
+
+  return (
+    <nav className="nzad-pg" aria-label="Pagination">
+      <button
+        className="nzad-pg-btn"
+        onClick={() => onChange(page - 1)}
+        disabled={page <= 1}
+        aria-label="Previous page"
+      >
+        ← Prev
+      </button>
+      {pagesList().map((p, i) =>
+        p === "…" ? (
+          <span key={`gap-${i}`} className="nzad-pg-gap" aria-hidden="true">…</span>
+        ) : (
+          <button
+            key={p}
+            className={`nzad-pg-num${p === page ? " on" : ""}`}
+            onClick={() => onChange(p)}
+            disabled={p === page}
+            aria-current={p === page ? "page" : undefined}
+          >
+            {p}
+          </button>
+        )
+      )}
+      <button
+        className="nzad-pg-btn"
+        onClick={() => onChange(page + 1)}
+        disabled={page >= totalPages}
+        aria-label="Next page"
+      >
+        Next →
+      </button>
+      <style jsx>{`
+        .nzad-pg {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 4px;
+          margin-top: 18px;
+          flex-wrap: wrap;
+        }
+        .nzad-pg-btn, .nzad-pg-num {
+          background: #fff;
+          border: 1.5px solid var(--gray-200);
+          border-radius: var(--r-sm);
+          padding: 7px 12px;
+          font-size: 12.5px;
+          font-weight: 700;
+          cursor: pointer;
+          font-family: inherit;
+          color: var(--ink);
+          min-width: 36px;
+          transition: border-color 0.15s, background 0.15s;
+        }
+        .nzad-pg-btn:hover:not(:disabled),
+        .nzad-pg-num:hover:not(:disabled) {
+          border-color: var(--ink);
+        }
+        .nzad-pg-btn:disabled, .nzad-pg-num:disabled {
+          opacity: 0.45;
+          cursor: not-allowed;
+        }
+        .nzad-pg-num.on {
+          background: var(--ink);
+          color: #fff;
+          border-color: var(--ink);
+          opacity: 1;
+          cursor: default;
+        }
+        .nzad-pg-gap {
+          padding: 0 4px;
+          color: var(--gray-400);
+          font-size: 12.5px;
+          font-weight: 700;
+        }
+      `}</style>
+    </nav>
+  );
+}
+
 function BookingsManager() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
@@ -1706,6 +1841,15 @@ function BookingsManager() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
 
+  // ---- Pagination state ---------------------------------------------------
+  // Page is 1-indexed (matches the backend's pagination shape). limit is
+  // fixed at 25 — gives a tidy UI without long scrolls. total/totalPages
+  // come from the backend response on every load.
+  const PAGE_SIZE = 25;
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
   // Debounce the search box — 300ms after the user stops typing, we promote
   // searchInput to search, which triggers a re-fetch via the load callback.
   useEffect(() => {
@@ -1713,15 +1857,26 @@ function BookingsManager() {
     return () => clearTimeout(id);
   }, [searchInput]);
 
+  // Whenever any filter changes, reset to page 1. Otherwise a user on page
+  // 5 who applies a new filter would land on "page 5 of 1" — meaningless.
+  useEffect(() => {
+    setPage(1);
+  }, [status, paymentStatus, from, to, search]);
+
   const load = useCallback(() => {
-    const params = { limit: 50 };
+    const params = { page, limit: PAGE_SIZE };
     if (status) params.status = status;
     if (paymentStatus) params.paymentStatus = paymentStatus;
     if (from) params.from = from;
     if (to) params.to = to;
     if (search) params.search = search;
-    adminBookings(params).then((r) => setData(r.data || [])).catch((e) => setErr(e.message));
-  }, [status, paymentStatus, from, to, search]);
+    adminBookings(params).then((r) => {
+      setData(r.data || []);
+      // Backend returns { data, pagination: { page, limit, total, totalPages } }
+      setTotal(r.pagination?.total ?? (r.data || []).length);
+      setTotalPages(r.pagination?.totalPages ?? 1);
+    }).catch((e) => setErr(e.message));
+  }, [status, paymentStatus, from, to, search, page]);
   useEffect(() => { load(); }, [load]);
 
   const hasFilters = !!(status || paymentStatus || from || to || search);
@@ -1793,7 +1948,9 @@ function BookingsManager() {
       {data && data.length > 0 && (
         <div className="nzad-panel">
           <div className="nzad-result-count">
-            {data.length} booking{data.length === 1 ? "" : "s"}{hasFilters ? " (filtered)" : ""}
+            {total === 0
+              ? `0 bookings${hasFilters ? " (filtered)" : ""}`
+              : `Showing ${(page - 1) * PAGE_SIZE + 1}-${Math.min(page * PAGE_SIZE, total)} of ${total}${hasFilters ? " (filtered)" : ""}`}
           </div>
           <table className="nzad-table">
             <thead>
@@ -1819,6 +1976,18 @@ function BookingsManager() {
               ))}
             </tbody>
           </table>
+
+          {/* ---- Pagination controls ----
+              Shown when there's more than one page. Prev/Next buttons plus
+              a compact page-number row (first, current ± 1, last with
+              ellipses) — keeps the UI tidy even with many pages. */}
+          {totalPages > 1 && (
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onChange={(p) => setPage(p)}
+            />
+          )}
         </div>
       )}
 
@@ -2021,6 +2190,362 @@ function BookingDetailPanel({ id, onClose, onChanged }) {
           @media (max-width: 640px) {
             .bd-grid { grid-template-columns: 1fr; }
             .bd-panel { padding: 22px; }
+          }
+        `}</style>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// CUSTOMERS MANAGER — registered customer accounts
+// -----------------------------------------------------------------------------
+// Read-only list of CUSTOMER-role users. Search by name / email / phone,
+// click a row to open a detail panel showing the user's bookings + totals.
+// Pagination via the same Pagination component used by BookingsManager.
+//
+// Deferred to a later wave:
+//   - editing user details (needs audit logging)
+//   - disabling / deleting (needs GDPR-style deletion policy)
+//   - exporting to CSV
+// =============================================================================
+function CustomersManager() {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState("");
+  const [selected, setSelected] = useState(null);
+
+  // Search + pagination — same pattern as BookingsManager for consistency.
+  const PAGE_SIZE = 25;
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
+  useEffect(() => {
+    const id = setTimeout(() => setSearch(searchInput.trim()), 300);
+    return () => clearTimeout(id);
+  }, [searchInput]);
+  useEffect(() => { setPage(1); }, [search]);
+
+  const load = useCallback(() => {
+    const params = { page, limit: PAGE_SIZE };
+    if (search) params.search = search;
+    adminUsers(params).then((r) => {
+      setData(r.data || []);
+      setTotal(r.pagination?.total ?? (r.data || []).length);
+      setTotalPages(r.pagination?.totalPages ?? 1);
+    }).catch((e) => setErr(e.message));
+  }, [search, page]);
+  useEffect(() => { load(); }, [load]);
+
+  function clearSearch() {
+    setSearchInput(""); setSearch("");
+  }
+
+  return (
+    <div>
+      <div className="nzad-page-head">
+        <h1 className="display">Customers</h1>
+        <p>Registered customer accounts. Read-only view.</p>
+      </div>
+
+      {err && <div className="nzad-err">{err}</div>}
+
+      <div className="nzad-filters">
+        <input
+          type="text"
+          placeholder="Search by name, email, or phone"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          className="nzad-filter-search"
+        />
+        {search && (
+          <button className="nzad-clear" onClick={clearSearch}>Clear</button>
+        )}
+      </div>
+
+      {data === null && <div className="nzad-load">Loading…</div>}
+      {data !== null && data.length === 0 && (
+        <div className="nzad-empty">
+          {search ? "No customers match that search." : "No customer accounts yet."}
+        </div>
+      )}
+
+      {data && data.length > 0 && (
+        <div>
+          <div className="nzad-result-count">
+            {total === 0
+              ? "0 customers"
+              : `Showing ${(page - 1) * PAGE_SIZE + 1}-${Math.min(page * PAGE_SIZE, total)} of ${total}${search ? " (filtered)" : ""}`}
+          </div>
+          <table className="nzad-table">
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Phone</th>
+                <th>Bookings</th>
+                <th>Lifetime spend</th>
+                <th>Joined</th>
+                <th>Last seen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((u) => (
+                <tr key={u.id} className="nzad-brow" onClick={() => setSelected(u.id)}>
+                  <td>
+                    <strong>{u.firstName || u.lastName ? `${u.firstName || ""} ${u.lastName || ""}`.trim() : "—"}</strong>
+                    <br />
+                    <span className="nzad-dim">{u.email}</span>
+                  </td>
+                  <td className="nzad-dim">{u.phone || "—"}</td>
+                  <td><strong>{u.bookingsCount}</strong></td>
+                  <td>{u.lifetimeRevenue > 0 ? fmt(u.lifetimeRevenue) : <span className="nzad-dim">—</span>}</td>
+                  <td className="nzad-dim">{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"}</td>
+                  <td className="nzad-dim">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : <span className="nzad-dim">never</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {totalPages > 1 && (
+            <Pagination page={page} totalPages={totalPages} onChange={(p) => setPage(p)} />
+          )}
+        </div>
+      )}
+
+      {selected && (
+        <CustomerDetailPanel id={selected} onClose={() => setSelected(null)} />
+      )}
+
+      <style jsx>{`
+        .nzad-page-head { margin-bottom: 22px; }
+        .nzad-page-head h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.025em; color: var(--ink); margin-bottom: 4px; }
+        .nzad-page-head p { font-size: 13.5px; color: var(--gray-400); }
+        .nzad-filters {
+          display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+          padding: 14px; background: var(--cream); border-radius: var(--r-md);
+          margin-bottom: 18px;
+        }
+        .nzad-filter-search {
+          flex: 1; min-width: 240px; padding: 9px 12px;
+          border: 1.5px solid var(--gray-200); border-radius: var(--r-sm);
+          font-size: 13.5px; font-family: inherit; outline: none; background: #fff;
+        }
+        .nzad-filter-search:focus { border-color: var(--ink); }
+        .nzad-clear {
+          background: var(--red-soft); color: var(--red-deep); border: none;
+          border-radius: 980px; padding: 7px 14px; font-size: 12px; font-weight: 700;
+          cursor: pointer; font-family: inherit;
+        }
+        .nzad-result-count { font-size: 12.5px; color: var(--gray-400); margin-bottom: 10px; font-weight: 600; }
+        .nzad-err { background: var(--red-soft); color: var(--red-deep); padding: 12px 14px; border-radius: var(--r-sm); margin-bottom: 14px; font-size: 13.5px; }
+        .nzad-load, .nzad-empty { padding: 40px; text-align: center; color: var(--gray-400); font-size: 14px; }
+      `}</style>
+    </div>
+  );
+}
+
+// =============================================================================
+// Customer detail panel — modal showing one customer's profile + bookings.
+// -----------------------------------------------------------------------------
+// Uses the same modal pattern (portal + global styles) we adopted for the
+// /account booking modal so it positions reliably regardless of ancestor
+// layout. Read-only.
+// =============================================================================
+function CustomerDetailPanel({ id, onClose }) {
+  const [u, setU] = useState(null);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    adminUserDetail(id).then(setU).catch((e) => setErr(e.message));
+  }, [id]);
+
+  // ESC closes the panel.
+  useEffect(() => {
+    function onKey(e) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // Lock page scroll while open.
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previous; };
+  }, []);
+
+  const fullName = u ? `${u.firstName || ""} ${u.lastName || ""}`.trim() : "";
+  const totalSpend = u && u.bookings
+    ? u.bookings
+        .filter((b) => b.status === "CONFIRMED" || b.status === "COMPLETED")
+        .reduce((sum, b) => sum + Number(b.pricing?.total || 0), 0)
+    : 0;
+  const bookingCount = u && u.bookings ? u.bookings.length : 0;
+
+  return (
+    <div className="cd-back" onClick={onClose}>
+      <div className="cd-panel" onClick={(e) => e.stopPropagation()}>
+        <button className="cd-close" onClick={onClose} aria-label="Close">×</button>
+
+        {err && <div className="cd-err">{err}</div>}
+        {!u && !err && <div className="cd-load">Loading…</div>}
+
+        {u && (
+          <>
+            <div className="cd-head">
+              <div>
+                <div className="cd-name display">{fullName || u.email}</div>
+                <div className="cd-email">{u.email}</div>
+                {u.phone && <div className="cd-phone">{u.phone}</div>}
+              </div>
+              <div className="cd-badges">
+                {u.isActive ? (
+                  <span className="cd-badge ok">Active</span>
+                ) : (
+                  <span className="cd-badge off">Disabled</span>
+                )}
+                {u.emailVerified && <span className="cd-badge soft">Email verified</span>}
+                <span className="cd-badge soft">{(u.preferredLang || "fr").toUpperCase()}</span>
+              </div>
+            </div>
+
+            <div className="cd-stats">
+              <div className="cd-stat">
+                <div className="cd-stat-k">Bookings</div>
+                <div className="cd-stat-v">{bookingCount}</div>
+              </div>
+              <div className="cd-stat">
+                <div className="cd-stat-k">Lifetime spend</div>
+                <div className="cd-stat-v">{totalSpend > 0 ? fmt(totalSpend) : "—"}</div>
+              </div>
+              <div className="cd-stat">
+                <div className="cd-stat-k">Joined</div>
+                <div className="cd-stat-v small">{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"}</div>
+              </div>
+              <div className="cd-stat">
+                <div className="cd-stat-k">Last seen</div>
+                <div className="cd-stat-v small">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : "never"}</div>
+              </div>
+            </div>
+
+            <div className="cd-section">
+              <h3>Booking history</h3>
+              {bookingCount === 0 ? (
+                <div className="cd-empty">No bookings yet.</div>
+              ) : (
+                <table className="cd-bookings">
+                  <thead>
+                    <tr><th>Reference</th><th>Hotel</th><th>Dates</th><th>Total</th><th>Status</th></tr>
+                  </thead>
+                  <tbody>
+                    {u.bookings.map((b) => (
+                      <tr key={b.id}>
+                        <td><strong>{b.reference}</strong></td>
+                        <td>{b.hotel?.name}</td>
+                        <td className="cd-dim">{(b.checkIn || "").slice(0, 10)} → {(b.checkOut || "").slice(0, 10)}</td>
+                        <td>{fmt(b.pricing?.total)}</td>
+                        <td><span className={`cd-st s-${b.status}`}>{b.status}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </>
+        )}
+
+        <style jsx>{`
+          .cd-back {
+            position: fixed; inset: 0; z-index: 100;
+            background: rgba(0,0,0,0.6);
+            display: flex; align-items: center; justify-content: center;
+            padding: 24px; overflow-y: auto;
+          }
+          .cd-panel {
+            position: relative; background: #fff;
+            border-radius: var(--r-lg);
+            max-width: 760px; width: 100%; max-height: 92vh;
+            overflow-y: auto;
+            padding: 32px 36px;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.3);
+          }
+          .cd-close {
+            position: absolute; top: 14px; right: 14px;
+            width: 36px; height: 36px; border-radius: 50%;
+            border: none; background: var(--gray-100);
+            font-size: 22px; line-height: 1; cursor: pointer;
+          }
+          .cd-close:hover { background: var(--gray-200); }
+          .cd-err { background: var(--red-soft); color: var(--red-deep); padding: 12px; border-radius: var(--r-sm); }
+          .cd-load { padding: 40px; text-align: center; color: var(--gray-400); }
+
+          .cd-head {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            gap: 18px; margin-bottom: 22px; padding-bottom: 20px;
+            border-bottom: 1px solid var(--gray-100);
+          }
+          .cd-name { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 6px; color: var(--ink); }
+          .cd-email { font-size: 14px; color: var(--ink-2); font-weight: 600; }
+          .cd-phone { font-size: 13px; color: var(--gray-400); margin-top: 2px; }
+          .cd-badges { display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; }
+          .cd-badge { font-size: 10.5px; font-weight: 700; padding: 4px 10px; border-radius: 980px; letter-spacing: 0.04em; }
+          .cd-badge.ok { background: var(--teal-soft); color: var(--teal); }
+          .cd-badge.off { background: var(--red-soft); color: var(--red-deep); }
+          .cd-badge.soft { background: var(--gray-100); color: var(--ink-2); }
+
+          .cd-stats {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+            margin-bottom: 26px;
+          }
+          .cd-stat {
+            background: var(--cream); border: 1px solid var(--gray-100);
+            border-radius: var(--r-sm); padding: 12px 14px;
+          }
+          .cd-stat-k {
+            font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em;
+            text-transform: uppercase; color: var(--gray-400); margin-bottom: 6px;
+          }
+          .cd-stat-v { font-size: 17px; font-weight: 700; color: var(--ink); }
+          .cd-stat-v.small { font-size: 13.5px; }
+
+          .cd-section h3 {
+            font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+            text-transform: uppercase; color: var(--gray-400); margin-bottom: 12px;
+          }
+          .cd-empty {
+            padding: 28px; text-align: center; color: var(--gray-400);
+            background: var(--cream); border-radius: var(--r-sm); font-size: 13.5px;
+          }
+          .cd-bookings {
+            width: 100%; border-collapse: collapse;
+            background: #fff; border: 1px solid var(--gray-100); border-radius: var(--r-sm);
+            overflow: hidden;
+          }
+          .cd-bookings th, .cd-bookings td {
+            padding: 10px 14px; font-size: 13px; text-align: left;
+            border-bottom: 1px solid var(--gray-100);
+          }
+          .cd-bookings th {
+            font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.06em; color: var(--gray-400); background: var(--cream);
+          }
+          .cd-bookings tr:last-child td { border-bottom: none; }
+          .cd-dim { color: var(--gray-400); }
+          .cd-st {
+            font-size: 10.5px; font-weight: 700; padding: 3px 9px;
+            border-radius: 980px; letter-spacing: 0.04em;
+          }
+          .cd-st.s-CONFIRMED, .cd-st.s-COMPLETED { background: var(--teal-soft); color: var(--teal); }
+          .cd-st.s-PENDING { background: #FFF4E0; color: #9A6700; }
+          .cd-st.s-REJECTED, .cd-st.s-CANCELLED, .cd-st.s-NO_SHOW, .cd-st.s-REFUNDED {
+            background: var(--red-soft); color: var(--red-deep);
+          }
+
+          @media (max-width: 720px) {
+            .cd-panel { padding: 24px 22px; }
+            .cd-head { flex-direction: column; }
+            .cd-stats { grid-template-columns: repeat(2, 1fr); }
           }
         `}</style>
       </div>
