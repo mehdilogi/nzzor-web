@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Icon, { AMENITY_ICON } from "./Icon";
 import Lightbox from "./Lightbox";
+import HotelMap from "./HotelMap";
 import { formatPrice, formatPriceShort } from "../lib/format";
 import { useLang } from "../lib/LangContext";
 import { todayInAlgiers, validateBookingDates, localizeDateError } from "../lib/dates";
@@ -43,10 +44,25 @@ export default function HotelDetail({ hotel }) {
   // through the viewport during the scroll cause the underline to flicker.
   const TABS = [
     { id: "about",     labelKey: "detail.tab_overview"  },
+    { id: "location",  labelKey: "detail.tab_location"  },
     { id: "rooms",     labelKey: "detail.tab_rooms"     },
     { id: "amenities", labelKey: "detail.tab_amenities" },
     { id: "policies",  labelKey: "detail.tab_policies"  },
   ];
+  // Fallback labels so a missing translation key never renders as the raw
+  // "detail.tab_xxx" string (e.g. before the i18n files get the new keys).
+  const TAB_FALLBACKS = {
+    "detail.tab_overview": "Overview",
+    "detail.tab_location": "Location",
+    "detail.tab_rooms": "Rooms",
+    "detail.tab_amenities": "Amenities",
+    "detail.tab_policies": "Policies",
+  };
+  const labelFor = (tt, tab) => {
+    const out = tt(tab.labelKey);
+    // If the translator echoes the key back (missing translation), fall back.
+    return !out || out === tab.labelKey ? (TAB_FALLBACKS[tab.labelKey] || tab.id) : out;
+  };
   const [activeTab, setActiveTab] = useState("about");
   const lockSpyUntil = useRef(0);
 
@@ -192,14 +208,14 @@ export default function HotelDetail({ hotel }) {
 
           {/* Sticky scroll-spy tabs — click to jump, underline tracks scroll */}
           <nav className="nz-dtabs">
-            {TABS.map((tab) => (
+            {TABS.filter((tab) => tab.id !== "location" || hotel.location).map((tab) => (
               <button
                 key={tab.id}
                 className={`nz-dtab ${activeTab === tab.id ? "active" : ""}`}
                 onClick={() => jumpToTab(tab.id)}
                 aria-current={activeTab === tab.id ? "true" : undefined}
               >
-                {t(tab.labelKey)}
+                {labelFor(t, tab)}
               </button>
             ))}
           </nav>
@@ -209,6 +225,14 @@ export default function HotelDetail({ hotel }) {
             <h2 className="display">{t("detail.about")}</h2>
             <p className="nz-about">{hotel.description}</p>
           </section>
+
+          {/* location — renders nothing if the hotel has no coordinates yet */}
+          {hotel.location && (
+            <section id="location" className="nz-dsection">
+              <h2 className="display">{t("detail.location") || "Location"}</h2>
+              <HotelMap hotel={hotel} t={t} />
+            </section>
+          )}
 
           {/* rooms */}
           <section id="rooms" className="nz-dsection">
