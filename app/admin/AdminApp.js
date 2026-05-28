@@ -12,6 +12,7 @@ import {
   adminTags,
   adminUsers, adminUserDetail,
 } from "../../lib/adminApi";
+import AnalyticsPanel from "./AnalyticsPanel";
 
 const fmt = (n) => Number(n || 0).toLocaleString("en") + " DZD";
 
@@ -168,6 +169,7 @@ function Dashboard({ user, onLogout }) {
         <nav>
           {[
             ["overview", "Overview"],
+            ["analytics", "Analytics"],
             ["hotels", "Hotels"],
             ["bookings", "Bookings"],
             ["customers", "Customers"],
@@ -188,6 +190,7 @@ function Dashboard({ user, onLogout }) {
 
       <main className="nzad-main">
         {tab === "overview" && <Overview />}
+        {tab === "analytics" && <AnalyticsPanel />}
         {tab === "hotels" && <HotelsManager />}
         {tab === "bookings" && <BookingsManager />}
         {tab === "customers" && <CustomersManager />}
