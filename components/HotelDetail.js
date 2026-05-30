@@ -110,8 +110,8 @@ export default function HotelDetail({ hotel }) {
     window.scrollTo({ top, behavior: "smooth" });
   }
 
-  // nights — default to 3 for preview if dates not set
-  let nights = 3;
+  // nights — default to 1 for preview if dates not set
+  let nights = 1;
   if (checkIn && checkOut) {
     const d = Math.ceil((new Date(checkOut) - new Date(checkIn)) / 86400000);
     if (d > 0) nights = d;
@@ -199,10 +199,12 @@ export default function HotelDetail({ hotel }) {
             <h1 className="display">{hotel.name}</h1>
             <div className="nz-hotel-sub">
               <span className="loc"><Icon name="pin" size={16} /> {hotel.city} · {hotel.region}</span>
-              <span className="rate">
-                <span className="pill">{hotel.rating}</span>
-                <span className="rtext"><strong>{t(ratingKey(hotel.rating))}</strong> · {hotel.reviewCount} {t("detail.reviews")}</span>
-              </span>
+              {hotel.reviewCount > 0 && (
+                <span className="rate">
+                  <span className="pill">{hotel.rating}</span>
+                  <span className="rtext"><strong>{t(ratingKey(hotel.rating))}</strong> · {hotel.reviewCount} {t("detail.reviews")}</span>
+                </span>
+              )}
             </div>
           </div>
 

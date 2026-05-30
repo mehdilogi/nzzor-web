@@ -30,10 +30,12 @@ export default function HotelCard({ hotel }) {
             <span className="nz-live" /> {t("card.instant")}
           </span>
         )}
-        <span className="nz-hcard-score">
-          <Icon name="star" size={11} style={{ color: "var(--red)" }} strokeWidth={0} />
-          {hotel.rating}
-        </span>
+        {hotel.reviewCount > 0 && (
+          <span className="nz-hcard-score">
+            <Icon name="star" size={11} style={{ color: "var(--red)" }} strokeWidth={0} />
+            {hotel.rating}
+          </span>
+        )}
         <span className="nz-hcard-fav" aria-hidden="true">
           <Icon name="heart" size={17} />
         </span>
