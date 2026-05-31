@@ -25,6 +25,21 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
   const router = useRouter();
   const { user, refresh: refreshAuth } = useAuth();
 
+  // How many units of this room to book, carried from the search picker via
+  // ?rooms=N. Read from the URL on mount in an effect (client-only, so it does
+  // NOT force a <Suspense> boundary the way next/navigation useSearchParams
+  // would). Defaults to 1, clamped to 1..10 so a tampered URL can't request
+  // 9999 units. The availability guard re-checks units server-side regardless.
+  const [roomsQty, setRoomsQty] = useState(1);
+  useEffect(() => {
+    try {
+      const n = parseInt(new URLSearchParams(window.location.search).get("rooms") || "1", 10);
+      if (!Number.isNaN(n)) setRoomsQty(Math.min(10, Math.max(1, n)));
+    } catch {
+      /* SSR / no window — keep default 1 */
+    }
+  }, []);
+
   const [step, setStep] = useState(1);
 
   // guest details
@@ -136,7 +151,7 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
   }
 
   // ---- pricing -------------------------------------------------------------
-  const subtotal = room.price * nights;
+  const subtotal = room.price * nights * roomsQty;
   const discount = coupon ? couponDiscount(coupon, subtotal) : 0;
   const total = subtotal - discount;
 
@@ -212,7 +227,7 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
     // payload shaped exactly as the backend's bookings route expects
     const payload = {
       hotelId: hotel.id,
-      rooms: [{ roomId: room.id, quantity: 1 }],
+      rooms: [{ roomId: room.id, quantity: roomsQty }],
       checkIn,
       checkOut,
       guest: {
@@ -686,7 +701,10 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
 
             <div className="bk-sum-prices">
               <div className="bk-sum-row">
-                <span>{t("bk.room_x_nights")} {nights} {nightLabel}</span>
+                <span>
+                  {roomsQty > 1 ? `${roomsQty} ${t("bk.rooms") || "rooms"} · ` : ""}
+                  {t("bk.room_x_nights")} {nights} {nightLabel}
+                </span>
                 <span>{formatPrice(subtotal)}</span>
               </div>
               {discount > 0 && (

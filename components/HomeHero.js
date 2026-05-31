@@ -21,7 +21,9 @@ export default function HomeHero() {
   const [city, setCity] = useState("");
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
-  const [guests, setGuests] = useState(2);
+  const [adults, setAdults] = useState(2);
+  const [children, setChildren] = useState(0);
+  const [rooms, setRooms] = useState(1);
   const [open, setOpen] = useState(null); // 'city' | 'dates' | 'guests' | null
   const [aiMode, setAiMode] = useState(false); // natural-language search toggle
   const [aiQuery, setAiQuery] = useState("");
@@ -58,7 +60,11 @@ export default function HomeHero() {
     if (city) params.set("city", city);
     if (checkIn) params.set("checkIn", checkIn);
     if (checkOut) params.set("checkOut", checkOut);
-    if (guests) params.set("guests", String(guests));
+    params.set("adults", String(adults));
+    params.set("children", String(children));
+    params.set("rooms", String(rooms));
+    // keep `guests` for any code still reading the old param (total heads)
+    params.set("guests", String(adults + children));
     const qs = params.toString();
     router.push(qs ? `/hotels?${qs}` : "/hotels");
   }
@@ -166,7 +172,9 @@ export default function HomeHero() {
                 onClick={() => setOpen(open === "guests" ? null : "guests")}
               >
                 <span className="nzs-label">{t("search.guests")}</span>
-                <span className="nzs-value">{guests} {guests === 1 ? t("search.guest") : t("search.guests_plural")}</span>
+                <span className="nzs-value">
+                  {adults + children} {(adults + children) === 1 ? t("search.guest") : t("search.guests_plural")} · {rooms} {rooms === 1 ? t("search.room") || "room" : t("search.rooms") || "rooms"}
+                </span>
               </button>
 
               <button className="nzs-submit" onClick={search}>
@@ -233,12 +241,36 @@ export default function HomeHero() {
           {!aiMode && open === "guests" && (
             <div className="nzs-panel">
               <div className="nzs-panel-title">{t("search.how_many")}</div>
-              <div className="nzs-guests">
-                <span>{t("search.travelers")}</span>
-                <div className="nzs-stepper">
-                  <button onClick={() => setGuests((g) => Math.max(1, g - 1))} disabled={guests <= 1}>−</button>
-                  <strong>{guests}</strong>
-                  <button onClick={() => setGuests((g) => Math.min(10, g + 1))} disabled={guests >= 10}>+</button>
+              <div className="nzs-occ">
+                <div className="nzs-occ-row">
+                  <div className="nzs-occ-label">
+                    <strong>{t("search.adults") || "Adults"}</strong>
+                  </div>
+                  <div className="nzs-stepper">
+                    <button onClick={() => setAdults((a) => Math.max(1, a - 1))} disabled={adults <= 1} aria-label="decrease adults">−</button>
+                    <strong>{adults}</strong>
+                    <button onClick={() => setAdults((a) => Math.min(30, a + 1))} disabled={adults >= 30} aria-label="increase adults">+</button>
+                  </div>
+                </div>
+                <div className="nzs-occ-row">
+                  <div className="nzs-occ-label">
+                    <strong>{t("search.children") || "Children"}</strong>
+                  </div>
+                  <div className="nzs-stepper">
+                    <button onClick={() => setChildren((c) => Math.max(0, c - 1))} disabled={children <= 0} aria-label="decrease children">−</button>
+                    <strong>{children}</strong>
+                    <button onClick={() => setChildren((c) => Math.min(20, c + 1))} disabled={children >= 20} aria-label="increase children">+</button>
+                  </div>
+                </div>
+                <div className="nzs-occ-row">
+                  <div className="nzs-occ-label">
+                    <strong>{t("search.rooms") || "Rooms"}</strong>
+                  </div>
+                  <div className="nzs-stepper">
+                    <button onClick={() => setRooms((r) => Math.max(1, r - 1))} disabled={rooms <= 1} aria-label="decrease rooms">−</button>
+                    <strong>{rooms}</strong>
+                    <button onClick={() => setRooms((r) => Math.min(10, r + 1))} disabled={rooms >= 10} aria-label="increase rooms">+</button>
+                  </div>
                 </div>
               </div>
               <button className="nzs-done" onClick={() => { setOpen(null); search(); }}>
@@ -483,6 +515,13 @@ export default function HomeHero() {
           padding: 8px 0 16px;
         }
         .nzs-guests > span { font-size: 14px; font-weight: 700; }
+        .nzs-occ { padding: 4px 0 12px; }
+        .nzs-occ-row {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 12px 0;
+        }
+        .nzs-occ-row:not(:last-child) { border-bottom: 1px solid var(--gray-100); }
+        .nzs-occ-label strong { font-size: 14.5px; font-weight: 700; color: var(--ink); }
         .nzs-stepper { display: flex; align-items: center; gap: 16px; }
         .nzs-stepper button {
           width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--gray-300);
