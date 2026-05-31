@@ -21,9 +21,24 @@ export default function HomeHero() {
   const [city, setCity] = useState("");
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
-  const [adults, setAdults] = useState(2);
-  const [children, setChildren] = useState(0);
-  const [rooms, setRooms] = useState(1);
+  // Per-room occupancy: an array of { adults, children }, one entry per room.
+  // Replaces the old flat adults/children/rooms trio. Defaults to one room of
+  // 2 adults. Encoded to the URL as ?occ=2-0_2-1 (rooms separated by "_",
+  // adults-children by "-") plus back-compat ?rooms / ?adults / ?guests.
+  const [roomsList, setRoomsList] = useState([{ adults: 2, children: 0 }]);
+
+  const setRoomField = (idx, field, val) =>
+    setRoomsList((list) =>
+      list.map((r, i) => (i === idx ? { ...r, [field]: val } : r))
+    );
+  const addRoom = () =>
+    setRoomsList((list) => (list.length >= 8 ? list : [...list, { adults: 2, children: 0 }]));
+  const removeRoom = (idx) =>
+    setRoomsList((list) => (list.length <= 1 ? list : list.filter((_, i) => i !== idx)));
+
+  const totalAdults = roomsList.reduce((s, r) => s + r.adults, 0);
+  const totalChildren = roomsList.reduce((s, r) => s + r.children, 0);
+  const totalRooms = roomsList.length;
   const [open, setOpen] = useState(null); // 'city' | 'dates' | 'guests' | null
   const [aiMode, setAiMode] = useState(false); // natural-language search toggle
   const [aiQuery, setAiQuery] = useState("");
@@ -60,11 +75,14 @@ export default function HomeHero() {
     if (city) params.set("city", city);
     if (checkIn) params.set("checkIn", checkIn);
     if (checkOut) params.set("checkOut", checkOut);
-    params.set("adults", String(adults));
-    params.set("children", String(children));
-    params.set("rooms", String(rooms));
-    // keep `guests` for any code still reading the old param (total heads)
-    params.set("guests", String(adults + children));
+    // Per-room occupancy, compact: room1adults-room1children_room2adults-...
+    params.set("occ", roomsList.map((r) => `${r.adults}-${r.children}`).join("_"));
+    // Back-compat params so the existing booking flow (reads ?rooms) and any
+    // ?adults/?guests consumers keep working unchanged.
+    params.set("rooms", String(totalRooms));
+    params.set("adults", String(totalAdults));
+    params.set("children", String(totalChildren));
+    params.set("guests", String(totalAdults + totalChildren));
     const qs = params.toString();
     router.push(qs ? `/hotels?${qs}` : "/hotels");
   }
@@ -173,7 +191,7 @@ export default function HomeHero() {
               >
                 <span className="nzs-label">{t("search.guests")}</span>
                 <span className="nzs-value">
-                  {adults + children} {(adults + children) === 1 ? t("search.guest") : t("search.guests_plural")} · {rooms} {rooms === 1 ? t("search.room") || "room" : t("search.rooms") || "rooms"}
+                  {totalAdults + totalChildren} {(totalAdults + totalChildren) === 1 ? t("search.guest") : t("search.guests_plural")} · {totalRooms} {totalRooms === 1 ? (t("search.room") || "room") : (t("search.rooms") || "rooms")}
                 </span>
               </button>
 
@@ -239,43 +257,61 @@ export default function HomeHero() {
           )}
 
           {!aiMode && open === "guests" && (
-            <div className="nzs-panel">
+            <div className="nzs-panel nzs-panel-occ">
               <div className="nzs-panel-title">{t("search.how_many")}</div>
-              <div className="nzs-occ">
-                <div className="nzs-occ-row">
-                  <div className="nzs-occ-label">
-                    <strong>{t("search.adults") || "Adults"}</strong>
+              <div className="nzs-rooms">
+                {roomsList.map((room, idx) => (
+                  <div className="nzs-room" key={idx}>
+                    <div className="nzs-room-head">
+                      <strong>{(t("search.room") || "Room")} {idx + 1}</strong>
+                      {roomsList.length > 1 && (
+                        <button
+                          type="button"
+                          className="nzs-room-remove"
+                          onClick={() => removeRoom(idx)}
+                        >
+                          {t("search.remove") || "Remove"}
+                        </button>
+                      )}
+                    </div>
+                    <div className="nzs-room-grid">
+                      <div className="nzs-occ-row">
+                        <div className="nzs-occ-label">
+                          <strong>{t("search.adults") || "Adults"}</strong>
+                        </div>
+                        <div className="nzs-stepper">
+                          <button onClick={() => setRoomField(idx, "adults", Math.max(1, room.adults - 1))} disabled={room.adults <= 1} aria-label="decrease adults">−</button>
+                          <strong>{room.adults}</strong>
+                          <button onClick={() => setRoomField(idx, "adults", Math.min(10, room.adults + 1))} disabled={room.adults >= 10} aria-label="increase adults">+</button>
+                        </div>
+                      </div>
+                      <div className="nzs-occ-row">
+                        <div className="nzs-occ-label">
+                          <strong>{t("search.children") || "Children"}</strong>
+                        </div>
+                        <div className="nzs-stepper">
+                          <button onClick={() => setRoomField(idx, "children", Math.max(0, room.children - 1))} disabled={room.children <= 0} aria-label="decrease children">−</button>
+                          <strong>{room.children}</strong>
+                          <button onClick={() => setRoomField(idx, "children", Math.min(10, room.children + 1))} disabled={room.children >= 10} aria-label="increase children">+</button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="nzs-stepper">
-                    <button onClick={() => setAdults((a) => Math.max(1, a - 1))} disabled={adults <= 1} aria-label="decrease adults">−</button>
-                    <strong>{adults}</strong>
-                    <button onClick={() => setAdults((a) => Math.min(30, a + 1))} disabled={adults >= 30} aria-label="increase adults">+</button>
-                  </div>
-                </div>
-                <div className="nzs-occ-row">
-                  <div className="nzs-occ-label">
-                    <strong>{t("search.children") || "Children"}</strong>
-                  </div>
-                  <div className="nzs-stepper">
-                    <button onClick={() => setChildren((c) => Math.max(0, c - 1))} disabled={children <= 0} aria-label="decrease children">−</button>
-                    <strong>{children}</strong>
-                    <button onClick={() => setChildren((c) => Math.min(20, c + 1))} disabled={children >= 20} aria-label="increase children">+</button>
-                  </div>
-                </div>
-                <div className="nzs-occ-row">
-                  <div className="nzs-occ-label">
-                    <strong>{t("search.rooms") || "Rooms"}</strong>
-                  </div>
-                  <div className="nzs-stepper">
-                    <button onClick={() => setRooms((r) => Math.max(1, r - 1))} disabled={rooms <= 1} aria-label="decrease rooms">−</button>
-                    <strong>{rooms}</strong>
-                    <button onClick={() => setRooms((r) => Math.min(10, r + 1))} disabled={rooms >= 10} aria-label="increase rooms">+</button>
-                  </div>
-                </div>
+                ))}
               </div>
-              <button className="nzs-done" onClick={() => { setOpen(null); search(); }}>
-                {t("search.search_hotels")}
-              </button>
+              <div className="nzs-occ-foot">
+                <button
+                  type="button"
+                  className="nzs-add-room"
+                  onClick={addRoom}
+                  disabled={roomsList.length >= 8}
+                >
+                  + {t("search.add_room") || "Add a room"}
+                </button>
+                <button className="nzs-done" onClick={() => { setOpen(null); search(); }}>
+                  {t("search.search_hotels")}
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -516,6 +552,28 @@ export default function HomeHero() {
         }
         .nzs-guests > span { font-size: 14px; font-weight: 700; }
         .nzs-occ { padding: 4px 0 12px; }
+        .nzs-rooms { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+        .nzs-room { padding: 6px 0; }
+        .nzs-room:not(:last-child) { border-bottom: 1px solid var(--gray-100); padding-bottom: 14px; margin-bottom: 4px; }
+        .nzs-room-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+        .nzs-room-head strong { font-size: 15px; font-weight: 700; color: var(--ink); }
+        .nzs-room-remove {
+          background: none; border: none; cursor: pointer;
+          color: var(--red); font-size: 13px; font-weight: 700; padding: 2px 4px;
+        }
+        .nzs-room-remove:hover { text-decoration: underline; }
+        .nzs-room-grid { display: flex; flex-direction: column; }
+        .nzs-occ-foot {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 12px; margin-top: 8px;
+        }
+        .nzs-add-room {
+          background: none; border: none; cursor: pointer;
+          color: var(--red); font-size: 14px; font-weight: 700; padding: 6px 2px;
+        }
+        .nzs-add-room:hover:not(:disabled) { text-decoration: underline; }
+        .nzs-add-room:disabled { opacity: 0.4; cursor: default; }
+        .nzs-occ-foot .nzs-done { margin-top: 0; width: auto; flex-shrink: 0; }
         .nzs-occ-row {
           display: flex; align-items: center; justify-content: space-between;
           padding: 12px 0;
