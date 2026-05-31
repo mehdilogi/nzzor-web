@@ -10,14 +10,24 @@ export default function HotelCard({ hotel }) {
   const { t } = useLang();
   const searchParams = useSearchParams();
 
-  // carry dates (and guests) from the current search through to the hotel page
+  // Carry the search context from the current URL through to the hotel page,
+  // so occupancy (rooms/adults/children) and dates survive results -> detail
+  // -> booking. Without forwarding rooms here, the booking always defaulted to
+  // 1 unit no matter what the guest picked. `guests` is kept for back-compat
+  // with any older code still reading the single-number param.
   const ci = searchParams.get("checkIn");
   const co = searchParams.get("checkOut");
   const guests = searchParams.get("guests");
+  const rooms = searchParams.get("rooms");
+  const adults = searchParams.get("adults");
+  const children = searchParams.get("children");
   const qs = new URLSearchParams();
   if (ci) qs.set("checkIn", ci);
   if (co) qs.set("checkOut", co);
   if (guests) qs.set("guests", guests);
+  if (rooms) qs.set("rooms", rooms);
+  if (adults) qs.set("adults", adults);
+  if (children) qs.set("children", children);
   const href = qs.toString()
     ? `/hotels/${hotel.slug}?${qs.toString()}`
     : `/hotels/${hotel.slug}`;
