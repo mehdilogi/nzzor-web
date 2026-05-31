@@ -134,6 +134,18 @@ export default function HotelDetail({ hotel }) {
     });
     params.set("checkIn", checkIn);
     params.set("checkOut", checkOut);
+    // Forward the occupancy the guest chose in the search picker so the
+    // booking page books the right number of units (and can show heads).
+    // These arrived on this page's URL from the homepage search; without
+    // forwarding them here they'd be dropped and the booking would default
+    // to 1 room. Only set when present so a direct visit (no search) stays
+    // clean.
+    const roomsParam = searchParams.get("rooms");
+    const adultsParam = searchParams.get("adults");
+    const childrenParam = searchParams.get("children");
+    if (roomsParam) params.set("rooms", roomsParam);
+    if (adultsParam) params.set("adults", adultsParam);
+    if (childrenParam) params.set("children", childrenParam);
     router.push(`/booking?${params.toString()}`);
   }
 
