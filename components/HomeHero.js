@@ -8,6 +8,12 @@ import { MOCK_CITIES } from "../lib/mockData";
 import { useLang } from "../lib/LangContext";
 import { parseQuery } from "../lib/nlSearch";
 
+// Show the BETA natural-language search toggle? Off = cleaner mobile UX
+// (no typing input, no auto-popping keyboard, just the structured picker).
+// The AI parser code stays in the build so flipping this back to true
+// restores the toggle without another deploy.
+const SHOW_AI_SEARCH = false;
+
 // search bar steps: city -> dates -> guests, with auto-advance
 export default function HomeHero() {
   const { t } = useLang();
@@ -171,16 +177,18 @@ export default function HomeHero() {
           )}
 
           {/* AI toggle — VRBO-style, sits under the bar */}
-          <button
-            className={`nz-ai-toggle ${aiMode ? "on" : ""}`}
-            onClick={() => { setAiMode(!aiMode); setOpen(null); }}
-          >
-            <span className={`nz-ai-switch ${aiMode ? "on" : ""}`}>
-              <span className="knob" />
-            </span>
-            <span className="nz-ai-toggle-label">{t("ai.toggle")}</span>
-            <span className="nz-ai-badge">{t("ai.beta")}</span>
-          </button>
+          {SHOW_AI_SEARCH && (
+            <button
+              className={`nz-ai-toggle ${aiMode ? "on" : ""}`}
+              onClick={() => { setAiMode(!aiMode); setOpen(null); }}
+            >
+              <span className={`nz-ai-switch ${aiMode ? "on" : ""}`}>
+                <span className="knob" />
+              </span>
+              <span className="nz-ai-toggle-label">{t("ai.toggle")}</span>
+              <span className="nz-ai-badge">{t("ai.beta")}</span>
+            </button>
+          )}
 
           {!aiMode && open === "city" && (
             <div className="nzs-panel">
