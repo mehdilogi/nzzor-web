@@ -481,6 +481,10 @@ function DetailStyles() {
         position: relative;
         z-index: 2;
       }
+      /* Both grid children must be allowed to shrink below their min-content,
+         or an over-wide child (e.g. the booking widget on mobile) widens the
+         whole single-column track past the viewport and clips siblings. */
+      .nz-detail-layout > * { min-width: 0; }
       .nz-hotel-head { margin-bottom: 32px; }
       .nz-hotel-badges { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
       .nz-badge {
@@ -596,6 +600,7 @@ function DetailStyles() {
         position: sticky; top: 90px; background: var(--white);
         border: 1px solid var(--gray-200); border-radius: var(--r-lg);
         box-shadow: var(--shadow-lg); overflow: hidden;
+        max-width: 100%;
       }
       .nz-widget-head {
         padding: 14px 22px; background: var(--red-soft);
@@ -609,9 +614,10 @@ function DetailStyles() {
       .nz-widget-price .amt { font-size: 32px; font-weight: 600; letter-spacing: -0.025em; }
       .nz-widget-price .unit { font-size: 13px; color: var(--gray-400); font-weight: 600; }
       .nz-widget-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
-      .wf { border: 1.5px solid var(--gray-200); border-radius: var(--r-sm); padding: 9px 12px; }
+      .nz-widget-dates > .wf { min-width: 0; }
+      .wf { border: 1.5px solid var(--gray-200); border-radius: var(--r-sm); padding: 9px 12px; min-width: 0; }
       .wf label { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gray-400); display: block; margin-bottom: 3px; }
-      .wf input { border: none; outline: none; width: 100%; font-size: 13px; font-weight: 600; color: var(--ink); }
+      .wf input { border: none; outline: none; width: 100%; min-width: 0; font-size: 13px; font-weight: 600; color: var(--ink); }
       .nz-widget-room { padding: 14px; background: var(--cream); border-radius: var(--r-md); margin-bottom: 16px; border: 1px solid var(--gray-100); }
       .wr-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-400); margin-bottom: 5px; }
       .wr-name { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
@@ -665,6 +671,12 @@ function DetailStyles() {
       @media (max-width: 1080px) {
         .nz-detail-layout { grid-template-columns: 1fr; }
         .nz-widget { position: static; }
+        /* The floating WhatsApp bubble overlaps the sticky reserve bar and is
+           redundant here — the booking widget already has a "book by WhatsApp"
+           CTA. Hide it on mobile detail pages only (this global style tag is
+           only mounted on detail pages). !important beats WhatsAppButton's own
+           scoped display:flex. Desktop keeps the bubble (no reserve bar there). */
+        .nz-wa { display: none !important; }
       }
       @media (max-width: 720px) {
         .nz-gallery { grid-template-columns: 1fr 1fr; height: 320px; }
