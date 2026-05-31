@@ -1378,8 +1378,44 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
 // loaded before the editor refactor.
 function RoomCard({ room, onDelete, onRoomChange }) {
   const [showPhotos, setShowPhotos] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(room);
+  const [savingRoom, setSavingRoom] = useState(false);
+  const [editErr, setEditErr] = useState("");
   const photoCount = (room.photos || []).length;
   const displayName = room.typeEn || room.type || "(unnamed room)";
+
+  const setD = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
+
+  function startEdit() {
+    // Seed the form from the current room each time we open, so cancelling
+    // and reopening always reflects the latest saved values.
+    setDraft(room);
+    setEditErr("");
+    setEditing(true);
+  }
+
+  async function saveRoom() {
+    setEditErr(""); setSavingRoom(true);
+    try {
+      const payload = {
+        typeEn: draft.typeEn, typeFr: draft.typeFr, typeAr: draft.typeAr,
+        bedType: draft.bedType,
+        capacity: Number(draft.capacity),
+        sizeSqm: Number(draft.sizeSqm),
+        basePrice: Number(draft.basePrice),
+        totalUnits: Number(draft.totalUnits),
+      };
+      const result = await adminUpdateRoom(room.id, payload);
+      // The PUT returns the updated room (without its photos include), so
+      // merge onto the existing room to keep the photo gallery intact.
+      const updated = { ...room, ...(result?.data || result || {}), photos: room.photos };
+      onRoomChange(updated);
+      setEditing(false);
+    } catch (e) {
+      setEditErr(e.message);
+    } finally { setSavingRoom(false); }
+  }
 
   return (
     <div className="nzad-room-card">
@@ -1396,9 +1432,33 @@ function RoomCard({ room, onDelete, onRoomChange }) {
           >
             📷 Photos ({photoCount}) {showPhotos ? "▴" : "▾"}
           </button>
+          <button className="nzad-btn-mini" onClick={editing ? () => setEditing(false) : startEdit}>
+            {editing ? "Close" : "Edit"}
+          </button>
           <button className="nzad-btn-mini-danger" onClick={onDelete}>Remove</button>
         </div>
       </div>
+      {editing && (
+        <div className="nzad-room-edit">
+          {editErr && <div className="nzad-room-edit-err">{editErr}</div>}
+          <div className="nzad-redit-grid">
+            <Field label="Type (EN)" v={draft.typeEn} onChange={(v) => setD("typeEn", v)} />
+            <Field label="Type (FR)" v={draft.typeFr} onChange={(v) => setD("typeFr", v)} />
+            <Field label="Type (AR)" v={draft.typeAr} onChange={(v) => setD("typeAr", v)} rtl />
+            <Field label="Price / night (DZD)" v={draft.basePrice} onChange={(v) => setD("basePrice", v)} type="number" />
+            <Field label="Capacity (guests)" v={draft.capacity} onChange={(v) => setD("capacity", v)} type="number" />
+            <Field label="Size (m²)" v={draft.sizeSqm} onChange={(v) => setD("sizeSqm", v)} type="number" />
+            <Field label="Bed type" v={draft.bedType} onChange={(v) => setD("bedType", v)} />
+            <Field label="Number of rooms" v={draft.totalUnits} onChange={(v) => setD("totalUnits", v)} type="number" />
+          </div>
+          <div className="nzad-redit-actions">
+            <button className="nzad-btn-primary" onClick={saveRoom} disabled={savingRoom}>
+              {savingRoom ? "Saving…" : "Save room"}
+            </button>
+            <button className="nzad-btn-ghost" onClick={() => setEditing(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
       {showPhotos && (
         <div className="nzad-room-photos-wrap">
           <RoomPhotos
@@ -1424,6 +1484,22 @@ function RoomCard({ room, onDelete, onRoomChange }) {
         .nzad-room-meta strong { font-size: 14px; }
         .nzad-room-meta span { font-size: 12.5px; color: var(--gray-400); font-weight: 600; margin-left: 6px; }
         .nzad-room-actions { display: flex; gap: 8px; align-items: center; }
+        .nzad-room-edit {
+          padding: 14px;
+          border-top: 1px solid var(--gray-100);
+          background: #fff;
+        }
+        .nzad-redit-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 14px;
+        }
+        .nzad-redit-actions { display: flex; gap: 10px; margin-top: 14px; }
+        .nzad-room-edit-err {
+          padding: 9px 12px; margin-bottom: 12px;
+          background: var(--red-soft); color: var(--red-deep);
+          border-radius: var(--r-sm); font-size: 12.5px; font-weight: 600;
+        }
         .nzad-room-photos-wrap {
           padding: 14px 14px 16px;
           border-top: 1px solid var(--gray-100);
@@ -1432,6 +1508,7 @@ function RoomCard({ room, onDelete, onRoomChange }) {
         @media (max-width: 720px) {
           .nzad-room-head { flex-direction: column; align-items: stretch; }
           .nzad-room-actions { justify-content: flex-end; }
+          .nzad-redit-grid { grid-template-columns: 1fr; }
         }
       `}</style>
     </div>
