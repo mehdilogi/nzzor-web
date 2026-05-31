@@ -21,6 +21,24 @@ export default function HomeHero() {
   const [aiQuery, setAiQuery] = useState("");
   const barRef = useRef(null);
 
+  // Live hotel counts per wilaya — overlaid on MOCK_CITIES so the picker
+  // stays accurate as the partner adds hotels, without needing a redeploy.
+  // Falls back gracefully to "no count shown" if the API is unreachable.
+  const [liveCounts, setLiveCounts] = useState({});
+  useEffect(() => {
+    const API = process.env.NEXT_PUBLIC_API_URL || "";
+    if (!API) return;
+    fetch(`${API}/api/hotels/meta/cities`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!j || !Array.isArray(j.data)) return;
+        const m = {};
+        for (const c of j.data) m[c.key] = c.hotelCount;
+        setLiveCounts(m);
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     function onDoc(e) {
       if (barRef.current && !barRef.current.contains(e.target)) setOpen(null);
@@ -164,15 +182,24 @@ export default function HomeHero() {
             <div className="nzs-panel">
               <div className="nzs-panel-title">{t("search.choose_dest")}</div>
               <div className="nzs-cities">
-                {MOCK_CITIES.map((c) => (
-                  <button key={c.key} className="nzs-city" onClick={() => pickCity(c.name)}>
-                    <Icon name="pin" size={16} style={{ color: "var(--red)" }} />
-                    <span>
-                      <strong>{c.name}</strong>
-                      <em>{c.hotelCount} hotel{c.hotelCount === 1 ? "" : "s"}</em>
-                    </span>
-                  </button>
-                ))}
+                {MOCK_CITIES.map((c) => {
+                  // Prefer live API count; fall back to static fallback.
+                  // A count of 0 (or unknown wilaya) means "no count shown"
+                  // — the wilaya still renders and is clickable, leading
+                  // to the standard "no hotels yet" empty state.
+                  const count = liveCounts[c.key] ?? c.hotelCount;
+                  return (
+                    <button key={c.key} className="nzs-city" onClick={() => pickCity(c.name)}>
+                      <Icon name="pin" size={16} style={{ color: "var(--red)" }} />
+                      <span>
+                        <strong>{c.name}</strong>
+                        {count > 0 && (
+                          <em>{count} hotel{count === 1 ? "" : "s"}</em>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -427,7 +454,10 @@ export default function HomeHero() {
           max-height: 80vh; overflow-y: auto;
         }
         .nzs-panel-title { font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 16px; }
-        .nzs-cities { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .nzs-cities {
+          display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+          max-height: 60vh; overflow-y: auto; padding-right: 4px;
+        }
         .nzs-city {
           display: flex; align-items: center; gap: 10px; padding: 11px 12px;
           border: none; background: transparent; border-radius: var(--r-sm);
