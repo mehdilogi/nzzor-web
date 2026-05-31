@@ -43,6 +43,12 @@ const PATHS = {
   cib: '<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19"/><rect x="5" y="12" width="4" height="3.2" rx="0.6"/><path d="M5.7 13.6h2.6M14 14.5h4"/>',
   edahabia: '<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19M6 14.5h4"/><path d="M15.5 5L21.5 5L21.5 8.5Z" fill="currentColor" stroke="none" opacity="0.85"/><path d="M16.5 6.2L20.5 6.2M16.5 7.4L19.5 7.4" stroke="#FAF8F4" strokeWidth="0.8"/>',
   banktransfer: '<path d="M4 10h16M5 10l7-5 7 5M7 10v6M11 10v6M13 10v6M17 10v6M4 18h11"/><path d="M16 21l4-2.5-4-2.5"/>',
+  // PLACEHOLDER MARKS — Visa and Mastercard logos are trademarked. These are
+  // neutral generic-card glyphs so the slots render now. Replace each string
+  // with the official brand SVG inner-markup from the Visa / Mastercard brand
+  // centers (free for merchants who accept the cards). Keep the 24x24 viewBox.
+  visa: '<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19"/><path d="M8 16l1.6-4M13 12l-1.4 4M15.5 12l1.2 4 1.4-4" stroke-width="1.3"/>',
+  mastercard: '<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19"/><circle cx="10.5" cy="14" r="2.6"/><circle cx="14" cy="14" r="2.6"/>',
   cash: '<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 12h.01M18 12h.01"/>',
   bank: '<path d="M4 10h16M5 10l7-5 7 5M6 10v7M10 10v7M14 10v7M18 10v7M4 20h16"/>',
   heart: '<path d="M12 20.5C7 16.5 4 13.5 4 9.8A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 8 2.8c0 3.7-3 6.7-8 10.7Z"/>',

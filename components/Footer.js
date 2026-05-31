@@ -24,6 +24,8 @@ export default function Footer() {
             <div className="nz-pay">
               <span><Icon name="cib" size={18} strokeWidth={1.6} /> CIB</span>
               <span><Icon name="edahabia" size={18} strokeWidth={1.6} /> Edahabia</span>
+              <span><Icon name="visa" size={18} strokeWidth={1.6} /> Visa</span>
+              <span><Icon name="mastercard" size={18} strokeWidth={1.6} /> Mastercard</span>
               <span><Icon name="banktransfer" size={18} strokeWidth={1.6} /> Bank transfer</span>
             </div>
           </div>

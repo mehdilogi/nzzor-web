@@ -193,8 +193,21 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
     const firstName = parts[0] || name.trim();
     const lastName = parts.slice(1).join(" ") || parts[0] || "-";
 
-    // backend payment-method codes are uppercase
-    const methodCode = payMethod === "edahabia" ? "EDDAHABIA" : "CIB";
+    // backend payment-method codes are uppercase. Explicit map — do NOT use a
+    // binary fallback here: a "anything-else -> CIB" ternary silently mis-files
+    // Visa/Mastercard bookings as CIB. Every selectable method maps explicitly,
+    // and an unknown value throws rather than guessing.
+    const METHOD_CODES = {
+      cib: "CIB",
+      edahabia: "EDDAHABIA",
+      visa: "VISA",
+      mastercard: "MASTERCARD",
+    };
+    const methodCode = METHOD_CODES[payMethod];
+    if (!methodCode) {
+      setBookingError(t("bk.pay_method_error") || "Please choose a payment method.");
+      return;
+    }
 
     // payload shaped exactly as the backend's bookings route expects
     const payload = {
@@ -436,6 +449,34 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
                     <em>{t("bk.edahabia_desc")}</em>
                   </span>
                   <span className="bk-pay-logo gold">ED</span>
+                </button>
+
+                <button
+                  className={`bk-pay ${payMethod === "visa" ? "on" : ""}`}
+                  onClick={() => setPayMethod("visa")}
+                >
+                  <span className="bk-pay-radio" />
+                  <span className="bk-pay-info">
+                    <strong>Visa</strong>
+                    <em>{t("bk.visa_desc")}</em>
+                  </span>
+                  <span className="bk-pay-logo card">
+                    <Icon name="visa" size={22} />
+                  </span>
+                </button>
+
+                <button
+                  className={`bk-pay ${payMethod === "mastercard" ? "on" : ""}`}
+                  onClick={() => setPayMethod("mastercard")}
+                >
+                  <span className="bk-pay-radio" />
+                  <span className="bk-pay-info">
+                    <strong>Mastercard</strong>
+                    <em>{t("bk.mastercard_desc")}</em>
+                  </span>
+                  <span className="bk-pay-logo card">
+                    <Icon name="mastercard" size={22} />
+                  </span>
                 </button>
               </div>
 
@@ -802,6 +843,13 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
           padding: 6px 10px; border-radius: 6px; letter-spacing: 0.02em;
         }
         .bk-pay-logo.gold { background: #C8951C; }
+        /* For icon-based marks (Visa/Mastercard). Neutral chrome — holds the
+           Icon glyph centred. Replace the placeholder glyph in Icon.js with the
+           official brand SVGs; this box just frames them. */
+        .bk-pay-logo.card {
+          background: var(--cream); border: 1px solid var(--gray-200);
+          padding: 5px 9px; display: inline-flex; align-items: center; color: var(--ink);
+        }
 
         /* promo */
         .bk-promo { margin-bottom: 24px; }
