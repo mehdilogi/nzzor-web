@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   getToken, clearToken, adminLogin, adminMe, adminDashboard, adminToday,
   adminHotels, adminHotel, adminBookings, adminBookingDetail, adminUpdateBookingStatus,
@@ -620,6 +620,54 @@ function OpsPanel() {
 // =============================================================================
 // HOTELS MANAGER
 // =============================================================================
+// =============================================================================
+// HOTELS MANAGER  (with filter bar)
+// =============================================================================
+// The filter bar above the list lets the operator slice the inventory by:
+//   - Free-text search (matches name in EN/FR/AR, city, slug)
+//   - City (built dynamically from the hotels that exist right now)
+//   - Star rating (3 / 4 / 5)
+//   - Status (all / active / inactive)
+//   - Featured (toggle: show only featured)
+//   - Has rooms (toggle: show only hotels with at least one room)
+//
+// All filtering happens client-side over the array the admin endpoint
+// already returns in one shot — there is no per-filter API round-trip.
+// At 20-200 hotels the cost is negligible; if the catalog grows past a
+// few thousand, switching to a server-side `?city=&stars=&...` query
+// is the right move.
+//
+// Filter state persists in sessionStorage under the key NZAD_HOTEL_FILTERS
+// so a hard refresh during the same tab keeps the operator's place. It
+// does NOT persist across browser sessions — opening a fresh admin tab
+// always starts with everything visible.
+
+const FILTER_STORAGE_KEY = "NZAD_HOTEL_FILTERS";
+
+const BLANK_FILTERS = {
+  q: "",            // free-text search
+  city: "",         // exact match against h.city (the lowercase slug)
+  stars: 0,         // 0 = any; 3, 4, 5 = exact
+  status: "all",    // "all" | "active" | "inactive"
+  featured: false,  // true = only featured
+  hasRooms: false,  // true = only hotels with at least one room
+};
+
+function loadStoredFilters() {
+  if (typeof window === "undefined") return BLANK_FILTERS;
+  try {
+    const raw = sessionStorage.getItem(FILTER_STORAGE_KEY);
+    if (!raw) return BLANK_FILTERS;
+    const parsed = JSON.parse(raw);
+    // Defensive merge — if a future version adds a new filter key, old
+    // stored state shouldn't break the page; missing keys fall back to
+    // the blank default.
+    return { ...BLANK_FILTERS, ...parsed };
+  } catch {
+    return BLANK_FILTERS;
+  }
+}
+
 function HotelsManager() {
   const [hotels, setHotels] = useState(null);
   const [err, setErr] = useState("");
@@ -627,6 +675,13 @@ function HotelsManager() {
   // Track per-row "opening" state so the user gets feedback while we fetch the
   // detail endpoint (which carries the raw multilingual fields the editor needs).
   const [openingId, setOpeningId] = useState(null);
+
+  // Filter state — initialized from sessionStorage so a refresh keeps place.
+  const [filters, setFilters] = useState(loadStoredFilters);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try { sessionStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters)); } catch {}
+  }, [filters]);
 
   const load = useCallback(() => {
     setHotels(null);
@@ -655,6 +710,65 @@ function HotelsManager() {
     }
   }
 
+  // Cities dropdown options — built once per hotels-list change. Keyed by
+  // the lowercase `city` slug (matches the DB field used in the search URL).
+  // Display label is the most common cased form seen across the rows.
+  const cityOptions = useMemo(() => {
+    if (!hotels) return [];
+    const seen = new Map(); // key -> { label, count }
+    for (const h of hotels) {
+      const key = (h.city || "").toLowerCase().trim();
+      if (!key) continue;
+      // Prefer the partner's English label for display; fall back to capitalized slug.
+      const label = (h.cityEn && h.cityEn.trim()) || (key.charAt(0).toUpperCase() + key.slice(1));
+      const prev = seen.get(key);
+      if (prev) prev.count += 1;
+      else seen.set(key, { label, count: 1 });
+    }
+    return Array.from(seen.entries())
+      .map(([key, v]) => ({ key, label: v.label, count: v.count }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [hotels]);
+
+  // Apply filters → filteredHotels. Plain array reductions; no library.
+  const filteredHotels = useMemo(() => {
+    if (!hotels) return null;
+    const q = filters.q.trim().toLowerCase();
+    return hotels.filter((h) => {
+      // Free-text search across name, city, slug. Case-insensitive.
+      // Arabic and French are covered too because name is whatever the admin
+      // list endpoint returns for the current language (English by default).
+      if (q) {
+        const hay = [
+          h.name, h.nameEn, h.nameFr, h.nameAr,
+          h.city, h.cityEn, h.cityFr, h.cityAr,
+          h.slug,
+        ].filter(Boolean).join(" ").toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      if (filters.city && (h.city || "").toLowerCase() !== filters.city) return false;
+      if (filters.stars && h.stars !== filters.stars) return false;
+      if (filters.status === "active"   && !h.isActive) return false;
+      if (filters.status === "inactive" &&  h.isActive) return false;
+      if (filters.featured && !h.isFeatured) return false;
+      if (filters.hasRooms && !(h.rooms && h.rooms.length > 0)) return false;
+      return true;
+    });
+  }, [hotels, filters]);
+
+  // True when ANY filter is non-default. Used to show the "Clear filters" button
+  // and the "Showing X of Y" line only when relevant.
+  const filtersActive =
+    filters.q !== "" ||
+    filters.city !== "" ||
+    filters.stars !== 0 ||
+    filters.status !== "all" ||
+    filters.featured ||
+    filters.hasRooms;
+
+  function setFilter(patch) { setFilters((f) => ({ ...f, ...patch })); }
+  function clearFilters() { setFilters(BLANK_FILTERS); }
+
   if (editing) {
     return <HotelEditor hotel={editing === "new" ? null : editing}
       onClose={() => setEditing(null)}
@@ -670,36 +784,130 @@ function HotelsManager() {
       {!hotels && !err && <Loading />}
 
       {hotels && (
-        <div className="nzad-hotel-list">
-          {hotels.length === 0 && <div className="nzad-panel"><span className="nzad-empty-inline">No hotels yet. Click &quot;New hotel&quot; to add your first one.</span></div>}
-          {hotels.map((h) => (
-            <div className="nzad-hotel-row" key={h.id}>
-              <div className="nzad-hotel-thumb">
-                {h.primaryPhoto
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  ? <img src={h.primaryPhoto} alt={h.name} />
-                  : <div className="nzad-noimg">No photo</div>}
-              </div>
-              <div className="nzad-hotel-meta">
-                <div className="nzad-hotel-name">
-                  {h.name}
-                  {!h.isActive && <span className="nzad-tag-off">Inactive</span>}
-                  {h.isFeatured && <span className="nzad-tag-feat">Featured</span>}
-                </div>
-                <div className="nzad-hotel-sub">
-                  {"★".repeat(h.stars)} · {h.city} · {h.rooms?.length || 0} room types · from {fmt(h.priceFrom)}
-                </div>
-              </div>
-              <button
-                className="nzad-btn-ghost"
-                disabled={openingId === h.id}
-                onClick={() => openEditor(h)}
+        <>
+          {/* ===== FILTER BAR ===== */}
+          <div className="nzad-filter-bar">
+            <div className="nzad-filter-row">
+              <input
+                type="search"
+                className="nzad-filter-search"
+                placeholder="Search hotel name, city, slug…"
+                value={filters.q}
+                onChange={(e) => setFilter({ q: e.target.value })}
+              />
+
+              <select
+                className="nzad-filter-select"
+                value={filters.city}
+                onChange={(e) => setFilter({ city: e.target.value })}
+                aria-label="Filter by city"
               >
-                {openingId === h.id ? "Opening…" : "Manage"}
-              </button>
+                <option value="">All cities</option>
+                {cityOptions.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label} ({c.count})
+                  </option>
+                ))}
+              </select>
+
+              <select
+                className="nzad-filter-select"
+                value={filters.status}
+                onChange={(e) => setFilter({ status: e.target.value })}
+                aria-label="Filter by status"
+              >
+                <option value="all">All statuses</option>
+                <option value="active">Active only</option>
+                <option value="inactive">Inactive only</option>
+              </select>
             </div>
-          ))}
-        </div>
+
+            <div className="nzad-filter-row">
+              <div className="nzad-filter-pill-group" role="group" aria-label="Filter by stars">
+                <button
+                  className={`nzad-pill ${filters.stars === 0 ? "on" : ""}`}
+                  onClick={() => setFilter({ stars: 0 })}
+                >Any ★</button>
+                {[3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    className={`nzad-pill ${filters.stars === n ? "on" : ""}`}
+                    onClick={() => setFilter({ stars: filters.stars === n ? 0 : n })}
+                  >{n}★</button>
+                ))}
+              </div>
+
+              <button
+                className={`nzad-pill ${filters.featured ? "on" : ""}`}
+                onClick={() => setFilter({ featured: !filters.featured })}
+              >Featured only</button>
+
+              <button
+                className={`nzad-pill ${filters.hasRooms ? "on" : ""}`}
+                onClick={() => setFilter({ hasRooms: !filters.hasRooms })}
+                title="Hide hotels that have no rooms yet"
+              >Has rooms</button>
+
+              <div className="nzad-filter-spacer" />
+
+              {filtersActive && (
+                <button className="nzad-filter-clear" onClick={clearFilters}>
+                  Clear filters
+                </button>
+              )}
+            </div>
+
+            {filtersActive && (
+              <div className="nzad-filter-count">
+                Showing <strong>{filteredHotels.length}</strong> of {hotels.length} hotels
+              </div>
+            )}
+          </div>
+
+          {/* ===== HOTEL LIST ===== */}
+          <div className="nzad-hotel-list">
+            {hotels.length === 0 && (
+              <div className="nzad-panel">
+                <span className="nzad-empty-inline">No hotels yet. Click &quot;New hotel&quot; to add your first one.</span>
+              </div>
+            )}
+            {hotels.length > 0 && filteredHotels.length === 0 && (
+              <div className="nzad-panel">
+                <span className="nzad-empty-inline">
+                  No hotels match the current filters.{" "}
+                  <button className="nzad-link-btn" onClick={clearFilters}>Clear filters</button>
+                </span>
+              </div>
+            )}
+            {filteredHotels.map((h) => (
+              <div className="nzad-hotel-row" key={h.id}>
+                <div className="nzad-hotel-thumb">
+                  {h.primaryPhoto
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    ? <img src={h.primaryPhoto} alt={h.name} />
+                    : <div className="nzad-noimg">No photo</div>}
+                </div>
+                <div className="nzad-hotel-meta">
+                  <div className="nzad-hotel-name">
+                    {h.name}
+                    {!h.isActive && <span className="nzad-tag-off">Inactive</span>}
+                    {h.isFeatured && <span className="nzad-tag-feat">Featured</span>}
+                  </div>
+                  <div className="nzad-hotel-sub">
+                    {"★".repeat(h.stars)} · {h.city} · {h.rooms?.length || 0} room types · from {fmt(h.priceFrom)}
+                  </div>
+                </div>
+                <button
+                  className="nzad-btn-ghost"
+                  disabled={openingId === h.id}
+                  onClick={() => openEditor(h)}
+                >
+                  {openingId === h.id ? "Opening…" : "Manage"}
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       <style jsx>{`
@@ -717,6 +925,57 @@ function HotelsManager() {
         .nzad-tag-off { font-size: 10px; background: var(--gray-100); color: var(--gray-400); padding: 2px 7px; border-radius: 980px; font-weight: 700; }
         .nzad-tag-feat { font-size: 10px; background: var(--red-soft); color: var(--red-deep); padding: 2px 7px; border-radius: 980px; font-weight: 700; }
         .nzad-empty-inline { color: var(--gray-400); font-size: 13px; }
+        .nzad-link-btn { background: none; border: none; color: var(--red-deep); font-weight: 700; cursor: pointer; font-family: inherit; padding: 0; text-decoration: underline; }
+
+        /* ===== Filter bar ===== */
+        .nzad-filter-bar {
+          background: #fff; border: 1px solid var(--gray-200); border-radius: var(--r-md);
+          padding: 12px; margin-bottom: 16px;
+          display: flex; flex-direction: column; gap: 10px;
+        }
+        .nzad-filter-row {
+          display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+        }
+        .nzad-filter-search {
+          flex: 1; min-width: 200px;
+          padding: 9px 12px; border: 1.5px solid var(--gray-200); border-radius: var(--r-sm);
+          font-size: 14px; outline: none; font-family: inherit; background: #fff;
+          transition: border-color .15s;
+        }
+        .nzad-filter-search:focus { border-color: var(--ink); }
+        .nzad-filter-select {
+          padding: 9px 12px; border: 1.5px solid var(--gray-200); border-radius: var(--r-sm);
+          font-size: 14px; background: #fff; font-family: inherit; cursor: pointer;
+          min-width: 150px;
+        }
+        .nzad-filter-pill-group { display: flex; gap: 4px; padding: 2px; background: var(--gray-100); border-radius: var(--r-sm); }
+        .nzad-pill {
+          padding: 7px 12px; border: none; background: transparent; border-radius: 6px;
+          font-size: 12.5px; font-weight: 700; color: var(--gray-400); cursor: pointer;
+          font-family: inherit; transition: background .15s, color .15s;
+          white-space: nowrap;
+        }
+        .nzad-filter-pill-group .nzad-pill { padding: 6px 10px; }
+        .nzad-pill:hover { color: var(--ink); }
+        .nzad-pill.on { background: var(--ink); color: #fff; }
+        .nzad-filter-pill-group .nzad-pill.on { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+        .nzad-filter-spacer { flex: 1; }
+        .nzad-filter-clear {
+          padding: 7px 12px; background: transparent; border: 1px solid var(--gray-200);
+          border-radius: var(--r-sm); font-size: 12.5px; font-weight: 700;
+          color: var(--red-deep); cursor: pointer; font-family: inherit;
+        }
+        .nzad-filter-clear:hover { background: var(--red-soft); border-color: var(--red-soft); }
+        .nzad-filter-count {
+          font-size: 12px; color: var(--gray-400); padding-top: 4px;
+          border-top: 1px dashed var(--gray-200);
+        }
+        .nzad-filter-count strong { color: var(--ink); }
+
+        @media (max-width: 720px) {
+          .nzad-filter-search, .nzad-filter-select { width: 100%; flex: 1 1 100%; }
+          .nzad-filter-spacer { display: none; }
+        }
       `}</style>
     </div>
   );
