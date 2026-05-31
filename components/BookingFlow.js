@@ -702,7 +702,7 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
             <div className="bk-sum-prices">
               <div className="bk-sum-row">
                 <span>
-                  {roomsQty > 1 ? `${roomsQty} ${t("bk.rooms") || "rooms"} · ` : ""}
+                  {roomsQty > 1 ? `${roomsQty} ${(() => { const lbl = t("bk.rooms"); return lbl && lbl !== "bk.rooms" ? lbl : "rooms"; })()} · ` : ""}
                   {t("bk.room_x_nights")} {nights} {nightLabel}
                 </span>
                 <span>{formatPrice(subtotal)}</span>

@@ -14,6 +14,15 @@ export default function HotelDetail({ hotel }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rooms = hotel.rooms || [];
+  // How many units the guest is booking, carried from the search picker via
+  // ?rooms=N. Named roomsQty to avoid clashing with `rooms` (the hotel's room
+  // list above). Clamped 1..10. Drives the widget total so the preview here
+  // matches the booking page (which reads the same param).
+  const roomsQty = (() => {
+    const n = parseInt(searchParams.get("rooms") || "1", 10);
+    if (Number.isNaN(n)) return 1;
+    return Math.min(10, Math.max(1, n));
+  })();
   const { t } = useLang();
   const [selectedRoom, setSelectedRoom] = useState(rooms[0] || null);
   // pre-fill dates from the URL (carried over from the search bar)
@@ -116,7 +125,7 @@ export default function HotelDetail({ hotel }) {
     const d = Math.ceil((new Date(checkOut) - new Date(checkIn)) / 86400000);
     if (d > 0) nights = d;
   }
-  const subtotal = selectedRoom ? selectedRoom.price * nights : 0;
+  const subtotal = selectedRoom ? selectedRoom.price * nights * roomsQty : 0;
 
   function reserve() {
     if (!selectedRoom) return;
@@ -378,7 +387,9 @@ export default function HotelDetail({ hotel }) {
                   <div className="wr-label">{t("detail.selected_room")}</div>
                   <div className="wr-name display">{selectedRoom.type}</div>
                   <div className="wr-calc">
-                    <span>{formatPrice(selectedRoom.price)} × {nights} nights</span>
+                    <span>
+                      {roomsQty > 1 ? `${roomsQty} × ` : ""}{formatPrice(selectedRoom.price)} × {nights} {nights === 1 ? (t("detail.night") || "night") : (t("detail.nights") || "nights")}
+                    </span>
                     <span>{formatPrice(subtotal)}</span>
                   </div>
                 </div>
