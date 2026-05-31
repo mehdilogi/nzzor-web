@@ -1140,6 +1140,7 @@ function HotelEditor({ hotel, onClose, onSaved }) {
         <HotelMapPicker
           lat={form.latitude}
           lng={form.longitude}
+          address={[form.address, form.cityEn, "Algeria"].filter(Boolean).join(", ")}
           onChange={(la, lo) => setForm((f) => ({ ...f, latitude: la, longitude: lo }))}
         />
       </div>

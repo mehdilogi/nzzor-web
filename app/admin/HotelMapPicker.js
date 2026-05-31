@@ -47,9 +47,24 @@ function parsePair(str) {
   return [la, lo];
 }
 
-export default function HotelMapPicker({ lat, lng, onChange }) {
+export default function HotelMapPicker({ lat, lng, address = "", onChange }) {
   const [paste, setPaste] = useState("");
   const [pasteErr, setPasteErr] = useState("");
+
+  // Address-geocode state. `addr` seeds from the hotel's address prop but stays
+  // editable — the operator can refine it before searching. `geoStatus` drives
+  // the inline feedback (idle / searching / a found-place label / not-found).
+  const [addr, setAddr] = useState(address);
+  const [geoStatus, setGeoStatus] = useState("");
+  const [geoBusy, setGeoBusy] = useState(false);
+
+  // Keep the search box in sync if the hotel's address prop changes (e.g.
+  // switching which hotel is being edited) — but only when the operator hasn't
+  // already typed something different into it.
+  useEffect(() => {
+    setAddr(address);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address]);
 
   // Local text mirrors of the numeric coords, so typing a decimal like "36.7"
   // isn't fought by coercion. Synced from props only when the value actually
@@ -85,6 +100,47 @@ export default function HotelMapPicker({ lat, lng, onChange }) {
     pick(parsed[0], parsed[1]);
   };
 
+  // Geocode an address -> coordinates via OpenStreetMap's Nominatim (free, no
+  // key, same OSM family as our tiles). Biased to Algeria (countrycodes=dz) so
+  // a bare town name can't match abroad. This gets the pin ~90% there; the
+  // operator still confirms/drags, because rural Algerian addresses often
+  // resolve only to the town centre, not the exact building.
+  const geocode = async () => {
+    const q = addr.trim();
+    if (!q) {
+      setGeoStatus("Type an address first (it pre-fills from the Address field above).");
+      return;
+    }
+    setGeoBusy(true);
+    setGeoStatus("Searching…");
+    try {
+      const url =
+        "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=dz&q=" +
+        encodeURIComponent(q);
+      const res = await fetch(url, { headers: { "Accept-Language": "en" } });
+      if (!res.ok) throw new Error("geocode http " + res.status);
+      const results = await res.json();
+      if (!results || results.length === 0) {
+        setGeoStatus("No match in Algeria. Try a simpler address (street + town), or drop the pin by hand.");
+        return;
+      }
+      const hit = results[0];
+      const la = Number(hit.lat);
+      const lo = Number(hit.lon);
+      if (Number.isNaN(la) || Number.isNaN(lo)) {
+        setGeoStatus("Got an odd result — drop the pin by hand instead.");
+        return;
+      }
+      pick(la, lo);
+      const label = (hit.display_name || q).split(",").slice(0, 3).join(",");
+      setGeoStatus("Found: " + label + " — check the pin and drag it if it's off.");
+    } catch (e) {
+      setGeoStatus("Lookup failed (network or rate limit). Wait a moment, or drop the pin by hand.");
+    } finally {
+      setGeoBusy(false);
+    }
+  };
+
   return (
     <div className="nzad-mappick">
       <p className="nzad-mappick-help">
@@ -92,6 +148,31 @@ export default function HotelMapPicker({ lat, lng, onChange }) {
         coordinates from Google Maps. This is exactly where guests will see the
         hotel on its page — no map shows until a pin is set.
       </p>
+
+      <div className="nzad-mappick-geo">
+        <input
+          type="text"
+          className="nzad-mappick-geo-input"
+          value={addr}
+          placeholder="Type an address, then Find on map"
+          onChange={(e) => setAddr(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              geocode();
+            }
+          }}
+        />
+        <button
+          type="button"
+          className="nzad-mappick-geo-btn"
+          onClick={geocode}
+          disabled={geoBusy}
+        >
+          {geoBusy ? "Searching…" : "Find on map"}
+        </button>
+      </div>
+      {geoStatus && <div className="nzad-mappick-geo-status">{geoStatus}</div>}
 
       <div className="nzad-mappick-map">
         <MapInner lat={num(lat)} lng={num(lng)} onPick={pick} />
@@ -188,6 +269,49 @@ export default function HotelMapPicker({ lat, lng, onChange }) {
           color: var(--gray-400);
           line-height: 1.5;
           margin: 0;
+        }
+        .nzad-mappick-geo {
+          display: flex;
+          gap: 8px;
+        }
+        .nzad-mappick-geo-input {
+          flex: 1;
+          min-width: 0;
+          padding: 10px 13px;
+          border: 1.5px solid var(--gray-200);
+          border-radius: var(--r-sm);
+          font-size: 13px;
+          outline: none;
+          font-family: inherit;
+        }
+        .nzad-mappick-geo-input:focus {
+          border-color: var(--red);
+        }
+        .nzad-mappick-geo-btn {
+          padding: 10px 18px;
+          background: var(--red);
+          color: #fff;
+          border: none;
+          border-radius: var(--r-sm);
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          font-family: inherit;
+          flex-shrink: 0;
+          white-space: nowrap;
+        }
+        .nzad-mappick-geo-btn:hover:not(:disabled) {
+          background: var(--red-deep);
+        }
+        .nzad-mappick-geo-btn:disabled {
+          opacity: 0.6;
+          cursor: default;
+        }
+        .nzad-mappick-geo-status {
+          font-size: 12px;
+          color: var(--ink-2);
+          line-height: 1.5;
+          padding: 2px 2px 0;
         }
         .nzad-mappick-map {
           height: 320px;
