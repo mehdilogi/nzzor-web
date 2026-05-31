@@ -26,12 +26,14 @@ import "leaflet/dist/leaflet.css";
 
 const redPin = L.divIcon({
   className: "nz-pin",
+  // No CSS transform here. Leaflet positions the icon using iconSize +
+  // iconAnchor: the (14, 36) anchor is the bottom-centre of the 28x36 box —
+  // i.e. the teardrop tip — so it lands exactly on the lat/lng. A
+  // transform: translate(-50%,-100%) on top of that double-anchors the pin and
+  // makes it drift up-and-left by ~(14,28)px, which becomes hundreds of km at
+  // low zoom. line-height:0 kills the inline-SVG baseline gap.
   html: `
-    <div style="
-      width: 28px; height: 28px;
-      transform: translate(-50%, -100%);
-      position: relative;
-    ">
+    <div style="width: 28px; height: 36px; line-height: 0;">
       <svg width="28" height="36" viewBox="0 0 28 36" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M14 0C6.27 0 0 6.27 0 14c0 9.5 14 22 14 22s14-12.5 14-22c0-7.73-6.27-14-14-14z" fill="#E63946"/>
         <circle cx="14" cy="14" r="5.5" fill="#fff"/>
