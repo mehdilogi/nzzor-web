@@ -140,7 +140,11 @@ export default function HomeHero() {
                 onClick={() => setOpen(open === "city" ? null : "city")}
               >
                 <span className="nzs-label">{t("search.destination")}</span>
-                <span className={`nzs-value ${city ? "" : "ph"}`}>{city || t("search.destination_ph")}</span>
+                <span className={`nzs-value ${city ? "" : "ph"}`}>
+                  {city
+                    ? (MOCK_CITIES.find((w) => w.key === city)?.name || city)
+                    : t("search.destination_ph")}
+                </span>
               </button>
 
               <button
@@ -189,7 +193,7 @@ export default function HomeHero() {
                   // to the standard "no hotels yet" empty state.
                   const count = liveCounts[c.key] ?? c.hotelCount;
                   return (
-                    <button key={c.key} className="nzs-city" onClick={() => pickCity(c.name)}>
+                    <button key={c.key} className="nzs-city" onClick={() => pickCity(c.key)}>
                       <Icon name="pin" size={16} style={{ color: "var(--red)" }} />
                       <span>
                         <strong>{c.name}</strong>

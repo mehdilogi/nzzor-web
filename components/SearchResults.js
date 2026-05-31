@@ -38,7 +38,10 @@ export default function SearchResults({ initialHotels, cities, initialFilters })
     : null;
 
   function describeMatch(m) {
-    if (m.type === "city") return m.value;
+    // For cities, the parser stores the URL-safe key in `value` (e.g.
+    // "setif") and the human-readable name in `displayName` (e.g. "Sétif").
+    // The banner chip should always show the pretty name.
+    if (m.type === "city") return m.displayName || m.value;
     if (m.type === "price") return m.value === "cheap" ? t("ai.cheap") : t("ai.luxury");
     if (m.type === "stars") return `${m.value}${t("ai.stars_label")}`;
     if (m.type === "tag") return tagLabel(m.value);
