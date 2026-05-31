@@ -13,6 +13,7 @@ import {
   adminUsers, adminUserDetail,
 } from "../../lib/adminApi";
 import AnalyticsPanel from "./AnalyticsPanel";
+import HotelMapPicker from "./HotelMapPicker";
 
 const fmt = (n) => Number(n || 0).toLocaleString("en") + " DZD";
 
@@ -991,6 +992,7 @@ const BLANK_HOTEL = {
   cityEn: "", cityFr: "", cityAr: "",
   regionEn: "", regionFr: "", regionAr: "",
   address: "", contactEmail: "", contactPhone: "",
+  latitude: null, longitude: null,
   checkInTime: "14:00", checkOutTime: "12:00", cancellationHours: 48,
   childrenAllowed: true, petsAllowed: false, parkingFree: true,
   instantConfirmation: true, verifiedPartner: true,
@@ -1038,6 +1040,7 @@ function HotelEditor({ hotel, onClose, onSaved }) {
       cityEn: hotel.cityEn ?? "", cityFr: hotel.cityFr ?? "", cityAr: hotel.cityAr ?? "",
       regionEn: hotel.regionEn ?? "", regionFr: hotel.regionFr ?? "", regionAr: hotel.regionAr ?? "",
       address: hotel.address ?? "", contactEmail: hotel.contactEmail ?? "", contactPhone: hotel.contactPhone ?? "",
+      latitude: hotel.latitude ?? null, longitude: hotel.longitude ?? null,
       checkInTime: hotel.checkInTime ?? "14:00", checkOutTime: hotel.checkOutTime ?? "12:00",
       cancellationHours: hotel.cancellationHours ?? 48,
       childrenAllowed: hotel.childrenAllowed ?? true,
@@ -1063,6 +1066,8 @@ function HotelEditor({ hotel, onClose, onSaved }) {
         ...form,
         stars: Number(form.stars),
         cancellationHours: Number(form.cancellationHours),
+        latitude: form.latitude == null || form.latitude === "" || Number.isNaN(Number(form.latitude)) ? null : Number(form.latitude),
+        longitude: form.longitude == null || form.longitude === "" || Number.isNaN(Number(form.longitude)) ? null : Number(form.longitude),
       };
       if (isNew && !savedId) {
         const created = await adminCreateHotel(payload);
@@ -1128,6 +1133,15 @@ function HotelEditor({ hotel, onClose, onSaved }) {
           <Field label="Region (FR)" v={form.regionFr} onChange={(v) => set("regionFr", v)} />
           <Field label="Region (AR)" v={form.regionAr} onChange={(v) => set("regionAr", v)} rtl />
         </div>
+      </div>
+
+      <div className="nzad-panel">
+        <h3>Map location</h3>
+        <HotelMapPicker
+          lat={form.latitude}
+          lng={form.longitude}
+          onChange={(la, lo) => setForm((f) => ({ ...f, latitude: la, longitude: lo }))}
+        />
       </div>
 
       <div className="nzad-panel">
