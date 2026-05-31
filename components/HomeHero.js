@@ -12,7 +12,7 @@ import { parseQuery } from "../lib/nlSearch";
 // (no typing input, no auto-popping keyboard, just the structured picker).
 // The AI parser code stays in the build so flipping this back to true
 // restores the toggle without another deploy.
-const SHOW_AI_SEARCH = false;
+const SHOW_AI_SEARCH = true;
 
 // search bar steps: city -> dates -> guests, with auto-advance
 export default function HomeHero() {
