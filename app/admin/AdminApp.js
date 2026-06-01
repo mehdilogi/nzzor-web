@@ -6,6 +6,7 @@ import {
   adminHotels, adminHotel, adminBookings, adminBookingDetail, adminUpdateBookingStatus,
   adminCreateHotel, adminUpdateHotel, adminDeleteHotel,
   adminAddRoom, adminUpdateRoom, adminDeleteRoom,
+  adminGetBoardRates, adminSetBoardRates,
   adminAddPhoto, adminUploadPhoto, adminDeletePhoto, adminSetPrimaryPhoto,
   adminAddRoomPhoto, adminUploadRoomPhoto, adminDeleteRoomPhoto,
   adminHotelManagers, adminAddHotelManager, adminRemoveHotelManager, adminResetHotelManagerPassword,
@@ -1378,6 +1379,7 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
 // loaded before the editor refactor.
 function RoomCard({ room, onDelete, onRoomChange }) {
   const [showPhotos, setShowPhotos] = useState(false);
+  const [showBoards, setShowBoards] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(room);
   const [savingRoom, setSavingRoom] = useState(false);
@@ -1432,6 +1434,13 @@ function RoomCard({ room, onDelete, onRoomChange }) {
           >
             📷 Photos ({photoCount}) {showPhotos ? "▴" : "▾"}
           </button>
+          <button
+            className="nzad-btn-mini"
+            onClick={() => setShowBoards((s) => !s)}
+            title="Board & meal-plan rates for this room"
+          >
+            🍽 Boards {showBoards ? "▴" : "▾"}
+          </button>
           <button className="nzad-btn-mini" onClick={editing ? () => setEditing(false) : startEdit}>
             {editing ? "Close" : "Edit"}
           </button>
@@ -1457,6 +1466,11 @@ function RoomCard({ room, onDelete, onRoomChange }) {
             </button>
             <button className="nzad-btn-ghost" onClick={() => setEditing(false)}>Cancel</button>
           </div>
+        </div>
+      )}
+      {showBoards && (
+        <div className="nzad-room-boards-wrap">
+          <BoardRatesPanel room={room} />
         </div>
       )}
       {showPhotos && (
@@ -1505,10 +1519,156 @@ function RoomCard({ room, onDelete, onRoomChange }) {
           border-top: 1px solid var(--gray-100);
           background: white;
         }
+        .nzad-room-boards-wrap {
+          padding: 14px 14px 16px;
+          border-top: 1px solid var(--gray-100);
+          background: white;
+        }
         @media (max-width: 720px) {
           .nzad-room-head { flex-direction: column; align-items: stretch; }
           .nzad-room-actions { justify-content: flex-end; }
           .nzad-redit-grid { grid-template-columns: 1fr; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// =============================================================================
+// BOARD RATES — per-room meal-plan pricing (Phase B)
+// =============================================================================
+// Five fixed board rows. Each can hold a price or be left blank (= not offered
+// for this room). ROOM_ONLY defaults to the room's basePrice as a hint if no
+// explicit rate exists yet. Save sends the full set; blanks are removed.
+const BOARD_DEFS = [
+  { key: "ROOM_ONLY", label: "Room only", hint: "Chambre seule" },
+  { key: "BREAKFAST", label: "Breakfast (BB)", hint: "Petit Déjeuner" },
+  { key: "HALF_BOARD", label: "Half board (DP+)", hint: "Demi-pension" },
+  { key: "FULL_BOARD", label: "Full board (PC+)", hint: "Pension complète" },
+  { key: "ALL_INCLUSIVE", label: "All inclusive", hint: "Soft All Inclusive" },
+];
+
+function BoardRatesPanel({ room }) {
+  const [prices, setPrices] = useState(() =>
+    Object.fromEntries(BOARD_DEFS.map((b) => [b.key, ""]))
+  );
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    let live = true;
+    setLoading(true);
+    adminGetBoardRates(room.id)
+      .then((res) => {
+        if (!live) return;
+        // adminGetBoardRates returns the array directly (client unwraps .data).
+        const rows = Array.isArray(res) ? res : (res?.data || []);
+        const next = Object.fromEntries(BOARD_DEFS.map((b) => [b.key, ""]));
+        for (const r of rows) {
+          if (r.board in next) next[r.board] = String(r.price);
+        }
+        // Seed ROOM_ONLY from basePrice as a hint if nothing saved yet.
+        if (!next.ROOM_ONLY && room.basePrice != null) {
+          next.ROOM_ONLY = String(room.basePrice);
+        }
+        setPrices(next);
+      })
+      .catch((e) => live && setErr(e.message))
+      .finally(() => live && setLoading(false));
+    return () => { live = false; };
+  }, [room.id, room.basePrice]);
+
+  const setPrice = (key, v) => setPrices((p) => ({ ...p, [key]: v }));
+
+  async function save() {
+    setErr(""); setMsg(""); setSaving(true);
+    try {
+      const rates = BOARD_DEFS.map((b) => {
+        const raw = String(prices[b.key]).trim();
+        const price = raw === "" ? null : Number(raw);
+        return {
+          board: b.key,
+          price: price == null || Number.isNaN(price) ? null : price,
+          isActive: true,
+        };
+      });
+      await adminSetBoardRates(room.id, { rates });
+      setMsg("Board rates saved");
+      setTimeout(() => setMsg(""), 2500);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <div className="nzad-boards-loading">Loading board rates…</div>;
+
+  return (
+    <div className="nzad-boards">
+      <p className="nzad-boards-help">
+        Price each meal plan (DZD per room per night). Leave a row blank if this
+        room doesn&apos;t offer that board. These power the priced options guests
+        will see.
+      </p>
+      {err && <div className="nzad-boards-err">{err}</div>}
+      <div className="nzad-boards-grid">
+        {BOARD_DEFS.map((b) => (
+          <div className="nzad-board-row" key={b.key}>
+            <div className="nzad-board-label">
+              <strong>{b.label}</strong>
+              <em>{b.hint}</em>
+            </div>
+            <div className="nzad-board-input">
+              <input
+                type="number"
+                min="0"
+                step="1"
+                placeholder="—"
+                value={prices[b.key]}
+                onChange={(e) => setPrice(b.key, e.target.value)}
+              />
+              <span>DZD</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="nzad-boards-actions">
+        <button className="nzad-btn-primary" onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Save board rates"}
+        </button>
+        {msg && <span className="nzad-boards-msg">{msg}</span>}
+      </div>
+      <style jsx>{`
+        .nzad-boards { display: flex; flex-direction: column; gap: 12px; }
+        .nzad-boards-help { font-size: 12.5px; color: var(--gray-400); line-height: 1.5; margin: 0; }
+        .nzad-boards-loading { font-size: 13px; color: var(--gray-400); padding: 8px 0; }
+        .nzad-boards-err {
+          padding: 9px 12px; background: var(--red-soft); color: var(--red-deep);
+          border-radius: var(--r-sm); font-size: 12.5px; font-weight: 600;
+        }
+        .nzad-boards-grid { display: flex; flex-direction: column; gap: 8px; }
+        .nzad-board-row {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 12px; padding: 8px 0;
+        }
+        .nzad-board-row:not(:last-child) { border-bottom: 1px solid var(--gray-100); }
+        .nzad-board-label strong { font-size: 14px; color: var(--ink); display: block; }
+        .nzad-board-label em { font-size: 11.5px; color: var(--gray-400); font-style: normal; }
+        .nzad-board-input { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .nzad-board-input input {
+          width: 120px; padding: 8px 11px; border: 1.5px solid var(--gray-200);
+          border-radius: var(--r-sm); font-size: 13px; font-family: inherit; outline: none;
+          text-align: right;
+        }
+        .nzad-board-input input:focus { border-color: var(--red); }
+        .nzad-board-input span { font-size: 12px; font-weight: 700; color: var(--gray-400); }
+        .nzad-boards-actions { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+        .nzad-boards-msg { font-size: 12.5px; font-weight: 600; color: var(--teal, #1B8A5A); }
+        @media (max-width: 720px) {
+          .nzad-board-input input { width: 96px; }
         }
       `}</style>
     </div>
