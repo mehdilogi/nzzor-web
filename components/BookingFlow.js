@@ -31,12 +31,24 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
   // would). Defaults to 1, clamped to 1..10 so a tampered URL can't request
   // 9999 units. The availability guard re-checks units server-side regardless.
   const [roomsQty, setRoomsQty] = useState(1);
+  // The chosen meal plan, carried from the hotel page via ?board=. Passed to
+  // the booking payload; the API prices it server-side. null = room-only.
+  const [board, setBoard] = useState(null);
+  // Board's per-night price carried from the hotel page (?bp=). When present,
+  // the displayed total uses it so the booking summary matches what the API
+  // will charge for the chosen board (the API re-derives it server-side too).
+  const [boardPrice, setBoardPrice] = useState(null);
   useEffect(() => {
     try {
-      const n = parseInt(new URLSearchParams(window.location.search).get("rooms") || "1", 10);
+      const sp = new URLSearchParams(window.location.search);
+      const n = parseInt(sp.get("rooms") || "1", 10);
       if (!Number.isNaN(n)) setRoomsQty(Math.min(10, Math.max(1, n)));
+      const b = sp.get("board");
+      if (b) setBoard(b);
+      const bp = parseInt(sp.get("bp") || "", 10);
+      if (!Number.isNaN(bp) && bp > 0) setBoardPrice(bp);
     } catch {
-      /* SSR / no window — keep default 1 */
+      /* SSR / no window — keep defaults */
     }
   }, []);
 
@@ -151,7 +163,8 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
   }
 
   // ---- pricing -------------------------------------------------------------
-  const subtotal = room.price * nights * roomsQty;
+  const perNight = boardPrice || room.price;
+  const subtotal = perNight * nights * roomsQty;
   const discount = coupon ? couponDiscount(coupon, subtotal) : 0;
   const total = subtotal - discount;
 
@@ -227,7 +240,7 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
     // payload shaped exactly as the backend's bookings route expects
     const payload = {
       hotelId: hotel.id,
-      rooms: [{ roomId: room.id, quantity: roomsQty }],
+      rooms: [{ roomId: room.id, quantity: roomsQty, ...(board ? { board } : {}) }],
       checkIn,
       checkOut,
       guest: {

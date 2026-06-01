@@ -10,6 +10,30 @@ import { formatPrice, formatPriceShort } from "../lib/format";
 import { useLang } from "../lib/LangContext";
 import { todayInAlgiers, validateBookingDates, localizeDateError } from "../lib/dates";
 
+// Group flat quote options (one per room×board) into one entry per room type,
+// each carrying its board rows. Preserves the quote's price sort.
+function groupOptionsByRoom(options) {
+  const byRoom = new Map();
+  for (const o of options) {
+    if (!byRoom.has(o.roomId)) {
+      byRoom.set(o.roomId, {
+        roomId: o.roomId,
+        roomType: o.roomType,
+        availability: o.availability,
+        boards: [],
+      });
+    }
+    byRoom.get(o.roomId).boards.push(o);
+  }
+  return Array.from(byRoom.values());
+}
+
+// Pick a localized string from an {en,fr,ar} object, falling back to en.
+function localized(obj, lang) {
+  if (!obj) return "";
+  return obj[lang] || obj.en || obj.fr || "";
+}
+
 export default function HotelDetail({ hotel }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -23,12 +47,63 @@ export default function HotelDetail({ hotel }) {
     if (Number.isNaN(n)) return 1;
     return Math.min(10, Math.max(1, n));
   })();
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const [selectedRoom, setSelectedRoom] = useState(rooms[0] || null);
+  // The chosen board for the selected room (e.g. "HALF_BOARD"). Drives the
+  // price and is carried to the booking page. null until a board row is picked.
+  const [selectedBoard, setSelectedBoard] = useState(null);
   // pre-fill dates from the URL (carried over from the search bar)
   const [checkIn, setCheckIn] = useState(searchParams.get("checkIn") || "");
   const [checkOut, setCheckOut] = useState(searchParams.get("checkOut") || "");
   const [lightboxIndex, setLightboxIndex] = useState(null);
+
+  // ---- Quote-driven pricing (Phase C2) ------------------------------------
+  // When dates are set we fetch /api/quote to get live priced options per
+  // room type × board, with Disponible/Sur demande availability. Before dates
+  // are picked we show the static room list (so the page is never empty).
+  const [quote, setQuote] = useState(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+
+  // Per-room occupancy carried from search (?occ=2-0_2-1) or derived from
+  // ?rooms/?adults/?children. Used as the quote's occupancy input.
+  const occupancy = (() => {
+    const occ = searchParams.get("occ");
+    if (occ) {
+      const parsed = occ.split("_").map((r) => {
+        const [a, c] = r.split("-").map((n) => parseInt(n, 10));
+        return { adults: a || 1, children: c || 0 };
+      });
+      if (parsed.length) return parsed;
+    }
+    const adults = parseInt(searchParams.get("adults") || "2", 10) || 2;
+    const children = parseInt(searchParams.get("children") || "0", 10) || 0;
+    const n = Math.min(10, Math.max(1, parseInt(searchParams.get("rooms") || "1", 10) || 1));
+    // Spread total adults/children across N rooms isn't known per-room here, so
+    // approximate: each room gets the per-room figures the search implied. The
+    // quote prices the same room type × N, so we just need per-room heads.
+    const perRoomAdults = Math.max(1, Math.round(adults / n));
+    const perRoomChildren = Math.round(children / n);
+    return Array.from({ length: n }, () => ({ adults: perRoomAdults, children: perRoomChildren }));
+  })();
+
+  useEffect(() => {
+    if (!checkIn || !checkOut) { setQuote(null); return; }
+    if (validateBookingDates(checkIn, checkOut)) { setQuote(null); return; }
+    let live = true;
+    setQuoteLoading(true);
+    const API = process.env.NEXT_PUBLIC_API_URL || "";
+    fetch(`${API}/api/quote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hotelSlug: hotel.slug, checkIn, checkOut, occupancy }),
+    })
+      .then((r) => r.json())
+      .then((j) => { if (live) setQuote(j.data || null); })
+      .catch(() => { if (live) setQuote(null); })
+      .finally(() => { if (live) setQuoteLoading(false); });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkIn, checkOut, hotel.slug]);
 
   // ---- Date validation for the inline booking widget ----------------------
   // The widget uses native <input type="date"> elements. Native inputs honor
@@ -125,7 +200,20 @@ export default function HotelDetail({ hotel }) {
     const d = Math.ceil((new Date(checkOut) - new Date(checkIn)) / 86400000);
     if (d > 0) nights = d;
   }
-  const subtotal = selectedRoom ? selectedRoom.price * nights * roomsQty : 0;
+  // The chosen quote option (room + board), if a board row was picked and a
+  // quote is loaded. Its `total` already accounts for nights × rooms × board.
+  const chosenOption = (() => {
+    if (!quote || !selectedRoom || !selectedBoard) return null;
+    return (quote.options || []).find(
+      (o) => o.roomId === selectedRoom.id && o.board === selectedBoard
+    ) || null;
+  })();
+
+  // Widget subtotal: prefer the board-aware quote total; fall back to the
+  // static room price × nights × rooms when no board/quote is in play.
+  const subtotal = chosenOption
+    ? chosenOption.total
+    : (selectedRoom ? selectedRoom.price * nights * roomsQty : 0);
 
   function reserve() {
     if (!selectedRoom) return;
@@ -141,6 +229,8 @@ export default function HotelDetail({ hotel }) {
       room: selectedRoom.id,
       nights: String(nights),
     });
+    if (selectedBoard) params.set("board", selectedBoard);
+    if (chosenOption) params.set("bp", String(chosenOption.pricePerNightPerRoom));
     params.set("checkIn", checkIn);
     params.set("checkOut", checkOut);
     // Forward the occupancy the guest chose in the search picker so the
@@ -260,43 +350,105 @@ export default function HotelDetail({ hotel }) {
           {/* rooms */}
           <section id="rooms" className="nz-dsection">
             <h2 className="display">{t("detail.choose_room")}</h2>
-            <div className="nz-rooms">
-              {rooms.map((r) => {
-                const selected = selectedRoom?.id === r.id;
-                return (
-                  <div className={`nz-room ${selected ? "selected" : ""}`} key={r.id}>
-                    <div className="nz-room-photo">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={r.photos?.[0]} alt={r.type} loading="lazy" />
-                    </div>
-                    <div className="nz-room-info">
-                      <h3 className="display">{r.type}</h3>
-                      <div className="nz-room-specs">
-                        <span><Icon name="guest" size={15} /> {r.capacity} {t("detail.guests")}</span>
-                        {r.sizeSqm && <span><Icon name="size" size={15} /> {r.sizeSqm} m²</span>}
-                        <span><Icon name="bed" size={15} /> {r.bedType}</span>
+
+            {/* Quote-driven grid: shown once dates are set and a quote loaded.
+                Before that (no dates), fall back to the static room list so the
+                page is never empty. */}
+            {quoteLoading && (
+              <div className="nz-quote-loading">{t("detail.loading_rates") || "Loading rates…"}</div>
+            )}
+
+            {!quoteLoading && quote && quote.options && quote.options.length > 0 ? (
+              <div className="nz-rooms">
+                {groupOptionsByRoom(quote.options).map((group) => {
+                  const isSel = selectedRoom?.id === group.roomId;
+                  const staticRoom = rooms.find((r) => r.id === group.roomId);
+                  return (
+                    <div className={`nz-room nz-room-q ${isSel ? "selected" : ""}`} key={group.roomId}>
+                      <div className="nz-room-photo">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={staticRoom?.photos?.[0]} alt={localized(group.roomType, lang)} loading="lazy" />
                       </div>
-                      <div className="nz-room-perks">
-                        <span><Icon name="check" size={13} strokeWidth={2.5} /> {t("detail.free_cancel")}</span>
-                        <span><Icon name="check" size={13} strokeWidth={2.5} /> {t("detail.breakfast")}</span>
+                      <div className="nz-room-qbody">
+                        <div className="nz-room-qhead">
+                          <h3 className="display">{localized(group.roomType, lang)}</h3>
+                          <span className={`nz-avail ${group.availability === "AVAILABLE" ? "ok" : "req"}`}>
+                            {group.availability === "AVAILABLE"
+                              ? (t("detail.available") || "Available")
+                              : (t("detail.on_request") || "On request")}
+                          </span>
+                        </div>
+                        <div className="nz-board-rows">
+                          {group.boards.map((opt) => {
+                            const chosen = isSel && selectedBoard === opt.board;
+                            return (
+                              <button
+                                type="button"
+                                key={opt.board}
+                                className={`nz-board-row ${chosen ? "chosen" : ""}`}
+                                onClick={() => { setSelectedRoom(staticRoom || null); setSelectedBoard(opt.board); }}
+                              >
+                                <span className="nz-board-name">
+                                  {localized(opt.boardLabel, lang)}
+                                  {opt.bestPrice && <span className="nz-best">{t("detail.best_price") || "Best price"}</span>}
+                                </span>
+                                <span className="nz-board-price">
+                                  <span className="amt display">{formatPrice(opt.total)}</span>
+                                  <span className="per">{t("detail.total_stay") || "total"}</span>
+                                </span>
+                                <span className={`nz-board-radio ${chosen ? "on" : ""}`} aria-hidden="true" />
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
-                    <div className="nz-room-action">
-                      <div className="nz-room-price">
-                        <span className="amt display">{formatPriceShort(r.price)}</span>
-                        <span className="unit">{t("detail.per_night")}</span>
+                  );
+                })}
+              </div>
+            ) : (
+              !quoteLoading && (
+                <div className="nz-rooms">
+                  {rooms.map((r) => {
+                    const selected = selectedRoom?.id === r.id;
+                    return (
+                      <div className={`nz-room ${selected ? "selected" : ""}`} key={r.id}>
+                        <div className="nz-room-photo">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={r.photos?.[0]} alt={r.type} loading="lazy" />
+                        </div>
+                        <div className="nz-room-info">
+                          <h3 className="display">{r.type}</h3>
+                          <div className="nz-room-specs">
+                            <span><Icon name="guest" size={15} /> {r.capacity} {t("detail.guests")}</span>
+                            {r.sizeSqm && <span><Icon name="size" size={15} /> {r.sizeSqm} m²</span>}
+                            <span><Icon name="bed" size={15} /> {r.bedType}</span>
+                          </div>
+                          <div className="nz-room-perks">
+                            <span><Icon name="check" size={13} strokeWidth={2.5} /> {t("detail.free_cancel")}</span>
+                          </div>
+                        </div>
+                        <div className="nz-room-action">
+                          <div className="nz-room-price">
+                            <span className="amt display">{formatPriceShort(r.price)}</span>
+                            <span className="unit">{t("detail.per_night")}</span>
+                          </div>
+                          <button
+                            className={`nz-room-btn ${selected ? "sel" : ""}`}
+                            onClick={() => setSelectedRoom(r)}
+                          >
+                            {selected ? t("detail.selected") + " ✓" : t("detail.select")}
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        className={`nz-room-btn ${selected ? "sel" : ""}`}
-                        onClick={() => setSelectedRoom(r)}
-                      >
-                        {selected ? t("detail.selected") + " ✓" : t("detail.select")}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                  {!checkIn || !checkOut ? (
+                    <p className="nz-rooms-hint">{t("detail.pick_dates_for_rates") || "Choose your dates to see live prices and meal-plan options."}</p>
+                  ) : null}
+                </div>
+              )
+            )}
           </section>
 
           {/* amenities */}
@@ -581,6 +733,38 @@ function DetailStyles() {
       .nz-about { font-size: 15.5px; line-height: 1.75; color: var(--ink-2); }
 
       .nz-rooms { display: flex; flex-direction: column; gap: 16px; }
+      .nz-rooms-hint { font-size: 13.5px; color: var(--gray-400); margin-top: 4px; }
+      .nz-quote-loading { font-size: 14px; color: var(--gray-400); padding: 20px 0; }
+      /* quote-driven room card: photo + body with board rows */
+      .nz-room-q { display: flex; gap: 0; align-items: stretch; overflow: hidden; }
+      .nz-room-q .nz-room-photo { width: 220px; flex-shrink: 0; }
+      .nz-room-qbody { flex: 1; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+      .nz-room-qhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+      .nz-room-qhead h3 { font-size: 19px; }
+      .nz-avail { font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 980px; white-space: nowrap; }
+      .nz-avail.ok { background: rgba(27,138,90,0.12); color: #1B8A5A; }
+      .nz-avail.req { background: rgba(230,57,70,0.10); color: var(--red-deep); }
+      .nz-board-rows { display: flex; flex-direction: column; gap: 8px; }
+      .nz-board-row {
+        display: flex; align-items: center; gap: 12px; width: 100%;
+        padding: 12px 14px; border: 1.5px solid var(--gray-200); border-radius: var(--r-md);
+        background: var(--white); cursor: pointer; transition: border-color .15s, background .15s;
+        text-align: start;
+      }
+      .nz-board-row:hover { border-color: var(--gray-300); }
+      .nz-board-row.chosen { border-color: var(--red); background: var(--red-soft); }
+      .nz-board-name { flex: 1; font-size: 14.5px; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 8px; min-width: 0; }
+      .nz-best { font-size: 10.5px; font-weight: 800; color: #fff; background: var(--red); padding: 2px 8px; border-radius: 980px; white-space: nowrap; }
+      .nz-board-price { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; }
+      .nz-board-price .amt { font-size: 17px; font-weight: 600; color: var(--ink); }
+      .nz-board-price .per { font-size: 11px; color: var(--gray-400); font-weight: 600; }
+      .nz-board-radio { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--gray-300); flex-shrink: 0; position: relative; }
+      .nz-board-radio.on { border-color: var(--red); }
+      .nz-board-radio.on::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--red); }
+      @media (max-width: 640px) {
+        .nz-room-q { flex-direction: column; }
+        .nz-room-q .nz-room-photo { width: 100%; height: 180px; }
+      }
       .nz-room {
         display: grid; grid-template-columns: 200px 1fr auto; gap: 22px; align-items: center;
         padding: 18px; border: 1.5px solid var(--gray-200); border-radius: var(--r-lg);
