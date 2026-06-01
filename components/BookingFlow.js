@@ -20,37 +20,36 @@ import { createBooking } from "../lib/api";
 import { validateBookingDates, localizeDateError } from "../lib/dates";
 import { setUserToken } from "../lib/accountApi";
 
-export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) {
+// Human label for a board code, using the i18n dictionary when present and a
+// clean English fallback otherwise. null/ROOM_ONLY -> "Room only".
+function boardLabel(board, t) {
+  if (!board || board === "ROOM_ONLY") return t("board.room_only") !== "board.room_only" ? t("board.room_only") : "Room only";
+  const map = {
+    BREAKFAST: ["board.breakfast", "Breakfast"],
+    HALF_BOARD: ["board.half", "Half board"],
+    FULL_BOARD: ["board.full", "Full board"],
+    ALL_INCLUSIVE: ["board.all_inclusive", "All inclusive"],
+  };
+  const [key, fallback] = map[board] || [null, board];
+  if (!key) return fallback;
+  const v = t(key);
+  return v && v !== key ? v : fallback;
+}
+
+export default function BookingFlow({ hotel, selections, nights, checkIn, checkOut }) {
   const { t } = useLang();
   const router = useRouter();
   const { user, refresh: refreshAuth } = useAuth();
 
-  // How many units of this room to book, carried from the search picker via
-  // ?rooms=N. Read from the URL on mount in an effect (client-only, so it does
-  // NOT force a <Suspense> boundary the way next/navigation useSearchParams
-  // would). Defaults to 1, clamped to 1..10 so a tampered URL can't request
-  // 9999 units. The availability guard re-checks units server-side regardless.
-  const [roomsQty, setRoomsQty] = useState(1);
-  // The chosen meal plan, carried from the hotel page via ?board=. Passed to
-  // the booking payload; the API prices it server-side. null = room-only.
-  const [board, setBoard] = useState(null);
-  // Board's per-night price carried from the hotel page (?bp=). When present,
-  // the displayed total uses it so the booking summary matches what the API
-  // will charge for the chosen board (the API re-derives it server-side too).
-  const [boardPrice, setBoardPrice] = useState(null);
-  useEffect(() => {
-    try {
-      const sp = new URLSearchParams(window.location.search);
-      const n = parseInt(sp.get("rooms") || "1", 10);
-      if (!Number.isNaN(n)) setRoomsQty(Math.min(10, Math.max(1, n)));
-      const b = sp.get("board");
-      if (b) setBoard(b);
-      const bp = parseInt(sp.get("bp") || "", 10);
-      if (!Number.isNaN(bp) && bp > 0) setBoardPrice(bp);
-    } catch {
-      /* SSR / no window — keep defaults */
-    }
-  }, []);
+  // Multi-room model: `selections` is an array of { room, board, pricePerNight }
+  // — one entry per booked room, room types and boards may differ (mixed
+  // bookings). Everything downstream sums across this list. We keep a
+  // representative `room` (the first selection's room) for the few places that
+  // still show a single hero image/name (e.g. the empty-state link and the
+  // confirmation hero), but PRICING and the payload use the full list.
+  const sels = Array.isArray(selections) ? selections : [];
+  const room = sels[0]?.room || null;
+  const roomsQty = sels.length; // number of booked rooms (each entry = 1 room)
 
   const [step, setStep] = useState(1);
 
@@ -163,8 +162,8 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
   }
 
   // ---- pricing -------------------------------------------------------------
-  const perNight = boardPrice || room.price;
-  const subtotal = perNight * nights * roomsQty;
+  // Sum each selected room's price (board-aware pricePerNight × nights).
+  const subtotal = sels.reduce((sum, s) => sum + (s.pricePerNight || s.room.price) * nights, 0);
   const discount = coupon ? couponDiscount(coupon, subtotal) : 0;
   const total = subtotal - discount;
 
@@ -240,7 +239,11 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
     // payload shaped exactly as the backend's bookings route expects
     const payload = {
       hotelId: hotel.id,
-      rooms: [{ roomId: room.id, quantity: roomsQty, ...(board ? { board } : {}) }],
+      rooms: sels.map((s) => ({
+        roomId: s.room.id,
+        quantity: 1,
+        ...(s.board ? { board: s.board } : {}),
+      })),
       checkIn,
       checkOut,
       guest: {
@@ -697,8 +700,21 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
               <img src={room.photos?.[0] || hotel.primaryPhoto} alt={hotel.name} />
               <div>
                 <strong>{hotel.name}</strong>
-                <span>{room.type}</span>
+                <span>{sels.length} {sels.length === 1 ? (t("bk.room") || "room") : (t("bk.rooms") !== "bk.rooms" ? t("bk.rooms") : "rooms")}</span>
               </div>
+            </div>
+
+            {/* Per-room breakdown — each selected room with its board + price */}
+            <div className="bk-sum-rooms">
+              {sels.map((s, i) => (
+                <div className="bk-sum-roomrow" key={i}>
+                  <div className="bk-sum-roominfo">
+                    <strong>{s.room.type}</strong>
+                    <span>{boardLabel(s.board, t)}</span>
+                  </div>
+                  <span className="bk-sum-roomprice">{formatPrice((s.pricePerNight || s.room.price) * nights)}</span>
+                </div>
+              ))}
             </div>
 
             <div className="bk-sum-trip">
@@ -715,8 +731,7 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
             <div className="bk-sum-prices">
               <div className="bk-sum-row">
                 <span>
-                  {roomsQty > 1 ? `${roomsQty} ${(() => { const lbl = t("bk.rooms"); return lbl && lbl !== "bk.rooms" ? lbl : "rooms"; })()} · ` : ""}
-                  {t("bk.room_x_nights")} {nights} {nightLabel}
+                  {sels.length} {sels.length === 1 ? (t("bk.room") || "room") : (t("bk.rooms") !== "bk.rooms" ? t("bk.rooms") : "rooms")} · {nights} {nightLabel}
                 </span>
                 <span>{formatPrice(subtotal)}</span>
               </div>
@@ -1217,6 +1232,12 @@ export default function BookingFlow({ hotel, room, nights, checkIn, checkOut }) 
         .bk-sum-hotel div { display: flex; flex-direction: column; gap: 3px; justify-content: center; }
         .bk-sum-hotel strong { font-size: 14.5px; font-weight: 700; color: var(--ink); line-height: 1.3; }
         .bk-sum-hotel span { font-size: 13px; color: var(--gray-400); }
+        .bk-sum-rooms { padding: 14px 0; border-bottom: 1px solid var(--gray-100); display: flex; flex-direction: column; gap: 10px; }
+        .bk-sum-roomrow { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+        .bk-sum-roominfo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+        .bk-sum-roominfo strong { font-size: 13.5px; font-weight: 700; color: var(--ink); line-height: 1.3; }
+        .bk-sum-roominfo span { font-size: 12px; color: var(--gray-400); }
+        .bk-sum-roomprice { font-size: 13.5px; font-weight: 700; color: var(--ink); white-space: nowrap; flex-shrink: 0; }
         .bk-sum-trip { padding: 16px 0; border-bottom: 1px solid var(--gray-100); display: flex; flex-direction: column; gap: 9px; }
         .bk-sum-prices { padding-top: 16px; display: flex; flex-direction: column; gap: 9px; }
         .bk-sum-row { display: flex; justify-content: space-between; font-size: 13.5px; color: var(--ink-2); }
