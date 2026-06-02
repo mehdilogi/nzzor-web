@@ -1575,22 +1575,19 @@ function BoardRatesPanel({ room }) {
       .then((res) => {
         if (!live) return;
         const rows = Array.isArray(res) ? res : (res?.data || []);
-        // Stored values are ABSOLUTE. Derive base from ROOM_ONLY (or basePrice),
-        // then each supplement = storedAbsolute - base.
+        // The API now returns `supplement` directly. Base is the room's price.
         const byBoard = {};
-        for (const r of rows) byBoard[r.board] = Number(r.price);
-        const baseVal = byBoard.ROOM_ONLY != null
-          ? byBoard.ROOM_ONLY
-          : (room.basePrice != null ? room.basePrice : 0);
-        setBase(String(baseVal));
+        for (const r of rows) byBoard[r.board] = r;
+        setBase(room.basePrice != null ? String(room.basePrice) : "0");
 
         const nextSupps = {};
         const nextOffered = Object.fromEntries(BOARD_DEFS.map((b) => [b.key, false]));
         nextOffered.ROOM_ONLY = true; // room-only is always offered
         for (const b of BOARD_DEFS) {
           if (b.key === "ROOM_ONLY") continue;
-          if (byBoard[b.key] != null) {
-            nextSupps[b.key] = String(Math.max(0, byBoard[b.key] - baseVal));
+          const row = byBoard[b.key];
+          if (row && row.isActive) {
+            nextSupps[b.key] = String(Math.max(0, Number(row.supplement) || 0));
             nextOffered[b.key] = true;
           } else {
             nextSupps[b.key] = "";
@@ -1619,16 +1616,17 @@ function BoardRatesPanel({ room }) {
   async function save() {
     setErr(""); setMsg(""); setSaving(true);
     try {
-      // Send ABSOLUTE prices (base + supplement) for offered boards; null for
-      // boards not offered. ROOM_ONLY is always sent as the base.
+      // Send the SUPPLEMENT for each board (DZD added to the room's base).
+      // null = not offered. ROOM_ONLY supplement is always 0. The engine adds
+      // the base, so what the guest sees = base + supplement.
       const rates = BOARD_DEFS.map((b) => {
         if (b.key === "ROOM_ONLY") {
-          return { board: b.key, price: baseNum > 0 ? baseNum : null, isActive: true };
+          return { board: b.key, supplement: 0, isActive: true };
         }
         const isOffered = !!offered[b.key];
         return {
           board: b.key,
-          price: isOffered && baseNum > 0 ? baseNum + suppNum(b.key) : null,
+          supplement: isOffered ? suppNum(b.key) : null,
           isActive: true,
         };
       });
@@ -1647,21 +1645,17 @@ function BoardRatesPanel({ room }) {
   return (
     <div className="nzad-boards">
       <p className="nzad-boards-help">
-        Set the room&apos;s base price (Room only), then add a supplement for each
-        meal plan. The guest sees the full price (base + supplement). Untick a
-        meal plan if this room doesn&apos;t offer it.
+        The base price (Room only) comes from the room&apos;s &quot;Price / night&quot;
+        above. Add a supplement for each meal plan — the guest sees the full
+        price (base + supplement). Untick a meal plan this room doesn&apos;t offer.
       </p>
       {err && <div className="nzad-boards-err">{err}</div>}
 
-      {/* Base price row */}
+      {/* Base price row — read-only, mirrors the room's basePrice */}
       <div className="nzad-board-base">
-        <div className="nzad-board-label"><strong>Base price (Room only)</strong><em>Chambre seule · per room / night</em></div>
+        <div className="nzad-board-label"><strong>Base price (Room only)</strong><em>Chambre seule · from the room&apos;s price / night</em></div>
         <div className="nzad-board-input">
-          <input
-            type="number" min="0" step="1" placeholder="0"
-            value={base}
-            onChange={(e) => setBase(e.target.value)}
-          />
+          <input type="number" value={base} readOnly disabled />
           <span>DZD</span>
         </div>
       </div>

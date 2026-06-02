@@ -454,9 +454,7 @@ export default function HotelDetail({ hotel }) {
                                   </span>
                                 </div>
                                 <button className="nz-rate-btn" onClick={() => addToCart(grp.roomId, opt.board)}>
-                                  {onReq
-                                    ? (t("detail.request") !== "detail.request" ? t("detail.request") : "Request")
-                                    : (t("detail.select") !== "detail.select" ? t("detail.select") : "Select")}
+                                  {t("detail.select") !== "detail.select" ? t("detail.select") : "Select"}
                                 </button>
                               </div>
                             </div>
@@ -498,9 +496,7 @@ export default function HotelDetail({ hotel }) {
                       </div>
                     )}
                     <button className="nz-cart-cta" onClick={reserve} disabled={!canReserve}>
-                      {cartOptions.some((o) => o.availability !== "AVAILABLE")
-                        ? (t("detail.request_to_book") !== "detail.request_to_book" ? t("detail.request_to_book") : "Request to book")
-                        : (t("detail.book_now") !== "detail.book_now" ? t("detail.book_now") : "Book now")}
+                      {t("detail.book_now") !== "detail.book_now" ? t("detail.book_now") : "Book now"}
                     </button>
                   </div>
                 </div>
@@ -836,8 +832,15 @@ function DetailStyles() {
       .nz-rooms { display: flex; flex-direction: column; gap: 16px; }
       .nz-rooms-hint { font-size: 13.5px; color: var(--gray-400); margin-top: 12px; }
       .nz-quote-loading { font-size: 14px; color: var(--gray-400); padding: 20px 0; }
-      .nz-opts { display: flex; flex-direction: column; gap: 20px; }
-      .nz-opts-head { display: flex; flex-direction: column; gap: 10px; }
+      .nz-opts {
+        display: flex; flex-direction: column;
+        border: 1px solid var(--gray-200); border-radius: var(--r-lg, 14px);
+        background: var(--white); overflow: hidden;
+      }
+      .nz-opts-head {
+        display: flex; flex-direction: column; gap: 12px;
+        padding: 18px 20px; border-bottom: 1px solid var(--gray-100);
+      }
       .nz-opts-sub { font-size: 13.5px; color: var(--gray-500); font-weight: 600; }
       .nz-opts-chips { display: flex; flex-wrap: wrap; gap: 8px; }
       .nz-chip {
@@ -851,7 +854,7 @@ function DetailStyles() {
       .nz-avail.ok { background: rgba(27,138,90,0.12); color: #1B8A5A; }
       .nz-avail.req { background: rgba(230,57,70,0.10); color: var(--red-deep, #A32D2D); }
 
-      .nz-rblock { display: flex; gap: 16px; align-items: flex-start; }
+      .nz-rblock { display: flex; gap: 18px; align-items: flex-start; padding: 20px; border-bottom: 1px solid var(--gray-100); }
       .nz-rcard {
         flex: 0 0 180px; width: 180px; align-self: stretch;
         display: flex; flex-direction: column; gap: 6px;
@@ -891,9 +894,10 @@ function DetailStyles() {
       }
       .nz-rate-btn:hover { opacity: .88; }
 
+      .nz-rblock:last-of-type { border-bottom: none; }
       .nz-cart {
-        border: 1px solid var(--gray-200); border-radius: var(--r-md); padding: 16px 18px; background: var(--cream, #FAF8F4);
-        display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin-top: 4px;
+        padding: 18px 20px; background: var(--cream, #FAF8F4);
+        display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px;
       }
       .nz-cart-main { flex: 1; min-width: 240px; }
       .nz-cart-title { font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
