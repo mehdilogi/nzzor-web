@@ -72,6 +72,8 @@ export default function HotelDetail({ hotel }) {
   // entry { roomId, board }. Order = add order. Length is independent of
   // occupancy (the guest adds as many rooms as they want).
   const [cart, setCart] = useState([]);
+  // Brief notice shown when the guest tries to exceed the rooms they searched.
+  const [capNotice, setCapNotice] = useState(false);
   // Active meal-plan filter (board code) or null = all. Drives the chips.
   const [mealFilter, setMealFilter] = useState(null);
 
@@ -110,8 +112,37 @@ export default function HotelDetail({ hotel }) {
     return Array.from(seen.entries()).map(([board, boardLabel]) => ({ board, boardLabel }));
   })();
 
+  // Cart selection rules:
+  //  (1) clicking a rate already selected -> remove it (toggle off)
+  //  (2) one board per room -> selecting another board on the same room switches
+  //  (3) total rooms selected can't exceed roomsQty (the search's room count);
+  //      a "N × Room" bundle counts as N toward the cap.
+  function cartRoomsUsed(list) {
+    return list.reduce((sum, c) => {
+      const opt = findOption(c.roomId, c.board);
+      return sum + (opt?.roomsCount || 1);
+    }, 0);
+  }
+
   function addToCart(roomId, board) {
-    setCart((prev) => [...prev, { roomId, board }]);
+    setCart((prev) => {
+      const existing = prev.find((c) => c.roomId === roomId);
+      // (1) same room + same board already selected -> toggle OFF
+      if (existing && existing.board === board) {
+        return prev.filter((c) => c.roomId !== roomId);
+      }
+      // (2) same room, different board -> SWITCH (replace this room's board)
+      const withoutThisRoom = existing ? prev.filter((c) => c.roomId !== roomId) : prev;
+      // (3) room-cap check: does adding this option fit within roomsQty?
+      const thisOpt = findOption(roomId, board);
+      const thisRooms = thisOpt?.roomsCount || 1;
+      if (cartRoomsUsed(withoutThisRoom) + thisRooms > roomsQty) {
+        setCapNotice(true);
+        setTimeout(() => setCapNotice(false), 2600);
+        return prev; // reject — would exceed the rooms picked in search
+      }
+      return [...withoutThisRoom, { roomId, board }];
+    });
   }
   function removeFromCart(i) {
     setCart((prev) => prev.filter((_, idx) => idx !== i));
@@ -480,8 +511,15 @@ export default function HotelDetail({ hotel }) {
                 <div className="nz-cart">
                   <div className="nz-cart-main">
                     <div className="nz-cart-title">
-                      {t("detail.your_booking") !== "detail.your_booking" ? t("detail.your_booking") : "Your booking"} · {cart.length} {cart.length === 1 ? (t("detail.room_one") !== "detail.room_one" ? t("detail.room_one") : "room") : (t("detail.rooms_n") !== "detail.rooms_n" ? t("detail.rooms_n") : "rooms")}
+                      {t("detail.your_booking") !== "detail.your_booking" ? t("detail.your_booking") : "Your booking"} · {cartRoomsUsed(cart)} / {roomsQty} {roomsQty === 1 ? (t("detail.room_one") !== "detail.room_one" ? t("detail.room_one") : "room") : (t("detail.rooms_n") !== "detail.rooms_n" ? t("detail.rooms_n") : "rooms")}
                     </div>
+                    {capNotice && (
+                      <div className="nz-cart-cap">
+                        {t("detail.cap_notice") !== "detail.cap_notice"
+                          ? t("detail.cap_notice")
+                          : `You searched for ${roomsQty} ${roomsQty === 1 ? "room" : "rooms"}. Remove one to pick a different option.`}
+                      </div>
+                    )}
                     {cartOptions.length === 0 ? (
                       <div className="nz-cart-empty">{t("detail.cart_empty") !== "detail.cart_empty" ? t("detail.cart_empty") : "Tap Select on a rate to add a room."}</div>
                     ) : (
@@ -944,6 +982,7 @@ function DetailStyles() {
       }
       .nz-cart-main { flex: 1; min-width: 240px; }
       .nz-cart-title { font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+      .nz-cart-cap { font-size: 12.5px; font-weight: 600; color: var(--red-deep, #A32D2D); background: rgba(230,57,70,0.10); padding: 7px 11px; border-radius: var(--r-sm); margin-bottom: 8px; }
       .nz-cart-empty { font-size: 13px; color: var(--gray-400); padding: 6px 0; }
       .nz-cart-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--gray-100); }
       .nz-cart-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
