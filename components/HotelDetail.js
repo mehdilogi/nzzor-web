@@ -68,8 +68,12 @@ export default function HotelDetail({ hotel }) {
 
   const [quote, setQuote] = useState(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
-  // One selection per slot: { roomId, board } | null (unset). Length = #slots.
-  const [slots, setSlots] = useState(() => occupancy.map(() => null));
+  // Cart: rooms the guest has added by clicking Select on a rate card. Each
+  // entry { roomId, board }. Order = add order. Length is independent of
+  // occupancy (the guest adds as many rooms as they want).
+  const [cart, setCart] = useState([]);
+  // Active meal-plan filter (board code) or null = all. Drives the chips.
+  const [mealFilter, setMealFilter] = useState(null);
 
   useEffect(() => {
     if (!checkIn || !checkOut || validateBookingDates(checkIn, checkOut)) {
@@ -85,27 +89,33 @@ export default function HotelDetail({ hotel }) {
       body: JSON.stringify({ hotelSlug: hotel.slug, checkIn, checkOut, occupancy }),
     })
       .then((r) => r.json())
-      .then((j) => {
-        if (!live) return;
-        const data = j.data || null;
-        setQuote(data);
-        // Default each empty slot to the cheapest available option.
-        if (data && data.options && data.options.length) {
-          const best = data.options.find((o) => o.availability === "AVAILABLE") || data.options[0];
-          setSlots((prev) => prev.map((s) => s || { roomId: best.roomId, board: best.board }));
-        }
-      })
+      .then((j) => { if (live) setQuote(j.data || null); })
       .catch(() => { if (live) setQuote(null); })
       .finally(() => { if (live) setQuoteLoading(false); });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkIn, checkOut, hotel.slug]);
 
-  // Quote options grouped by room type, for the dropdowns.
+  // Quote options grouped by room type.
   const roomGroups = quote ? groupOptionsByRoom(quote.options || []) : [];
-  // Look up a specific option (roomId + board) from the quote.
   const findOption = (roomId, board) =>
     (quote?.options || []).find((o) => o.roomId === roomId && o.board === board) || null;
+
+  // Distinct boards present across the quote, for the Meals filter chip.
+  const availableBoards = (() => {
+    const seen = new Map();
+    for (const o of (quote?.options || [])) {
+      if (!seen.has(o.board)) seen.set(o.board, o.boardLabel);
+    }
+    return Array.from(seen.entries()).map(([board, boardLabel]) => ({ board, boardLabel }));
+  })();
+
+  function addToCart(roomId, board) {
+    setCart((prev) => [...prev, { roomId, board }]);
+  }
+  function removeFromCart(i) {
+    setCart((prev) => prev.filter((_, idx) => idx !== i));
+  }
 
   // ---- Date validation for the inline booking widget ----------------------
   // The widget uses native <input type="date"> elements. Native inputs honor
@@ -202,14 +212,13 @@ export default function HotelDetail({ hotel }) {
     const d = Math.ceil((new Date(checkOut) - new Date(checkIn)) / 86400000);
     if (d > 0) nights = d;
   }
-  // Resolved options for each filled slot, and whether every slot is chosen.
-  const slotOptions = slots.map((s) => (s ? findOption(s.roomId, s.board) : null));
-  const allSlotsChosen = slots.length > 0 && slotOptions.every(Boolean);
+  // Resolved quote option for each cart entry (roomId + board -> full option).
+  const cartOptions = cart.map((c) => findOption(c.roomId, c.board)).filter(Boolean);
 
-  // Widget total: sum the chosen slot options' per-stay totals when a quote is
-  // active; otherwise fall back to the static room preview.
+  // Widget total: sum the cart's per-stay totals when a quote is active;
+  // otherwise fall back to the static room preview.
   const subtotal = quote
-    ? slotOptions.reduce((sum, o) => sum + (o ? o.total : 0), 0)
+    ? cartOptions.reduce((sum, o) => sum + o.total, 0)
     : (selectedRoom ? selectedRoom.price * nights * roomsQty : 0);
 
   function reserve() {
@@ -221,9 +230,10 @@ export default function HotelDetail({ hotel }) {
     params.set("checkIn", checkIn);
     params.set("checkOut", checkOut);
 
-    if (quote && allSlotsChosen) {
-      // New multi-room path: ?sel=roomId:BOARD:pricePerNight per slot.
-      const sel = slotOptions
+    if (quote && cartOptions.length > 0) {
+      // Multi-room path: ?sel=roomId:BOARD:pricePerNight per cart room. Comma
+      // between rooms (board codes contain underscores).
+      const sel = cartOptions
         .map((o) => `${o.roomId}:${o.board}:${o.pricePerNightPerRoom}`)
         .join(",");
       params.set("sel", sel);
@@ -248,7 +258,10 @@ export default function HotelDetail({ hotel }) {
   }
 
   const canReserve = !!checkIn && !!checkOut && !dateError &&
-    ((quote && allSlotsChosen) || (!quote && !!selectedRoom));
+    ((quote && cartOptions.length > 0) || (!quote && !!selectedRoom));
+
+  // Total guests from occupancy, for the header subline.
+  const totalGuests = occupancy.reduce((s, o) => s + (o.adults || 0) + (o.children || 0), 0);
 
   const photos = hotel.photos || [];
 
@@ -358,86 +371,129 @@ export default function HotelDetail({ hotel }) {
             )}
 
             {!quoteLoading && quote && roomGroups.length > 0 ? (
-              <div className="nz-slots">
-                <div className="nz-slots-head">
-                  {slots.length} {slots.length === 1 ? (t("detail.room_one") !== "detail.room_one" ? t("detail.room_one") : "room") : (t("detail.rooms_n") !== "detail.rooms_n" ? t("detail.rooms_n") : "rooms")} · {nights} {nights === 1 ? (t("detail.night") !== "detail.night" ? t("detail.night") : "night") : (t("detail.nights") !== "detail.nights" ? t("detail.nights") : "nights")}
+              <div className="nz-opts">
+                {/* header: subline + meal filter chips */}
+                <div className="nz-opts-head">
+                  <div className="nz-opts-sub">
+                    {nights} {nights === 1 ? (t("detail.night") !== "detail.night" ? t("detail.night") : "night") : (t("detail.nights") !== "detail.nights" ? t("detail.nights") : "nights")} · {totalGuests} {totalGuests === 1 ? (t("detail.guest_one") !== "detail.guest_one" ? t("detail.guest_one") : "guest") : (t("detail.guests") !== "detail.guests" ? t("detail.guests") : "guests")}
+                  </div>
+                  {availableBoards.length > 1 && (
+                    <div className="nz-opts-chips">
+                      <button
+                        className={`nz-chip ${mealFilter === null ? "on" : ""}`}
+                        onClick={() => setMealFilter(null)}
+                      >
+                        {t("detail.all_meals") !== "detail.all_meals" ? t("detail.all_meals") : "All meals"}
+                      </button>
+                      {availableBoards.map((b) => (
+                        <button
+                          key={b.board}
+                          className={`nz-chip ${mealFilter === b.board ? "on" : ""}`}
+                          onClick={() => setMealFilter(mealFilter === b.board ? null : b.board)}
+                        >
+                          {localized(b.boardLabel, lang)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                {slots.map((slot, i) => {
-                  const opt = slotOptions[i];
-                  const grp = slot ? roomGroups.find((g) => g.roomId === slot.roomId) : null;
-                  const occ = occupancy[i] || { adults: 2, children: 0 };
+                {/* one block per room type; rates scroll horizontally */}
+                {roomGroups.map((grp) => {
+                  const staticRoom = rooms.find((r) => r.id === grp.roomId);
+                  const boards = grp.boards
+                    .filter((o) => !mealFilter || o.board === mealFilter)
+                    .slice()
+                    .sort((a, b) => a.total - b.total);
+                  if (boards.length === 0) return null;
+                  const onReq = grp.availability !== "AVAILABLE";
                   return (
-                    <div className="nz-slot" key={i}>
-                      <div className="nz-slot-head">
-                        <span className="nz-slot-label">
-                          {(t("detail.room_label") !== "detail.room_label" ? t("detail.room_label") : "Room")} {i + 1} · {occ.adults} {occ.adults === 1 ? (t("detail.adult") !== "detail.adult" ? t("detail.adult") : "adult") : (t("detail.adults") !== "detail.adults" ? t("detail.adults") : "adults")}{occ.children ? ` + ${occ.children}` : ""}
-                        </span>
-                        {opt && (
-                          <span className={`nz-avail ${opt.availability === "AVAILABLE" ? "ok" : "req"}`}>
-                            {opt.availability === "AVAILABLE"
-                              ? (t("detail.available") !== "detail.available" ? t("detail.available") : "Available")
-                              : (t("detail.on_request") !== "detail.on_request" ? t("detail.on_request") : "On request")}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="nz-slot-fields">
-                        <label className="nz-slot-field">
-                          <span className="nz-slot-flabel">{t("detail.room_type") !== "detail.room_type" ? t("detail.room_type") : "Room type"}</span>
-                          <select
-                            value={slot?.roomId || ""}
-                            onChange={(e) => {
-                              const roomId = e.target.value;
-                              const g = roomGroups.find((x) => x.roomId === roomId);
-                              const firstBoard = g?.boards?.[0]?.board || null;
-                              setSlots((prev) => prev.map((s, idx) => idx === i ? { roomId, board: firstBoard } : s));
-                            }}
-                          >
-                            {roomGroups.map((g) => (
-                              <option key={g.roomId} value={g.roomId}>{localized(g.roomType, lang)}</option>
-                            ))}
-                          </select>
-                        </label>
-
-                        <label className="nz-slot-field">
-                          <span className="nz-slot-flabel">{t("detail.meal_plan") !== "detail.meal_plan" ? t("detail.meal_plan") : "Meal plan"}</span>
-                          <select
-                            value={slot?.board || ""}
-                            disabled={!grp}
-                            onChange={(e) => {
-                              const board = e.target.value;
-                              setSlots((prev) => prev.map((s, idx) => idx === i ? { ...s, board } : s));
-                            }}
-                          >
-                            {(grp?.boards || []).map((b) => (
-                              <option key={b.board} value={b.board}>{localized(b.boardLabel, lang)}</option>
-                            ))}
-                          </select>
-                        </label>
-                      </div>
-
-                      {opt && (
-                        <div className="nz-slot-price">
-                          {formatPrice(opt.pricePerNightPerRoom)}/{t("detail.per_night_short") !== "detail.per_night_short" ? t("detail.per_night_short") : "night"} × {nights} = <strong>{formatPrice(opt.total)}</strong>
+                    <div className="nz-rblock" key={grp.roomId}>
+                      <div className="nz-rblock-head">
+                        <div className="nz-rblock-thumb">
+                          {staticRoom?.photos?.[0] ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={staticRoom.photos[0]} alt={localized(grp.roomType, lang)} loading="lazy" />
+                          ) : <Icon name="bed" size={20} />}
                         </div>
-                      )}
+                        <div>
+                          <div className="nz-rblock-name display">{localized(grp.roomType, lang)}</div>
+                          <div className="nz-rblock-specs">
+                            <span><Icon name="guest" size={13} /> {staticRoom?.capacity} {t("detail.guests")}</span>
+                            {staticRoom?.sizeSqm && <span>· {staticRoom.sizeSqm} m²</span>}
+                            {staticRoom?.bedType && <span>· {staticRoom.bedType}</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="nz-rates">
+                        {boards.map((opt, i) => {
+                          const best = i === 0 && !onReq;
+                          return (
+                            <div className={`nz-rate ${best ? "best" : ""}`} key={opt.board}>
+                              <div className="nz-rate-tag">
+                                {best && <span className="nz-rate-best">{t("detail.best_price") !== "detail.best_price" ? t("detail.best_price") : "Best price"}</span>}
+                                {onReq && <span className="nz-rate-req">{t("detail.on_request") !== "detail.on_request" ? t("detail.on_request") : "On request"}</span>}
+                              </div>
+                              <div className="nz-rate-board">{localized(opt.boardLabel, lang)}</div>
+                              <div className="nz-rate-lines">
+                                {staticRoom?.bedType && <div><Icon name="bed" size={14} /> {staticRoom.bedType}</div>}
+                                <div><Icon name="check" size={13} strokeWidth={2.5} /> {t("detail.free_cancel")}</div>
+                              </div>
+                              <div className="nz-rate-foot">
+                                <div className="nz-rate-price">
+                                  <span className="amt display">{formatPrice(opt.total)}</span>
+                                  <span className="per">{nights} {nights === 1 ? (t("detail.night") !== "detail.night" ? t("detail.night") : "night") : (t("detail.nights") !== "detail.nights" ? t("detail.nights") : "nights")} · {t("detail.total_stay") !== "detail.total_stay" ? t("detail.total_stay") : "total"}</span>
+                                </div>
+                                <button className="nz-rate-btn" onClick={() => addToCart(grp.roomId, opt.board)}>
+                                  {onReq
+                                    ? (t("detail.request") !== "detail.request" ? t("detail.request") : "Request")
+                                    : (t("detail.select") !== "detail.select" ? t("detail.select") : "Select")}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 })}
 
-                <div className="nz-slots-summary">
-                  <div className="nz-slots-sumtext">
-                    {slotOptions.filter(Boolean).map((o, idx) => (
-                      <span key={idx}>
-                        {idx > 0 ? " + " : ""}
-                        {localized(o.roomType, lang)} ({localized(o.boardLabel, lang)})
-                      </span>
-                    ))}
+                {/* cart */}
+                <div className="nz-cart">
+                  <div className="nz-cart-main">
+                    <div className="nz-cart-title">
+                      {t("detail.your_booking") !== "detail.your_booking" ? t("detail.your_booking") : "Your booking"} · {cart.length} {cart.length === 1 ? (t("detail.room_one") !== "detail.room_one" ? t("detail.room_one") : "room") : (t("detail.rooms_n") !== "detail.rooms_n" ? t("detail.rooms_n") : "rooms")}
+                    </div>
+                    {cartOptions.length === 0 ? (
+                      <div className="nz-cart-empty">{t("detail.cart_empty") !== "detail.cart_empty" ? t("detail.cart_empty") : "Tap Select on a rate to add a room."}</div>
+                    ) : (
+                      cartOptions.map((o, i) => (
+                        <div className="nz-cart-row" key={i}>
+                          <div className="nz-cart-info">
+                            <strong>{localized(o.roomType, lang)}</strong>
+                            <span>{localized(o.boardLabel, lang)}{o.availability !== "AVAILABLE" ? ` · ${t("detail.on_request") !== "detail.on_request" ? t("detail.on_request") : "on request"}` : ""}</span>
+                          </div>
+                          <div className="nz-cart-rprice">
+                            {formatPrice(o.total)}
+                            <button className="nz-cart-x" onClick={() => removeFromCart(i)} aria-label="Remove">×</button>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
-                  <div className="nz-slots-sumtotal">
-                    <span className="amt display">{formatPrice(subtotal)}</span>
-                    <span className="lbl">{t("detail.total_stay") !== "detail.total_stay" ? t("detail.total_stay") : "total"}</span>
+                  <div className="nz-cart-foot">
+                    {cartOptions.length > 0 && (
+                      <div className="nz-cart-total">
+                        <span className="lbl">{t("detail.total_stay") !== "detail.total_stay" ? t("detail.total_stay") : "total"}</span>
+                        <span className="amt display">{formatPrice(subtotal)}</span>
+                      </div>
+                    )}
+                    <button className="nz-cart-cta" onClick={reserve} disabled={!canReserve}>
+                      {cartOptions.some((o) => o.availability !== "AVAILABLE")
+                        ? (t("detail.request_to_book") !== "detail.request_to_book" ? t("detail.request_to_book") : "Request to book")
+                        : (t("detail.book_now") !== "detail.book_now" ? t("detail.book_now") : "Book now")}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -772,34 +828,80 @@ function DetailStyles() {
       .nz-rooms { display: flex; flex-direction: column; gap: 16px; }
       .nz-rooms-hint { font-size: 13.5px; color: var(--gray-400); margin-top: 12px; }
       .nz-quote-loading { font-size: 14px; color: var(--gray-400); padding: 20px 0; }
-      .nz-slots { display: flex; flex-direction: column; gap: 12px; }
-      .nz-slots-head { font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 2px; }
-      .nz-slot { border: 1px solid var(--gray-200); border-radius: var(--r-md); padding: 14px 16px; background: var(--white); }
-      .nz-slot-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
-      .nz-slot-label { font-size: 13px; font-weight: 600; color: var(--gray-500); }
+      .nz-opts { display: flex; flex-direction: column; gap: 20px; }
+      .nz-opts-head { display: flex; flex-direction: column; gap: 10px; }
+      .nz-opts-sub { font-size: 13.5px; color: var(--gray-500); font-weight: 600; }
+      .nz-opts-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+      .nz-chip {
+        font-size: 12.5px; font-weight: 600; color: var(--gray-600, #5F5E5A);
+        border: 1px solid var(--gray-200); background: var(--white);
+        padding: 6px 14px; border-radius: 980px; cursor: pointer; transition: all .15s;
+      }
+      .nz-chip:hover { border-color: var(--gray-300); }
+      .nz-chip.on { background: var(--ink); color: var(--white); border-color: var(--ink); }
       .nz-avail { font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 980px; white-space: nowrap; }
       .nz-avail.ok { background: rgba(27,138,90,0.12); color: #1B8A5A; }
       .nz-avail.req { background: rgba(230,57,70,0.10); color: var(--red-deep, #A32D2D); }
-      .nz-slot-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-      .nz-slot-field { display: flex; flex-direction: column; gap: 5px; }
-      .nz-slot-flabel { font-size: 11px; color: var(--gray-400); font-weight: 600; }
-      .nz-slot-field select {
-        appearance: none; -webkit-appearance: none; width: 100%;
-        border: 1px solid var(--gray-200); border-radius: var(--r-sm); background: var(--white);
-        padding: 10px 12px; font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer;
+
+      .nz-rblock { display: flex; flex-direction: column; gap: 12px; }
+      .nz-rblock-head { display: flex; align-items: center; gap: 12px; }
+      .nz-rblock-thumb {
+        width: 54px; height: 54px; border-radius: var(--r-md); overflow: hidden; flex-shrink: 0;
+        background: var(--cream, #FAF8F4); display: flex; align-items: center; justify-content: center; color: var(--gray-300);
       }
-      .nz-slot-field select:disabled { color: var(--gray-300); cursor: default; }
-      .nz-slot-price { font-size: 12.5px; color: var(--gray-500); margin-top: 10px; }
-      .nz-slot-price strong { color: var(--ink); font-weight: 700; }
-      .nz-slots-summary {
-        display: flex; align-items: center; justify-content: space-between; gap: 12px;
-        border-top: 1px solid var(--gray-100); padding-top: 14px; margin-top: 2px;
+      .nz-rblock-thumb img { width: 100%; height: 100%; object-fit: cover; }
+      .nz-rblock-name { font-size: 16px; font-weight: 600; }
+      .nz-rblock-specs { font-size: 12px; color: var(--gray-400); margin-top: 2px; display: flex; gap: 5px; flex-wrap: wrap; }
+
+      .nz-rates {
+        display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory;
+        padding: 2px 2px 10px; -webkit-overflow-scrolling: touch;
       }
-      .nz-slots-sumtext { font-size: 13px; color: var(--gray-500); }
-      .nz-slots-sumtotal { text-align: right; white-space: nowrap; }
-      .nz-slots-sumtotal .amt { font-size: 20px; font-weight: 600; color: var(--ink); }
-      .nz-slots-sumtotal .lbl { font-size: 11px; color: var(--gray-400); display: block; }
-      @media (max-width: 640px) { .nz-slot-fields { grid-template-columns: 1fr; } }
+      .nz-rate {
+        flex: 0 0 200px; scroll-snap-align: start; display: flex; flex-direction: column;
+        border: 1px solid var(--gray-200); border-radius: var(--r-md); padding: 12px 13px; background: var(--white);
+      }
+      .nz-rate.best { border: 2px solid var(--red, #E63946); padding: 11px 12px; }
+      .nz-rate-tag { min-height: 18px; margin-bottom: 6px; }
+      .nz-rate-best { font-size: 10.5px; font-weight: 800; color: #fff; background: var(--red, #E63946); padding: 2px 8px; border-radius: 980px; }
+      .nz-rate-req { font-size: 10.5px; font-weight: 700; color: var(--red-deep, #A32D2D); background: rgba(230,57,70,0.10); padding: 2px 8px; border-radius: 980px; }
+      .nz-rate-board { font-size: 14.5px; font-weight: 700; color: var(--ink); margin-bottom: 8px; line-height: 1.3; }
+      .nz-rate-lines { font-size: 12px; color: var(--gray-500); line-height: 1.8; flex: 1; }
+      .nz-rate-lines > div { display: flex; align-items: center; gap: 5px; }
+      .nz-rate-foot { margin-top: 12px; }
+      .nz-rate-price .amt { font-size: 18px; font-weight: 600; color: var(--ink); display: block; }
+      .nz-rate-price .per { font-size: 11px; color: var(--gray-400); }
+      .nz-rate-btn {
+        width: 100%; margin-top: 10px; font-size: 13px; font-weight: 700; padding: 8px;
+        border: none; border-radius: var(--r-sm); background: var(--ink); color: var(--white); cursor: pointer; transition: opacity .15s;
+      }
+      .nz-rate-btn:hover { opacity: .88; }
+
+      .nz-cart {
+        border: 1px solid var(--gray-200); border-radius: var(--r-md); padding: 16px 18px; background: var(--cream, #FAF8F4);
+        display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin-top: 4px;
+      }
+      .nz-cart-main { flex: 1; min-width: 240px; }
+      .nz-cart-title { font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+      .nz-cart-empty { font-size: 13px; color: var(--gray-400); padding: 6px 0; }
+      .nz-cart-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--gray-100); }
+      .nz-cart-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+      .nz-cart-info strong { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+      .nz-cart-info span { font-size: 12px; color: var(--gray-400); }
+      .nz-cart-rprice { font-size: 13.5px; font-weight: 700; color: var(--ink); white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+      .nz-cart-x { border: none; background: none; cursor: pointer; color: var(--gray-300); padding: 0; font-size: 18px; line-height: 1; }
+      .nz-cart-x:hover { color: var(--red, #E63946); }
+      .nz-cart-foot { text-align: right; }
+      .nz-cart-total { margin-bottom: 8px; }
+      .nz-cart-total .lbl { font-size: 11px; color: var(--gray-400); display: block; }
+      .nz-cart-total .amt { font-size: 22px; font-weight: 600; color: var(--ink); }
+      .nz-cart-cta {
+        font-size: 14px; font-weight: 700; padding: 11px 24px; border: none; border-radius: var(--r-sm);
+        background: var(--red, #E63946); color: #fff; cursor: pointer; transition: opacity .15s;
+      }
+      .nz-cart-cta:hover { opacity: .9; }
+      .nz-cart-cta:disabled { opacity: .4; cursor: default; }
+      @media (max-width: 640px) { .nz-cart { flex-direction: column; align-items: stretch; } .nz-cart-foot { text-align: left; } }
       .nz-room {
         display: grid; grid-template-columns: 200px 1fr auto; gap: 22px; align-items: center;
         padding: 18px; border: 1.5px solid var(--gray-200); border-radius: var(--r-lg);
