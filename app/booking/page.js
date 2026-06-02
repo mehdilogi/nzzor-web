@@ -17,12 +17,13 @@ function parseSelections(sel) {
   const out = [];
   for (const chunk of String(sel).split(",")) {
     if (!chunk) continue;
-    const [roomId, board, price] = chunk.split(":");
+    const [roomId, board, price, qty] = chunk.split(":");
     if (!roomId) continue;
     out.push({
       roomId,
       board: board || null,
       pricePerNight: price ? parseInt(price, 10) || null : null,
+      qty: qty ? Math.min(10, Math.max(1, parseInt(qty, 10) || 1)) : 1,
     });
   }
   return out.length ? out : null;
@@ -41,14 +42,18 @@ export default async function BookingPage({ searchParams }) {
   let selections = null;
   if (hotel && hotel.rooms && parsedSel) {
     selections = parsedSel
-      .map((s) => {
+      .flatMap((s) => {
         const room = hotel.rooms.find((r) => r.id === s.roomId);
-        if (!room) return null;
-        return {
+        if (!room) return [];
+        // Expand the bundle quantity into N identical room entries so each is
+        // one bookable room (matches BookingFlow's per-entry quantity:1 model
+        // and the API's per-room availability check).
+        const entry = {
           room,
           board: s.board,
           pricePerNight: s.pricePerNight || room.price,
         };
+        return Array.from({ length: s.qty || 1 }, () => ({ ...entry }));
       })
       .filter(Boolean);
     if (selections.length === 0) selections = null;

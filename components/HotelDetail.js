@@ -231,10 +231,11 @@ export default function HotelDetail({ hotel }) {
     params.set("checkOut", checkOut);
 
     if (quote && cartOptions.length > 0) {
-      // Multi-room path: ?sel=roomId:BOARD:pricePerNight per cart room. Comma
-      // between rooms (board codes contain underscores).
+      // Multi-room path: ?sel=roomId:BOARD:pricePerNight:qty per cart entry.
+      // qty = how many of that room type (bundling to fit guests). Comma
+      // between entries (board codes contain underscores).
       const sel = cartOptions
-        .map((o) => `${o.roomId}:${o.board}:${o.pricePerNightPerRoom}`)
+        .map((o) => `${o.roomId}:${o.board}:${o.pricePerNightPerRoom}:${o.roomsCount || 1}`)
         .join(",");
       params.set("sel", sel);
     } else if (selectedRoom) {
@@ -407,25 +408,29 @@ export default function HotelDetail({ hotel }) {
                     .sort((a, b) => a.total - b.total);
                   if (boards.length === 0) return null;
                   const onReq = grp.availability !== "AVAILABLE";
+                  const nRooms = boards[0]?.roomsCount || 1;
+                  const roomTitle = nRooms > 1
+                    ? `${nRooms} × ${localized(grp.roomType, lang)}`
+                    : localized(grp.roomType, lang);
                   return (
                     <div className="nz-rblock" key={grp.roomId}>
-                      <div className="nz-rblock-head">
-                        <div className="nz-rblock-thumb">
+                      {/* room card — pinned left */}
+                      <div className="nz-rcard">
+                        <div className="nz-rcard-photo">
                           {staticRoom?.photos?.[0] ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={staticRoom.photos[0]} alt={localized(grp.roomType, lang)} loading="lazy" />
-                          ) : <Icon name="bed" size={20} />}
+                          ) : <Icon name="bed" size={24} />}
                         </div>
-                        <div>
-                          <div className="nz-rblock-name display">{localized(grp.roomType, lang)}</div>
-                          <div className="nz-rblock-specs">
-                            <span><Icon name="guest" size={13} /> {staticRoom?.capacity} {t("detail.guests")}</span>
-                            {staticRoom?.sizeSqm && <span>· {staticRoom.sizeSqm} m²</span>}
-                            {staticRoom?.bedType && <span>· {staticRoom.bedType}</span>}
-                          </div>
+                        <div className="nz-rcard-name display">{roomTitle}</div>
+                        {staticRoom?.bedType && <div className="nz-rcard-bed">{staticRoom.bedType}</div>}
+                        <div className="nz-rcard-specs">
+                          <span><Icon name="guest" size={14} /> {staticRoom?.capacity} {t("detail.guests")}</span>
+                          {staticRoom?.sizeSqm && <span><Icon name="size" size={14} /> {staticRoom.sizeSqm} m²</span>}
                         </div>
                       </div>
 
+                      {/* rate cards — scroll right */}
                       <div className="nz-rates">
                         {boards.map((opt, i) => {
                           const best = i === 0 && !onReq;
@@ -443,7 +448,10 @@ export default function HotelDetail({ hotel }) {
                               <div className="nz-rate-foot">
                                 <div className="nz-rate-price">
                                   <span className="amt display">{formatPrice(opt.total)}</span>
-                                  <span className="per">{nights} {nights === 1 ? (t("detail.night") !== "detail.night" ? t("detail.night") : "night") : (t("detail.nights") !== "detail.nights" ? t("detail.nights") : "nights")} · {t("detail.total_stay") !== "detail.total_stay" ? t("detail.total_stay") : "total"}</span>
+                                  <span className="per">
+                                    {opt.roomsCount > 1 ? `${opt.roomsCount} ${t("detail.rooms_n") !== "detail.rooms_n" ? t("detail.rooms_n") : "rooms"} · ` : ""}
+                                    {nights} {nights === 1 ? (t("detail.night") !== "detail.night" ? t("detail.night") : "night") : (t("detail.nights") !== "detail.nights" ? t("detail.nights") : "nights")} · {t("detail.total_stay") !== "detail.total_stay" ? t("detail.total_stay") : "total"}
+                                  </span>
                                 </div>
                                 <button className="nz-rate-btn" onClick={() => addToCart(grp.roomId, opt.board)}>
                                   {onReq
@@ -843,19 +851,25 @@ function DetailStyles() {
       .nz-avail.ok { background: rgba(27,138,90,0.12); color: #1B8A5A; }
       .nz-avail.req { background: rgba(230,57,70,0.10); color: var(--red-deep, #A32D2D); }
 
-      .nz-rblock { display: flex; flex-direction: column; gap: 12px; }
-      .nz-rblock-head { display: flex; align-items: center; gap: 12px; }
-      .nz-rblock-thumb {
-        width: 54px; height: 54px; border-radius: var(--r-md); overflow: hidden; flex-shrink: 0;
-        background: var(--cream, #FAF8F4); display: flex; align-items: center; justify-content: center; color: var(--gray-300);
+      .nz-rblock { display: flex; gap: 16px; align-items: flex-start; }
+      .nz-rcard {
+        flex: 0 0 180px; width: 180px; align-self: stretch;
+        display: flex; flex-direction: column; gap: 6px;
       }
-      .nz-rblock-thumb img { width: 100%; height: 100%; object-fit: cover; }
-      .nz-rblock-name { font-size: 16px; font-weight: 600; }
-      .nz-rblock-specs { font-size: 12px; color: var(--gray-400); margin-top: 2px; display: flex; gap: 5px; flex-wrap: wrap; }
+      .nz-rcard-photo {
+        width: 100%; height: 120px; border-radius: var(--r-md); overflow: hidden;
+        background: var(--cream, #FAF8F4); display: flex; align-items: center; justify-content: center; color: var(--gray-300);
+        margin-bottom: 4px;
+      }
+      .nz-rcard-photo img { width: 100%; height: 100%; object-fit: cover; }
+      .nz-rcard-name { font-size: 16px; font-weight: 700; line-height: 1.25; color: var(--ink); }
+      .nz-rcard-bed { font-size: 12.5px; color: var(--gray-500); }
+      .nz-rcard-specs { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+      .nz-rcard-specs span { font-size: 12px; color: var(--gray-400); display: flex; align-items: center; gap: 5px; }
 
       .nz-rates {
-        display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory;
-        padding: 2px 2px 10px; -webkit-overflow-scrolling: touch;
+        flex: 1; min-width: 0; display: flex; gap: 10px; overflow-x: auto;
+        scroll-snap-type: x mandatory; padding: 2px 2px 10px; -webkit-overflow-scrolling: touch;
       }
       .nz-rate {
         flex: 0 0 200px; scroll-snap-align: start; display: flex; flex-direction: column;
@@ -901,7 +915,13 @@ function DetailStyles() {
       }
       .nz-cart-cta:hover { opacity: .9; }
       .nz-cart-cta:disabled { opacity: .4; cursor: default; }
-      @media (max-width: 640px) { .nz-cart { flex-direction: column; align-items: stretch; } .nz-cart-foot { text-align: left; } }
+      @media (max-width: 640px) {
+        .nz-rblock { flex-direction: column; gap: 10px; }
+        .nz-rcard { flex: none; width: 100%; flex-direction: row; gap: 12px; align-items: center; }
+        .nz-rcard-photo { width: 90px; height: 70px; flex-shrink: 0; margin-bottom: 0; }
+        .nz-rcard-specs { flex-direction: row; gap: 10px; }
+        .nz-cart { flex-direction: column; align-items: stretch; } .nz-cart-foot { text-align: left; }
+      }
       .nz-room {
         display: grid; grid-template-columns: 200px 1fr auto; gap: 22px; align-items: center;
         padding: 18px; border: 1.5px solid var(--gray-200); border-radius: var(--r-lg);
