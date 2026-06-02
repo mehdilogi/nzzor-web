@@ -495,6 +495,9 @@ export default function HotelDetail({ hotel }) {
                               <div className="nz-rate-lines">
                                 {staticRoom?.bedType && <div><Icon name="bed" size={14} /> {staticRoom.bedType}</div>}
                                 <div><Icon name="check" size={13} strokeWidth={2.5} /> {t("detail.free_cancel")}</div>
+                                {opt.breakfastIncluded && (
+                                  <div><Icon name="check" size={13} strokeWidth={2.5} /> {t("detail.breakfast_incl") !== "detail.breakfast_incl" ? t("detail.breakfast_incl") : "Breakfast included"}</div>
+                                )}
                               </div>
                               <div className="nz-rate-foot">
                                 <div className="nz-rate-price">
