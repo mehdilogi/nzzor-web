@@ -215,10 +215,20 @@ export default function HotelDetail({ hotel }) {
   // Resolved quote option for each cart entry (roomId + board -> full option).
   const cartOptions = cart.map((c) => findOption(c.roomId, c.board)).filter(Boolean);
 
-  // Widget total: sum the cart's per-stay totals when a quote is active;
-  // otherwise fall back to the static room preview.
+  // Cheapest quote option across all rooms (for an empty-cart "from" preview).
+  const cheapestOption = quote && Array.isArray(quote.options) && quote.options.length > 0
+    ? quote.options.reduce((min, o) => (o.total < min.total ? o : min), quote.options[0])
+    : null;
+
+  // Widget total:
+  //  - quote + items in cart -> sum the cart's per-stay totals
+  //  - quote + empty cart -> show the cheapest rate as a "from" preview (NOT 0)
+  //  - no quote -> static room preview
+  const cartHasItems = cartOptions.length > 0;
   const subtotal = quote
-    ? cartOptions.reduce((sum, o) => sum + o.total, 0)
+    ? (cartHasItems
+        ? cartOptions.reduce((sum, o) => sum + o.total, 0)
+        : (cheapestOption ? cheapestOption.total : 0))
     : (selectedRoom ? selectedRoom.price * nights * roomsQty : 0);
 
   function reserve() {
@@ -433,11 +443,10 @@ export default function HotelDetail({ hotel }) {
                       {/* rate cards — scroll right */}
                       <div className="nz-rates">
                         {boards.map((opt, i) => {
-                          const best = i === 0 && !onReq;
+                          const isSelected = cart.some((c) => c.roomId === grp.roomId && c.board === opt.board);
                           return (
-                            <div className={`nz-rate ${best ? "best" : ""}`} key={opt.board}>
+                            <div className={`nz-rate ${isSelected ? "selected" : ""}`} key={opt.board}>
                               <div className="nz-rate-tag">
-                                {best && <span className="nz-rate-best">{t("detail.best_price") !== "detail.best_price" ? t("detail.best_price") : "Best price"}</span>}
                                 {onReq && <span className="nz-rate-req">{t("detail.on_request") !== "detail.on_request" ? t("detail.on_request") : "On request"}</span>}
                               </div>
                               <div className="nz-rate-board">{localized(opt.boardLabel, lang)}</div>
@@ -453,8 +462,10 @@ export default function HotelDetail({ hotel }) {
                                     {nights} {nights === 1 ? (t("detail.night") !== "detail.night" ? t("detail.night") : "night") : (t("detail.nights") !== "detail.nights" ? t("detail.nights") : "nights")} · {t("detail.total_stay") !== "detail.total_stay" ? t("detail.total_stay") : "total"}
                                   </span>
                                 </div>
-                                <button className="nz-rate-btn" onClick={() => addToCart(grp.roomId, opt.board)}>
-                                  {t("detail.select") !== "detail.select" ? t("detail.select") : "Select"}
+                                <button className={`nz-rate-btn ${isSelected ? "on" : ""}`} onClick={() => addToCart(grp.roomId, opt.board)}>
+                                  {isSelected
+                                    ? (t("detail.selected") !== "detail.selected" ? t("detail.selected") : "Selected ✓")
+                                    : (t("detail.select") !== "detail.select" ? t("detail.select") : "Select")}
                                 </button>
                               </div>
                             </div>
@@ -588,7 +599,11 @@ export default function HotelDetail({ hotel }) {
             </div>
             <div className="nz-widget-body">
               <div className="nz-widget-price">
-                <span className="amt display">{selectedRoom ? formatPriceShort(selectedRoom.price) : "—"}</span>
+                <span className="amt display">{
+                  quote
+                    ? (cheapestOption ? formatPriceShort(cheapestOption.pricePerNightPerRoom) : "—")
+                    : (selectedRoom ? formatPriceShort(selectedRoom.price) : "—")
+                }</span>
                 <span className="unit">{t("detail.per_night")}</span>
               </div>
 
@@ -631,7 +646,35 @@ export default function HotelDetail({ hotel }) {
                 </div>
               )}
 
-              {selectedRoom && (
+              {quote ? (
+                <div className="nz-widget-room">
+                  <div className="wr-label">
+                    {cartHasItems
+                      ? (t("detail.your_selection") !== "detail.your_selection" ? t("detail.your_selection") : "Your selection")
+                      : (t("detail.from_price") !== "detail.from_price" ? t("detail.from_price") : "From")}
+                  </div>
+                  {cartHasItems ? (
+                    cartOptions.map((o, i) => (
+                      <div className="wr-calc" key={i}>
+                        <span>
+                          {o.roomsCount > 1 ? `${o.roomsCount} × ` : ""}{localized(o.roomType, lang)} · {localized(o.boardLabel, lang)}
+                        </span>
+                        <span>{formatPrice(o.total)}</span>
+                      </div>
+                    ))
+                  ) : (
+                    cheapestOption && (
+                      <>
+                        <div className="wr-name display">{localized(cheapestOption.roomType, lang)}</div>
+                        <div className="wr-calc">
+                          <span>{localized(cheapestOption.boardLabel, lang)} · {nights} {nights === 1 ? (t("detail.night") || "night") : (t("detail.nights") || "nights")}</span>
+                          <span>{formatPrice(cheapestOption.total)}</span>
+                        </div>
+                      </>
+                    )
+                  )}
+                </div>
+              ) : selectedRoom && (
                 <div className="nz-widget-room">
                   <div className="wr-label">{t("detail.selected_room")}</div>
                   <div className="wr-name display">{selectedRoom.type}</div>
@@ -878,9 +921,8 @@ function DetailStyles() {
         flex: 0 0 200px; scroll-snap-align: start; display: flex; flex-direction: column;
         border: 1px solid var(--gray-200); border-radius: var(--r-md); padding: 12px 13px; background: var(--white);
       }
-      .nz-rate.best { border: 2px solid var(--red, #E63946); padding: 11px 12px; }
+      .nz-rate.selected { border: 2px solid var(--red, #E63946); padding: 11px 12px; box-shadow: 0 0 0 3px rgba(230,57,70,0.12); }
       .nz-rate-tag { min-height: 18px; margin-bottom: 6px; }
-      .nz-rate-best { font-size: 10.5px; font-weight: 800; color: #fff; background: var(--red, #E63946); padding: 2px 8px; border-radius: 980px; }
       .nz-rate-req { font-size: 10.5px; font-weight: 700; color: var(--red-deep, #A32D2D); background: rgba(230,57,70,0.10); padding: 2px 8px; border-radius: 980px; }
       .nz-rate-board { font-size: 14.5px; font-weight: 700; color: var(--ink); margin-bottom: 8px; line-height: 1.3; }
       .nz-rate-lines { font-size: 12px; color: var(--gray-500); line-height: 1.8; flex: 1; }
@@ -893,6 +935,7 @@ function DetailStyles() {
         border: none; border-radius: var(--r-sm); background: var(--ink); color: var(--white); cursor: pointer; transition: opacity .15s;
       }
       .nz-rate-btn:hover { opacity: .88; }
+      .nz-rate-btn.on { background: var(--red, #E63946); }
 
       .nz-rblock:last-of-type { border-bottom: none; }
       .nz-cart {
