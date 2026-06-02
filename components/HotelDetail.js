@@ -42,9 +42,18 @@ export default function HotelDetail({ hotel }) {
   })();
   const { t, lang } = useLang();
   const [selectedRoom, setSelectedRoom] = useState(rooms[0] || null);
-  // pre-fill dates from the URL (carried over from the search bar)
-  const [checkIn, setCheckIn] = useState(searchParams.get("checkIn") || "");
-  const [checkOut, setCheckOut] = useState(searchParams.get("checkOut") || "");
+  // Pre-fill dates from the URL (carried over from the search bar). When the
+  // user lands here directly from /hotels (no dates in URL), default to
+  // tomorrow + the day after, so a quote loads and the new room picker shows
+  // instead of the old static fallback. The user can change the dates inline.
+  const defaultDates = (() => {
+    const d1 = new Date(); d1.setDate(d1.getDate() + 1);
+    const d2 = new Date(); d2.setDate(d2.getDate() + 2);
+    const fmt = (d) => d.toISOString().slice(0, 10);
+    return { ci: fmt(d1), co: fmt(d2) };
+  })();
+  const [checkIn, setCheckIn] = useState(searchParams.get("checkIn") || defaultDates.ci);
+  const [checkOut, setCheckOut] = useState(searchParams.get("checkOut") || defaultDates.co);
   const [lightboxIndex, setLightboxIndex] = useState(null);
 
   // ---- Direction A: per-room slots + live quote (Phase C2) ----------------
@@ -72,8 +81,6 @@ export default function HotelDetail({ hotel }) {
   // entry { roomId, board }. Order = add order. Length is independent of
   // occupancy (the guest adds as many rooms as they want).
   const [cart, setCart] = useState([]);
-  // Brief notice shown when the guest tries to exceed the rooms they searched.
-  const [capNotice, setCapNotice] = useState(false);
   // Active meal-plan filter (board code) or null = all. Drives the chips.
   const [mealFilter, setMealFilter] = useState(null);
 
@@ -112,36 +119,37 @@ export default function HotelDetail({ hotel }) {
     return Array.from(seen.entries()).map(([board, boardLabel]) => ({ board, boardLabel }));
   })();
 
-  // Cart selection rules:
-  //  (1) clicking a rate already selected -> remove it (toggle off)
-  //  (2) one board per room -> selecting another board on the same room switches
-  //  (3) total rooms selected can't exceed roomsQty (the search's room count);
-  //      a "N × Room" bundle counts as N toward the cap.
+  // Cart = list of picked rooms, each entry { roomId, board } = ONE physical
+  // room. Model A: the guest picks up to roomsQty rooms, mixing types freely
+  // (and may pick the same type more than once). Rules:
+  //  (1) clicking a rate that's the ONLY copy currently picked -> toggle OFF
+  //  (2) below the cap -> add this room (allows a second, different, or same type)
+  //  (3) at the cap -> replace the OLDEST picked room with this one
   function cartRoomsUsed(list) {
+    return list.length; // one entry = one room in Model A
+  }
+  // Total beds across picked rooms (for the strict capacity check).
+  function cartCapacity(list) {
     return list.reduce((sum, c) => {
       const opt = findOption(c.roomId, c.board);
-      return sum + (opt?.roomsCount || 1);
+      return sum + (opt?.capacity || 1);
     }, 0);
   }
 
   function addToCart(roomId, board) {
     setCart((prev) => {
-      const existing = prev.find((c) => c.roomId === roomId);
-      // (1) same room + same board already selected -> toggle OFF
-      if (existing && existing.board === board) {
-        return prev.filter((c) => c.roomId !== roomId);
+      // (1) toggle OFF only if this exact rate is the single selected copy
+      const sameRate = prev.filter((c) => c.roomId === roomId && c.board === board);
+      const isOnlyThisRate = prev.length === 1 && sameRate.length === 1;
+      if (isOnlyThisRate) return [];
+
+      const entry = { roomId, board };
+      // (2) room available under the cap -> append
+      if (prev.length < roomsQty) {
+        return [...prev, entry];
       }
-      // (2) same room, different board -> SWITCH (replace this room's board)
-      const withoutThisRoom = existing ? prev.filter((c) => c.roomId !== roomId) : prev;
-      // (3) room-cap check: does adding this option fit within roomsQty?
-      const thisOpt = findOption(roomId, board);
-      const thisRooms = thisOpt?.roomsCount || 1;
-      if (cartRoomsUsed(withoutThisRoom) + thisRooms > roomsQty) {
-        setCapNotice(true);
-        setTimeout(() => setCapNotice(false), 2600);
-        return prev; // reject — would exceed the rooms picked in search
-      }
-      return [...withoutThisRoom, { roomId, board }];
+      // (3) at the cap -> replace the OLDEST selection with this one
+      return [...prev.slice(1), entry];
     });
   }
   function removeFromCart(i) {
@@ -299,11 +307,14 @@ export default function HotelDetail({ hotel }) {
     router.push(`/booking?${params.toString()}`);
   }
 
-  const canReserve = !!checkIn && !!checkOut && !dateError &&
-    ((quote && cartOptions.length > 0) || (!quote && !!selectedRoom));
-
-  // Total guests from occupancy, for the header subline.
+  // Total guests from occupancy, for the header subline + capacity check.
   const totalGuests = occupancy.reduce((s, o) => s + (o.adults || 0) + (o.children || 0), 0);
+  // Strict capacity: the picked rooms must seat all guests.
+  const pickedCapacity = cartCapacity(cart);
+  const capacityShort = quote && cart.length > 0 && pickedCapacity < totalGuests;
+
+  const canReserve = !!checkIn && !!checkOut && !dateError &&
+    ((quote && cartOptions.length > 0 && !capacityShort) || (!quote && !!selectedRoom));
 
   const photos = hotel.photos || [];
 
@@ -513,11 +524,11 @@ export default function HotelDetail({ hotel }) {
                     <div className="nz-cart-title">
                       {t("detail.your_booking") !== "detail.your_booking" ? t("detail.your_booking") : "Your booking"} · {cartRoomsUsed(cart)} / {roomsQty} {roomsQty === 1 ? (t("detail.room_one") !== "detail.room_one" ? t("detail.room_one") : "room") : (t("detail.rooms_n") !== "detail.rooms_n" ? t("detail.rooms_n") : "rooms")}
                     </div>
-                    {capNotice && (
+                    {capacityShort && (
                       <div className="nz-cart-cap">
-                        {t("detail.cap_notice") !== "detail.cap_notice"
-                          ? t("detail.cap_notice")
-                          : `You searched for ${roomsQty} ${roomsQty === 1 ? "room" : "rooms"}. Remove one to pick a different option.`}
+                        {t("detail.cap_warn") !== "detail.cap_warn"
+                          ? t("detail.cap_warn")
+                          : `These rooms sleep ${pickedCapacity} guest${pickedCapacity === 1 ? "" : "s"}, but you have ${totalGuests}. Add another room or pick a larger type.`}
                       </div>
                     )}
                     {cartOptions.length === 0 ? (

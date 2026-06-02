@@ -1205,6 +1205,9 @@ function HotelEditor({ hotel, onClose, onSaved }) {
         .nzad-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
         .nzad-toggles { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
         .nzad-editor-actions { display: flex; gap: 10px; margin-bottom: 24px; }
+        .nzad-bf-toggle { display: flex; align-items: flex-start; gap: 10px; margin: 14px 0; cursor: pointer; font-size: 12.5px; color: var(--gray-500); line-height: 1.5; }
+        .nzad-bf-toggle input { width: 16px; height: 16px; margin-top: 1px; flex-shrink: 0; accent-color: var(--red, #E63946); }
+        .nzad-bf-toggle strong { color: var(--ink); }
         .nzad-note { padding: 16px; background: var(--cream); border: 1px dashed var(--gray-300); border-radius: var(--r-md); font-size: 13px; color: var(--gray-400); }
         @media (max-width: 720px) { .nzad-grid3 { grid-template-columns: 1fr; } }
       `}</style>
@@ -1218,7 +1221,7 @@ function HotelEditor({ hotel, onClose, onSaved }) {
 const BLANK_ROOM = {
   typeEn: "", typeFr: "", typeAr: "",
   capacity: 2, sizeSqm: 30, bedType: "King",
-  basePrice: 20000, totalUnits: 5, isActive: true,
+  basePrice: 20000, totalUnits: 5, breakfastIncluded: true, isActive: true,
 };
 
 function RoomsPanel({ hotelId, initialRooms, refresh }) {
@@ -1324,6 +1327,14 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
             <Field label="Bed type" v={draft.bedType} onChange={(v) => set("bedType", v)} />
             <Field label="Number of rooms" v={draft.totalUnits} onChange={(v) => set("totalUnits", v)} type="number" />
           </div>
+          <label className="nzad-bf-toggle">
+            <input
+              type="checkbox"
+              checked={draft.breakfastIncluded !== false}
+              onChange={(e) => set("breakfastIncluded", e.target.checked)}
+            />
+            <span><strong>Breakfast included (free)</strong> — guests see a free breakfast option. Turn off if this room has no breakfast.</span>
+          </label>
           <div className="nzad-editor-actions">
             <button className="nzad-btn-primary" onClick={addRoom} disabled={busy}>
               {busy ? "Adding…" : "Add room"}
@@ -1407,6 +1418,7 @@ function RoomCard({ room, onDelete, onRoomChange }) {
         sizeSqm: Number(draft.sizeSqm),
         basePrice: Number(draft.basePrice),
         totalUnits: Number(draft.totalUnits),
+        breakfastIncluded: draft.breakfastIncluded !== false,
       };
       const result = await adminUpdateRoom(room.id, payload);
       // The PUT returns the updated room (without its photos include), so
@@ -1460,6 +1472,14 @@ function RoomCard({ room, onDelete, onRoomChange }) {
             <Field label="Bed type" v={draft.bedType} onChange={(v) => setD("bedType", v)} />
             <Field label="Number of rooms" v={draft.totalUnits} onChange={(v) => setD("totalUnits", v)} type="number" />
           </div>
+          <label className="nzad-bf-toggle">
+            <input
+              type="checkbox"
+              checked={draft.breakfastIncluded !== false}
+              onChange={(e) => setD("breakfastIncluded", e.target.checked)}
+            />
+            <span><strong>Breakfast included (free)</strong> — guests see a free breakfast option. Turn off if this room has no breakfast.</span>
+          </label>
           <div className="nzad-redit-actions">
             <button className="nzad-btn-primary" onClick={saveRoom} disabled={savingRoom}>
               {savingRoom ? "Saving…" : "Save room"}
@@ -1509,6 +1529,9 @@ function RoomCard({ room, onDelete, onRoomChange }) {
           gap: 14px;
         }
         .nzad-redit-actions { display: flex; gap: 10px; margin-top: 14px; }
+        .nzad-bf-toggle { display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; cursor: pointer; font-size: 12.5px; color: var(--gray-500); line-height: 1.5; }
+        .nzad-bf-toggle input { width: 16px; height: 16px; margin-top: 1px; flex-shrink: 0; accent-color: var(--red, #E63946); }
+        .nzad-bf-toggle strong { color: var(--ink); }
         .nzad-room-edit-err {
           padding: 9px 12px; margin-bottom: 12px;
           background: var(--red-soft); color: var(--red-deep);
