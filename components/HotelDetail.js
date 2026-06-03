@@ -461,11 +461,16 @@ export default function HotelDetail({ hotel }) {
                   if (boards.length === 0) return null;
                   const onReq = grp.availability !== "AVAILABLE";
                   const nRooms = boards[0]?.roomsCount || 1;
+                  const roomCap = boards[0]?.capacity || staticRoom?.capacity || 1;
+                  // When only 1 room is searched, a room that can't seat all
+                  // guests is too small to book on its own — flag it so the user
+                  // picks a bigger one instead of getting stuck at checkout.
+                  const tooSmall = roomsQty === 1 && roomCap < totalGuests;
                   const roomTitle = nRooms > 1
                     ? `${nRooms} × ${localized(grp.roomType, lang)}`
                     : localized(grp.roomType, lang);
                   return (
-                    <div className="nz-rblock" key={grp.roomId}>
+                    <div className={`nz-rblock ${tooSmall ? "toosmall" : ""}`} key={grp.roomId}>
                       {/* room card — pinned left */}
                       <div className="nz-rcard">
                         <div className="nz-rcard-photo">
@@ -480,6 +485,9 @@ export default function HotelDetail({ hotel }) {
                           <span><Icon name="guest" size={14} /> {staticRoom?.capacity} {t("detail.guests")}</span>
                           {staticRoom?.sizeSqm && <span><Icon name="size" size={14} /> {staticRoom.sizeSqm} m²</span>}
                         </div>
+                        {tooSmall && (
+                          <div className="nz-rcard-toosmall">Sleeps {roomCap} · too small for {totalGuests} guests</div>
+                        )}
                       </div>
 
                       {/* rate cards — scroll right */}
@@ -525,13 +533,13 @@ export default function HotelDetail({ hotel }) {
                 <div className="nz-cart">
                   <div className="nz-cart-main">
                     <div className="nz-cart-title">
-                      {t("detail.your_booking") !== "detail.your_booking" ? t("detail.your_booking") : "Your booking"} · {cartRoomsUsed(cart)} / {roomsQty} {roomsQty === 1 ? (t("detail.room_one") !== "detail.room_one" ? t("detail.room_one") : "room") : (t("detail.rooms_n") !== "detail.rooms_n" ? t("detail.rooms_n") : "rooms")}
+                      Your booking · {cartRoomsUsed(cart)} of {roomsQty} {roomsQty === 1 ? "room" : "rooms"} selected
                     </div>
                     {capacityShort && (
                       <div className="nz-cart-cap">
-                        {t("detail.cap_warn") !== "detail.cap_warn"
-                          ? t("detail.cap_warn")
-                          : `These rooms sleep ${pickedCapacity} guest${pickedCapacity === 1 ? "" : "s"}, but you have ${totalGuests}. Add another room or pick a larger type.`}
+                        {roomsQty === 1
+                          ? `This room sleeps ${pickedCapacity}, but you're booking for ${totalGuests} guests. Please choose a larger room.`
+                          : `Your rooms sleep ${pickedCapacity}, but you have ${totalGuests} guests. Add another room or pick a larger one.`}
                       </div>
                     )}
                     {cartOptions.length === 0 ? (
@@ -964,6 +972,9 @@ function DetailStyles() {
       .nz-rcard-bed { font-size: 12.5px; color: var(--gray-500); }
       .nz-rcard-specs { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
       .nz-rcard-specs span { font-size: 12px; color: var(--gray-400); display: flex; align-items: center; gap: 5px; }
+      .nz-rcard-toosmall { font-size: 11.5px; font-weight: 700; color: var(--red-deep, #A32D2D); margin-top: 6px; line-height: 1.35; }
+      .nz-rblock.toosmall { opacity: 0.62; }
+      .nz-rblock.toosmall .nz-rate-btn { background: var(--gray-300, #c9c9c9); }
 
       .nz-rates {
         flex: 1; min-width: 0; display: flex; gap: 10px; overflow-x: auto;
