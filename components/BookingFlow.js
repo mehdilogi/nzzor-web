@@ -4,8 +4,13 @@
 // Nzzor — Booking Flow
 // Step 1: guest details · Step 2: payment + promo · Step 3: confirmation
 // Guest checkout by default; optional account creation. CIB & Edahabia.
-// Cash-at-hotel intentionally omitted. CIB completes as pending-payment
-// (Option B) — the real SATIM redirect slots into payNow() later.
+// Cash-at-hotel intentionally omitted.
+//
+// Card payments hand off to SATIM-EPG's hosted page: we create the booking
+// (which lands as PENDING_PAYMENT), register it as an order, then send the
+// browser to the formUrl SATIM returns. The customer comes back to
+// /booking/result, which the API redirects to after confirming the outcome
+// server-side.
 // =============================================================================
 
 import { useState, useEffect } from "react";
@@ -16,7 +21,7 @@ import { useLang } from "../lib/LangContext";
 import { useAuth } from "../lib/AuthContext";
 import { formatPrice } from "../lib/format";
 import { validateCoupon, couponDiscount } from "../lib/coupons";
-import { createBooking } from "../lib/api";
+import { createBooking, startSatimPayment } from "../lib/api";
 import { validateBookingDates, localizeDateError } from "../lib/dates";
 import { setUserToken } from "../lib/accountApi";
 
@@ -37,7 +42,7 @@ function boardLabel(board, t) {
 }
 
 export default function BookingFlow({ hotel, selections, nights, checkIn, checkOut }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const router = useRouter();
   const { user, refresh: refreshAuth } = useAuth();
 
@@ -220,21 +225,43 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
     const firstName = parts[0] || name.trim();
     const lastName = parts.slice(1).join(" ") || parts[0] || "-";
 
-    // backend payment-method codes are uppercase. Explicit map — do NOT use a
-    // binary fallback here: a "anything-else -> CIB" ternary silently mis-files
-    // Visa/Mastercard bookings as CIB. Every selectable method maps explicitly,
-    // and an unknown value throws rather than guessing.
+    // Backend payment-method codes are uppercase. Explicit map — do NOT add a
+    // "anything-else -> CIB" fallback: every selectable method must map
+    // explicitly, and an unknown value must fail rather than guess.
+    //
+    // These keys MUST stay in lockstep with the Zod enum in api/src/routes/
+    // bookings.js AND the PaymentMethod enum in schema.prisma. VISA and
+    // MASTERCARD used to be here and in Zod but never existed in the database
+    // enum, so choosing them passed validation and then threw inside the
+    // booking transaction — an opaque 500 with no clue for the customer.
+    // SATIM-EPG is a CIB card acceptance system; the "Verified by Visa /
+    // MasterCard SecureCode" in their docs refers to the 3-D Secure protocol,
+    // not to accepting foreign scheme cards.
     const METHOD_CODES = {
       cib: "CIB",
       edahabia: "EDDAHABIA",
-      visa: "VISA",
-      mastercard: "MASTERCARD",
     };
     const methodCode = METHOD_CODES[payMethod];
     if (!methodCode) {
-      setBookingError(t("bk.pay_method_error") || "Please choose a payment method.");
+      // Reset the spinner before bailing out. Without this the pay button
+      // stays in its processing state forever, because setProcessing(false)
+      // only runs further down after the await.
+      setProcessing(false);
+      const msg = t("bk.pay_method_error");
+      setBookingError({
+        message: msg && msg !== "bk.pay_method_error" ? msg : "Please choose a payment method.",
+        code: "NO_PAYMENT_METHOD",
+      });
       return;
     }
+
+    // Methods that redirect to the SATIM hosted payment page.
+    const CARD_METHODS = ["CIB", "EDDAHABIA"];
+    const isCard = CARD_METHODS.includes(methodCode);
+
+    // t() returns the raw key on a miss, so guard with !== key rather than a
+    // || fallback (which never fires, because the key itself is truthy).
+    const bookingLang = ["ar", "fr", "en"].includes(lang) ? lang : "fr";
 
     // payload shaped exactly as the backend's bookings route expects
     const payload = {
@@ -254,7 +281,11 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
       },
       specialRequests: notes.trim() || undefined,
       paymentMethod: methodCode,
-      lang: "en",
+      // Was hardcoded "en". This field selects which of the 15 email
+      // templates fires and what language the PDF voucher renders in, so a
+      // hardcoded value meant every Arabic and French guest received an
+      // English confirmation.
+      lang: bookingLang,
       // Account creation at booking time. The backend hashes the password
       // and creates a user IF createAccount is true, password is provided,
       // and no account with that email already exists. If the email is
@@ -266,7 +297,6 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
       promoCode: coupon?.code || undefined,
     };
     const result = await createBooking(payload);
-    setProcessing(false);
     if (result.ok) {
       // If the backend just created an account for this booking, it
       // returns an auth token. Persist it and refresh AuthContext so the
@@ -279,10 +309,43 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
         // user. We await so the UI doesn't briefly show "signed out" state.
         await refreshAuth();
       }
+      // ---- card payments: hand off to SATIM's hosted page ---------------
+      // The booking exists as PENDING_PAYMENT and holds inventory. It is NOT
+      // confirmed and no email has been sent — that happens only after SATIM
+      // confirms the payment server-side.
+      //
+      // result.data.demo is set only by the api.js no-backend fallback; there
+      // is nothing real to pay for in that case, so skip the redirect.
+      if (isCard && !result.data.demo) {
+        const pay = await startSatimPayment(result.data.reference, { lang: bookingLang });
+        if (pay.ok && pay.formUrl) {
+          // Deliberately leave `processing` true: we are navigating away, and
+          // clearing it would flash an idle pay button during the redirect.
+          window.location.href = pay.formUrl;
+          return;
+        }
+        // Could not reach the gateway. The booking is real and still held, so
+        // say so rather than implying nothing happened — the customer should
+        // keep their reference.
+        setProcessing(false);
+        const msg = t("bk.err_payment_init");
+        setBookingError({
+          message:
+            (msg && msg !== "bk.err_payment_init" ? msg : null) ||
+            pay.error ||
+            "We could not open the payment page. Your booking is held — please try again or contact us.",
+          code: pay.code || "PAYMENT_INIT_FAILED",
+          reference: result.data.reference,
+        });
+        return;
+      }
+
+      setProcessing(false);
       setReference(result.data.reference);
       setStep(3);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
+      setProcessing(false);
       // Real error from the backend. We surface it to the user on the
       // current step (payment) so they understand what happened and can
       // act on it — either fix something (re-pick dates, change payment
@@ -482,33 +545,21 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
                   <span className="bk-pay-logo gold">ED</span>
                 </button>
 
-                <button
-                  className={`bk-pay ${payMethod === "visa" ? "on" : ""}`}
-                  onClick={() => setPayMethod("visa")}
-                >
-                  <span className="bk-pay-radio" />
-                  <span className="bk-pay-info">
-                    <strong>Visa</strong>
-                    <em>{t("bk.visa_desc")}</em>
-                  </span>
-                  <span className="bk-pay-logo card">
-                    <Icon name="visa" size={22} />
-                  </span>
-                </button>
+                {/*
+                  Visa and Mastercard buttons removed. They mapped to VISA /
+                  MASTERCARD, which existed in the Zod enum but never in the
+                  PaymentMethod database enum — so selecting either passed
+                  validation and then threw inside the booking transaction,
+                  surfacing to the customer as a bare 500.
 
-                <button
-                  className={`bk-pay ${payMethod === "mastercard" ? "on" : ""}`}
-                  onClick={() => setPayMethod("mastercard")}
-                >
-                  <span className="bk-pay-radio" />
-                  <span className="bk-pay-info">
-                    <strong>Mastercard</strong>
-                    <em>{t("bk.mastercard_desc")}</em>
-                  </span>
-                  <span className="bk-pay-logo card">
-                    <Icon name="mastercard" size={22} />
-                  </span>
-                </button>
+                  They are not simply "not wired up yet": SATIM-EPG is a CIB
+                  card acceptance system. The "Verified by Visa / MasterCard
+                  SecureCode" wording in SATIM's documentation describes the
+                  3-D Secure authentication protocol, not acceptance of foreign
+                  scheme cards. If an international acquiring arrangement is
+                  added later, restore these buttons AND add the values to both
+                  enums in the same change — never one without the other.
+                */}
               </div>
 
               {/* promo code */}
