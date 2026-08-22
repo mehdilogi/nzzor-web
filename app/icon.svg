@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Nzzor">
+  <!--
+    Nzzor favicon.
+
+    Next.js 14's app router picks this up automatically from app/icon.svg and
+    emits the <link rel="icon"> tags — no manual metadata entry needed.
+
+    The mark is the brand's red dot (see components/LogoMark.js, rgb 230,57,70)
+    on the ink field from the Daylight Cinematic palette. A bare red dot on
+    transparent was the other option, but it vanishes against the red-tinted
+    tab chrome some browsers use and reads as a stray pixel at 16px. The dark
+    rounded square gives it an edge to sit against on both light and dark tabs.
+
+    Deliberately no letterform: at 16px an "N" in Clash Display turns to mush,
+    and the dot alone is already the brand's primary mark.
+  -->
+  <rect width="64" height="64" rx="14" fill="#16161A"/>
+  <circle cx="32" cy="32" r="15" fill="#E63946"/>
+</svg>

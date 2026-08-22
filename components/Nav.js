@@ -15,7 +15,9 @@ export default function Nav({ overHero = false }) {
   const [scrolled, setScrolled] = useState(!overHero);
   const [menuOpen, setMenuOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
+  const [signOpen, setSignOpen] = useState(false);
   const langRef = useRef(null);
+  const signRef = useRef(null);
 
   // Close the language dropdown when clicking outside or pressing Escape
   useEffect(() => {
@@ -33,6 +35,24 @@ export default function Nav({ overHero = false }) {
       document.removeEventListener("keydown", onKey);
     };
   }, [langOpen]);
+
+  // Same dismiss behaviour as the language dropdown: click outside, tap
+  // outside, or Escape.
+  useEffect(() => {
+    if (!signOpen) return;
+    function onDocClick(e) {
+      if (signRef.current && !signRef.current.contains(e.target)) setSignOpen(false);
+    }
+    function onKey(e) { if (e.key === "Escape") setSignOpen(false); }
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("touchstart", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("touchstart", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [signOpen]);
 
   useEffect(() => {
     if (!overHero) return;
@@ -87,12 +107,49 @@ export default function Nav({ overHero = false }) {
               onClick={() => setLang("ar")}
             >ع</button>
           </div>
-          <button
-            className="nzn-signin"
-            onClick={() => router.push(user ? "/account" : "/signin")}
-          >
-            {user ? (user.firstName || t("nav.signin")) : t("nav.signin")}
-          </button>
+          {/*
+            Signed in -> straight to /account, no menu: the user has already
+            told us who they are, so making them pick again is friction.
+            Signed out -> choose Client (/signin) or Partner (/partner).
+          */}
+          {user ? (
+            <button className="nzn-signin" onClick={() => router.push("/account")}>
+              {user.firstName || t("nav.signin")}
+            </button>
+          ) : (
+            <div className="nzn-sign-wrap" ref={signRef}>
+              <button
+                className={`nzn-signin nzn-signin-drop ${signOpen ? "open" : ""}`}
+                onClick={() => setSignOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={signOpen}
+              >
+                <span>{t("nav.signin")}</span>
+                <svg width="9" height="6" viewBox="0 0 9 6" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M1 1L4.5 4.5L8 1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              {signOpen && (
+                <div className="nzn-sign-menu" role="menu">
+                  <button
+                    role="menuitem"
+                    onClick={() => { setSignOpen(false); router.push("/signin"); }}
+                  >
+                    <span className="nzn-sign-label">{t("nav.signin_client")}</span>
+                    <span className="nzn-sign-desc">{t("nav.signin_client_desc")}</span>
+                  </button>
+                  <div className="nzn-sign-sep" />
+                  <button
+                    role="menuitem"
+                    onClick={() => { setSignOpen(false); router.push("/partner"); }}
+                  >
+                    <span className="nzn-sign-label">{t("nav.signin_partner")}</span>
+                    <span className="nzn-sign-desc">{t("nav.signin_partner_desc")}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           {/* Mobile-only language dropdown — tap to open, pick from EN/FR/AR */}
           <div className="nzn-lang-mobile-wrap" ref={langRef}>
             <button
@@ -190,12 +247,29 @@ export default function Nav({ overHero = false }) {
               onClick={() => setLang("ar")}
             >العربية</button>
           </div>
-          <button
-            className="nzn-menu-cta"
-            onClick={() => { setMenuOpen(false); router.push(user ? "/account" : "/signin"); }}
-          >
-            {user ? t("acc.title") : t("nav.signin")}
-          </button>
+          {user ? (
+            <button
+              className="nzn-menu-cta"
+              onClick={() => { setMenuOpen(false); router.push("/account"); }}
+            >
+              {t("acc.title")}
+            </button>
+          ) : (
+            <div className="nzn-menu-signs">
+              <button
+                className="nzn-menu-cta"
+                onClick={() => { setMenuOpen(false); router.push("/signin"); }}
+              >
+                {t("nav.signin_client")}
+              </button>
+              <button
+                className="nzn-menu-cta ghost"
+                onClick={() => { setMenuOpen(false); router.push("/partner"); }}
+              >
+                {t("nav.signin_partner")}
+              </button>
+            </div>
+          )}
           <p className="nzn-menu-foot">
             {t("nav.menu_foot")}
           </p>
@@ -343,6 +417,52 @@ export default function Nav({ overHero = false }) {
           color: ${dark ? "var(--ink)" : "#fff"};
           border: none; padding: 10px 22px; border-radius: 980px;
           font-size: 13px; font-weight: 700; cursor: pointer;
+          font-family: inherit;
+        }
+
+        /* ---- SIGN IN DROPDOWN (Client / Partner) ----
+           These rules live in this one block deliberately. Adding a second
+           styled-jsx block to the same JSX tree makes the SWC transform panic
+           with an unhelpful "Option::unwrap on None" (Next.js issue 65066),
+           so every conditional sub-tree's CSS is merged here. */
+        .nzn-sign-wrap { position: relative; }
+        .nzn-signin-drop {
+          display: inline-flex; align-items: center; gap: 7px;
+        }
+        .nzn-signin-drop svg { transition: transform .2s; opacity: .7; flex-shrink: 0; }
+        .nzn-signin-drop.open svg { transform: rotate(180deg); }
+
+        .nzn-sign-menu {
+          position: absolute;
+          top: calc(100% + 8px);
+          right: 0;
+          min-width: 230px;
+          background: #fff;
+          border-radius: var(--r-sm);
+          box-shadow:
+            0 12px 32px -8px rgba(15, 17, 26, 0.25),
+            0 0 0 1px rgba(15, 17, 26, 0.06);
+          padding: 6px;
+          z-index: 1000;
+          animation: nzn-lang-rise 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .nzn-sign-menu button {
+          display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+          width: 100%;
+          padding: 10px 12px;
+          background: none; border: none; border-radius: 6px;
+          cursor: pointer; font-family: inherit; text-align: left;
+          transition: background .12s;
+        }
+        .nzn-sign-menu button:hover { background: var(--gray-100); }
+        .nzn-sign-label { font-size: 14px; font-weight: 700; color: var(--ink); }
+        .nzn-sign-desc { font-size: 12px; color: var(--gray-400); font-weight: 500; }
+        .nzn-sign-sep { height: 1px; background: var(--gray-100); margin: 4px 8px; }
+
+        .nzn-menu-signs { display: flex; flex-direction: column; gap: 8px; }
+        .nzn-menu-cta.ghost {
+          background: #fff; color: var(--ink);
+          border: 1.5px solid var(--gray-200);
         }
 
         /* burger */
@@ -416,7 +536,7 @@ export default function Nav({ overHero = false }) {
         @media (max-width: 860px) {
           .nzn { padding: 12px 20px; }
           .nzn-links { display: none; }
-          .nzn-signin { display: none; }
+          .nzn-signin, .nzn-sign-wrap { display: none; }
           .nzn-lang { display: none; }
           .nzn-lang-mobile-wrap { display: block; }
           .nzn-burger { display: flex; }
