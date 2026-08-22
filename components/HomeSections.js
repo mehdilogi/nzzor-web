@@ -107,15 +107,21 @@ export default function HomeSections({ featured, wilayaCount = 9 }) {
 
           <div className="nz-stat" style={{ transitionDelay: "0ms" }}>
             <div className="v display">
-              <svg className="tick" width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-                <path
-                  d="M9 20.5L16.5 28L31 13"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              {/* A bare hairline tick sat next to 46px numerals and read as an
+                  empty slot. Seating it in a soft-red disc gives it the same
+                  optical weight as a numeral, and turns it into a stamp —
+                  which is what "verified" should look like. */}
+              <span className="seal">
+                <svg className="tick" width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true">
+                  <path
+                    d="M7 15.5L12.5 21L23 9.5"
+                    stroke="currentColor"
+                    strokeWidth="3.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
             </div>
             <div className="l">{t("trust.hotels")}</div>
           </div>
@@ -287,6 +293,7 @@ export default function HomeSections({ featured, wilayaCount = 9 }) {
         /* Each item rises in on its own delay (set inline). Transform +
            opacity only, so the whole thing stays on the compositor. */
         .nz-stat {
+          position: relative;
           flex: 1 1 0;
           min-width: 0;
           text-align: center;
@@ -297,6 +304,58 @@ export default function HomeSections({ featured, wilayaCount = 9 }) {
             transform .7s cubic-bezier(0.16, 1, 0.3, 1);
         }
         .nz-stats.in .nz-stat { opacity: 1; transform: translateY(0); }
+
+        /* ---- DIVIDERS ----
+           Hairlines between items, drawn as a gradient so they fade out at
+           both ends instead of stopping dead — a hard-edged 1px rule looks
+           like a table border, a faded one looks drawn.
+
+           They scale up from the centre AFTER the numbers have landed, so the
+           eye reads the values first and the structure second. */
+        .nz-stat + .nz-stat::before {
+          content: "";
+          position: absolute;
+          left: -12px;
+          top: 50%;
+          width: 1px;
+          height: 58px;
+          background: linear-gradient(
+            to bottom,
+            transparent,
+            var(--gray-200) 22%,
+            var(--gray-200) 78%,
+            transparent
+          );
+          transform: translateY(-50%) scaleY(0);
+          transform-origin: center;
+          transition: transform .55s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .nz-stats.in .nz-stat + .nz-stat::before { transform: translateY(-50%) scaleY(1); }
+        .nz-stats.in .nz-stat:nth-child(2)::before { transition-delay: .42s; }
+        .nz-stats.in .nz-stat:nth-child(3)::before { transition-delay: .50s; }
+        .nz-stats.in .nz-stat:nth-child(4)::before { transition-delay: .58s; }
+        .nz-stats.in .nz-stat:nth-child(5)::before { transition-delay: .66s; }
+
+        /* ---- VERIFIED SEAL ----
+           Sized to match the cap height of the 46px numerals beside it so the
+           row keeps one optical baseline. The disc scales in with a slight
+           overshoot, then the tick draws inside it. */
+        .nz-stat .seal {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 52px;
+          height: 52px;
+          border-radius: 50%;
+          background: var(--red-soft);
+          color: var(--red);
+          transform: scale(0.72);
+          opacity: 0;
+          transition:
+            transform .6s cubic-bezier(0.34, 1.56, 0.64, 1),
+            opacity .4s ease;
+        }
+        .nz-stats.in .nz-stat .seal { transform: scale(1); opacity: 1; }
 
         /* Font comes from the global "display" class on the element (Clash
            Display), exactly as the old trust bar did — do NOT set font-family
@@ -330,13 +389,12 @@ export default function HomeSections({ featured, wilayaCount = 9 }) {
 
         /* Check mark draws itself once, after its item has risen in. 60 is
            comfortably longer than the path, so the dash fully clears it. */
-        .nz-stat .tick { color: var(--red); }
         .nz-stat .tick path {
-          stroke-dasharray: 60;
-          stroke-dashoffset: 60;
+          stroke-dasharray: 40;
+          stroke-dashoffset: 40;
         }
         .nz-stats.in .nz-stat .tick path {
-          animation: nz-tick-draw .75s cubic-bezier(0.16, 1, 0.3, 1) .25s forwards;
+          animation: nz-tick-draw .6s cubic-bezier(0.16, 1, 0.3, 1) .42s forwards;
         }
         @keyframes nz-tick-draw {
           to { stroke-dashoffset: 0; }
@@ -352,6 +410,8 @@ export default function HomeSections({ featured, wilayaCount = 9 }) {
             transition: none;
           }
           .nz-stats.in .nz-stat .tick path { animation: none; stroke-dashoffset: 0; }
+          .nz-stat + .nz-stat::before { transform: translateY(-50%) scaleY(1); transition: none; }
+          .nz-stat .seal { transform: scale(1); opacity: 1; transition: none; }
         }
 
         @media (max-width: 860px) {
@@ -361,8 +421,12 @@ export default function HomeSections({ featured, wilayaCount = 9 }) {
             padding: 40px 0 38px;
           }
           .nz-stat { flex: 0 0 calc(33.333% - 8px); }
+          /* The row wraps here, so vertical rules would land between items
+             that are no longer side by side. */
+          .nz-stat + .nz-stat::before { display: none; }
           .nz-stat .v { font-size: 34px; min-height: 34px; }
-          .nz-stat .tick { width: 32px; height: 32px; }
+          .nz-stat .seal { width: 40px; height: 40px; }
+          .nz-stat .seal svg { width: 24px; height: 24px; }
           .nz-stat .l { font-size: 12px; margin-top: 9px; }
         }
         @media (max-width: 480px) {
