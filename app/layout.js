@@ -17,9 +17,13 @@ export const metadata = {
   },
 };
 
-// Favicon: app/icon.svg is picked up automatically by the app router, which
-// generates the <link rel="icon"> tags. Do not add manual link tags in <head>
-// — they would duplicate what Next already emits.
+// Favicon: app/icon.png (512px) and app/apple-icon.png (180px) are picked up
+// automatically by the app router, which generates the link tags. Do not add
+// manual link tags in <head> — they would duplicate what Next already emits,
+// and do not keep an icon.svg alongside them: Next would emit both and let the
+// browser choose, which is how you end up with two different marks in the wild.
+// The black padding from the source render has been made transparent so the
+// tile's rounded corners sit correctly on light and dark tab chrome.
 export const viewport = {
   width: "device-width",
   initialScale: 1,
