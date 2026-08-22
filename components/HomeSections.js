@@ -106,7 +106,7 @@ export default function HomeSections({ featured, wilayaCount = 9 }) {
         <div className="wrap nz-stats-row">
 
           <div className="nz-stat" style={{ transitionDelay: "0ms" }}>
-            <div className="v">
+            <div className="v display">
               <svg className="tick" width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
                 <path
                   d="M9 20.5L16.5 28L31 13"
@@ -121,22 +121,22 @@ export default function HomeSections({ featured, wilayaCount = 9 }) {
           </div>
 
           <div className="nz-stat" style={{ transitionDelay: "90ms" }}>
-            <div className="v">{nWilayas}</div>
+            <div className="v display">{nWilayas}</div>
             <div className="l">{t("trust.cities")}</div>
           </div>
 
           <div className="nz-stat" style={{ transitionDelay: "180ms" }}>
-            <div className="v">{nSeconds}s</div>
+            <div className="v display">{nSeconds}s</div>
             <div className="l">{t("trust.toconfirm")}</div>
           </div>
 
           <div className="nz-stat" style={{ transitionDelay: "270ms" }}>
-            <div className="v">{nRating}</div>
+            <div className="v display">{nRating}</div>
             <div className="l">{t("trust.rating")}</div>
           </div>
 
           <div className="nz-stat" style={{ transitionDelay: "360ms" }}>
-            <div className="v">24/7</div>
+            <div className="v display">24/7</div>
             <div className="l">{t("trust.support")}</div>
           </div>
 
@@ -298,8 +298,15 @@ export default function HomeSections({ featured, wilayaCount = 9 }) {
         }
         .nz-stats.in .nz-stat { opacity: 1; transform: translateY(0); }
 
+        /* Font comes from the global "display" class on the element (Clash
+           Display), exactly as the old trust bar did — do NOT set font-family
+           here. An earlier revision guessed at a --font-display variable that
+           does not exist, fell through to the inherit fallback, and quietly
+           rendered these in Manrope.
+           NOTE: no backticks anywhere inside this block. It is a template
+           literal, so a stray backtick terminates the CSS string and the file
+           fails to parse. */
         .nz-stat .v {
-          font-family: var(--font-display, inherit);
           font-size: 46px;
           font-weight: 600;
           line-height: 1;
