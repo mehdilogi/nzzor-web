@@ -85,6 +85,11 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
   const [coupon, setCoupon] = useState(null);
   const [promoError, setPromoError] = useState(false);
   const [processing, setProcessing] = useState(false);
+  // SATIM cahier de recette: the general payment conditions and the sale
+  // conditions must be shown and actively accepted immediately before payment.
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  // reCAPTCHA token. Required on the page carrying the payment button.
+  const [captchaToken, setCaptchaToken] = useState(null);
 
   // confirmation
   const [reference, setReference] = useState("");
@@ -217,6 +222,55 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
   }
 
   // ---- confirm -------------------------------------------------------------
+  // Loads Google's reCAPTCHA v2 checkbox and renders it into #nz-captcha.
+  // Skipped entirely when NEXT_PUBLIC_RECAPTCHA_SITE_KEY is unset, so the
+  // checkout keeps working before the keys exist — the API mirrors this and
+  // only enforces once RECAPTCHA_SECRET is configured.
+  useEffect(() => {
+    const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+    if (!siteKey || step !== 2) return;
+
+    let widgetId = null;
+    let cancelled = false;
+
+    function render() {
+      if (cancelled) return;
+      const el = document.getElementById("nz-captcha");
+      if (!el || el.childElementCount > 0) return;
+      if (!window.grecaptcha || !window.grecaptcha.render) return;
+      widgetId = window.grecaptcha.render(el, {
+        sitekey: siteKey,
+        callback: (token) => setCaptchaToken(token),
+        "expired-callback": () => setCaptchaToken(null),
+        "error-callback": () => setCaptchaToken(null),
+      });
+    }
+
+    if (window.grecaptcha && window.grecaptcha.render) {
+      render();
+    } else if (!document.getElementById("nz-recaptcha-script")) {
+      const sc = document.createElement("script");
+      sc.id = "nz-recaptcha-script";
+      sc.src = "https://www.google.com/recaptcha/api.js?render=explicit";
+      sc.async = true;
+      sc.defer = true;
+      sc.onload = render;
+      document.head.appendChild(sc);
+    } else {
+      const iv = setInterval(() => {
+        if (window.grecaptcha && window.grecaptcha.render) { clearInterval(iv); render(); }
+      }, 200);
+      return () => { cancelled = true; clearInterval(iv); };
+    }
+
+    return () => {
+      cancelled = true;
+      if (widgetId !== null && window.grecaptcha && window.grecaptcha.reset) {
+        try { window.grecaptcha.reset(widgetId); } catch (_) {}
+      }
+    };
+  }, [step]);
+
   async function payNow() {
     setProcessing(true);
     setBookingError(null);
@@ -259,6 +313,28 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
     const CARD_METHODS = ["CIB", "EDDAHABIA"];
     const isCard = CARD_METHODS.includes(methodCode);
 
+    // Both gates below are SATIM cahier de recette requirements. They run
+    // before any network call so a customer is never charged for a booking
+    // that would have failed validation anyway.
+    if (!termsAccepted) {
+      setProcessing(false);
+      const m = t("bk.terms_required");
+      setBookingError({
+        message: m && m !== "bk.terms_required" ? m : "Please accept the terms before paying.",
+        code: "TERMS_NOT_ACCEPTED",
+      });
+      return;
+    }
+    if (process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY && !captchaToken) {
+      setProcessing(false);
+      const m = t("bk.captcha_required");
+      setBookingError({
+        message: m && m !== "bk.captcha_required" ? m : "Please complete the captcha.",
+        code: "CAPTCHA_REQUIRED",
+      });
+      return;
+    }
+
     // t() returns the raw key on a miss, so guard with !== key rather than a
     // || fallback (which never fires, because the key itself is truthy).
     const bookingLang = ["ar", "fr", "en"].includes(lang) ? lang : "fr";
@@ -281,6 +357,7 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
       },
       specialRequests: notes.trim() || undefined,
       paymentMethod: methodCode,
+      captchaToken: captchaToken || undefined,
       // Was hardcoded "en". This field selects which of the 15 email
       // templates fires and what language the PDF voucher renders in, so a
       // hardcoded value meant every Arabic and French guest received an
@@ -346,6 +423,12 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
       setProcessing(false);
+      // reCAPTCHA tokens are single-use. Leaving a spent token in state means
+      // the retry fails verification for a reason the customer cannot see.
+      if (window.grecaptcha && window.grecaptcha.reset) {
+        try { window.grecaptcha.reset(); } catch (_) {}
+      }
+      setCaptchaToken(null);
       // Real error from the backend. We surface it to the user on the
       // current step (payment) so they understand what happened and can
       // act on it — either fix something (re-pick dates, change payment
@@ -607,9 +690,61 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
                 </div>
               )}
 
-              <button className="bk-cta" onClick={payNow} disabled={processing}>
-                {processing ? t("bk.processing") : `${t("bk.pay_now")} · ${formatPrice(total)}`}
+              {/* ---- SATIM COMPLIANCE BLOCK ----
+                  Four graded items from the cahier de recette live here:
+                  the final amount shown prominently, the general conditions
+                  with an explicit acceptance, the anti-bot captcha, and the
+                  CIB/Edahabia mark on the button that redirects to SATIM.
+                  All four sit immediately before the payment action, which is
+                  where the checklist requires them. */}
+
+              {/* "Le montant finale que le client va payer — il doit figurer
+                  et mis en évidence sur la page (caractère gras, police
+                  différente, taille de la police plus grande)." */}
+              <div className="bk-final-amount">
+                <span className="bk-final-amount-label">{t("bk.amount_to_pay")}</span>
+                <span className="bk-final-amount-value display">{formatPrice(total)}</span>
+              </div>
+
+              <label className="bk-terms">
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => { setTermsAccepted(e.target.checked); setBookingError(null); }}
+                />
+                <span>
+                  {t("bk.terms_accept")}{" "}
+                  <a href="/terms" target="_blank" rel="noopener noreferrer">
+                    {t("bk.terms_link")}
+                  </a>
+                </span>
+              </label>
+
+              {/* Rendered by the effect above; stays empty and collapsed when
+                  NEXT_PUBLIC_RECAPTCHA_SITE_KEY is unset. */}
+              <div className="bk-captcha" id="nz-captcha" />
+
+              <button
+                className="bk-cta bk-cta-pay"
+                onClick={payNow}
+                disabled={processing}
+              >
+                <span className="bk-cta-text">
+                  {processing ? t("bk.processing") : `${t("bk.pay_now")} · ${formatPrice(total)}`}
+                </span>
+                {/* "Le logo CIB doit figurer sur le bouton qui envoie vers le
+                    lien de la Platform de paiement SATIM." Shown only for the
+                    card methods, which are the ones that actually redirect. */}
+                {(payMethod === "cib" || payMethod === "edahabia") && !processing && (
+                  <span className="bk-cta-mark" aria-hidden="true">
+                    {payMethod === "cib" ? "CIB" : "ED"}
+                  </span>
+                )}
               </button>
+
+              {/* SATIM's green number, required wherever payment problems can
+                  occur — not only on the return page. */}
+              <p className="bk-satim-help">{t("bk.satim_helpline")}</p>
 
               <button className="bk-back" onClick={() => setStep(1)}>
                 <Icon name="arrow" size={15} strokeWidth={2.5} className="icon-flip" />
@@ -973,6 +1108,60 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
         .bk-promo-applied button {
           border: none; background: none; color: var(--gray-400); font-size: 12.5px;
           font-weight: 700; cursor: pointer; text-decoration: underline; font-family: inherit;
+        }
+
+        /* ---- SATIM COMPLIANCE BLOCK ---- */
+        /* The amount must be unmissable: heavier, larger, and in the display
+           face rather than body text. This is a graded item, not styling
+           preference. */
+        .bk-final-amount {
+          display: flex; align-items: baseline; justify-content: space-between;
+          gap: 14px;
+          padding: 16px 18px;
+          margin-bottom: 14px;
+          background: var(--cream, #FAF8F4);
+          border: 1px solid var(--gray-200);
+          border-radius: var(--r-sm, 12px);
+        }
+        .bk-final-amount-label {
+          font-size: 13px; font-weight: 600; color: var(--gray-400);
+        }
+        .bk-final-amount-value {
+          font-size: 26px; font-weight: 700; color: var(--ink);
+          letter-spacing: -0.02em;
+        }
+
+        .bk-terms {
+          display: flex; align-items: flex-start; gap: 10px;
+          margin-bottom: 14px;
+          font-size: 13px; line-height: 1.5; color: var(--gray-400);
+          cursor: pointer;
+        }
+        .bk-terms input {
+          margin-top: 2px; width: 17px; height: 17px;
+          accent-color: var(--red); cursor: pointer; flex-shrink: 0;
+        }
+        .bk-terms a { color: var(--ink); font-weight: 600; text-decoration: underline; }
+
+        /* Collapses to nothing when the site key is unset, so the layout does
+           not carry an empty gap before the keys are configured. */
+        .bk-captcha:not(:empty) { margin-bottom: 14px; }
+
+        .bk-cta-pay {
+          display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .bk-cta-mark {
+          display: inline-flex; align-items: center; justify-content: center;
+          min-width: 34px; height: 21px; padding: 0 6px;
+          background: #fff; color: var(--ink);
+          border-radius: 4px;
+          font-size: 11px; font-weight: 800; letter-spacing: 0.02em;
+          flex-shrink: 0;
+        }
+
+        .bk-satim-help {
+          margin-top: 10px; text-align: center;
+          font-size: 12px; color: var(--gray-400); line-height: 1.5;
         }
 
         .bk-secure {
