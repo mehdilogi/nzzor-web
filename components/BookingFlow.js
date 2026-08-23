@@ -271,6 +271,31 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
     };
   }, [step]);
 
+  // Turns an API error into something a customer can act on.
+  //
+  // Resolution order: errors.payment.<CODE>, then errors.dates.<CODE>, then a
+  // generic gateway line for any SATIM_* code, then the raw English message.
+  // t() returns the key itself on a miss, so each lookup is compared against
+  // its own key rather than using a || fallback (which never fires, because
+  // the key string is truthy).
+  function resolveErrorText(err) {
+    if (!err) return "";
+    const code = err.code;
+    if (code) {
+      const paymentKey = `errors.payment.${code}`;
+      if (t(paymentKey) !== paymentKey) return t(paymentKey);
+      const dateKey = `errors.dates.${code}`;
+      if (t(dateKey) !== dateKey) return t(dateKey);
+      // SATIM_REGISTER_5, SATIM_UNREACHABLE, SATIM_NOT_CONFIGURED and friends
+      // are diagnostic codes for us, never for the customer.
+      if (String(code).startsWith("SATIM_")) {
+        const generic = "errors.payment.GATEWAY_GENERIC";
+        if (t(generic) !== generic) return t(generic);
+      }
+    }
+    return err.message || t("bk.err_generic");
+  }
+
   async function payNow() {
     setProcessing(true);
     setBookingError(null);
@@ -680,12 +705,22 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
                 <div className="bk-booking-err" role="alert">
                   <Icon name="shield" size={18} style={{ color: "var(--red)" }} />
                   <div>
-                    <strong>{t("bk.err_could_not_create")}</strong>
-                    <p>
-                      {bookingError.code && t(`errors.dates.${bookingError.code}`) !== `errors.dates.${bookingError.code}`
-                        ? t(`errors.dates.${bookingError.code}`)
-                        : bookingError.message}
-                    </p>
+                    {/* Two different failures wear different headings. If the
+                        booking was created and only the gateway handoff failed,
+                        saying "we couldn't complete this booking" is false and
+                        alarming — the reservation exists and is holding a room.
+                        bookingError.reference is set only in that case. */}
+                    <strong>
+                      {bookingError.reference
+                        ? t("bk.err_booking_held")
+                        : t("bk.err_could_not_create")}
+                    </strong>
+                    <p>{resolveErrorText(bookingError)}</p>
+                    {bookingError.reference && (
+                      <p className="bk-booking-err-ref">
+                        {t("bk.your_ref")}: <strong>{bookingError.reference}</strong>
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -1108,6 +1143,12 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
         .bk-promo-applied button {
           border: none; background: none; color: var(--gray-400); font-size: 12.5px;
           font-weight: 700; cursor: pointer; text-decoration: underline; font-family: inherit;
+        }
+
+        .bk-booking-err-ref {
+          margin-top: 6px;
+          font-size: 12.5px;
+          letter-spacing: 0.03em;
         }
 
         /* ---- SATIM COMPLIANCE BLOCK ---- */
