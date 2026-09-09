@@ -226,51 +226,54 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
   // Skipped entirely when NEXT_PUBLIC_RECAPTCHA_SITE_KEY is unset, so the
   // checkout keeps working before the keys exist — the API mirrors this and
   // only enforces once RECAPTCHA_SECRET is configured.
-  useEffect(() => {
+   useEffect(() => {
     const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
     if (!siteKey || step !== 2) return;
 
     let widgetId = null;
     let cancelled = false;
+    let iv = null;
 
+    // Returns true once there is nothing left to do.
     function render() {
-      if (cancelled) return;
+      if (cancelled) return true;
       const el = document.getElementById("nz-captcha");
-      if (!el || el.childElementCount > 0) return;
-      if (!window.grecaptcha || !window.grecaptcha.render) return;
+      if (!el) return false;
+      if (el.childElementCount > 0) return true;
+      if (!window.grecaptcha || !window.grecaptcha.render) return false;
       widgetId = window.grecaptcha.render(el, {
         sitekey: siteKey,
         callback: (token) => setCaptchaToken(token),
         "expired-callback": () => setCaptchaToken(null),
         "error-callback": () => setCaptchaToken(null),
       });
+      return true;
     }
 
-    if (window.grecaptcha && window.grecaptcha.render) {
-      render();
-    } else if (!document.getElementById("nz-recaptcha-script")) {
-      const sc = document.createElement("script");
-      sc.id = "nz-recaptcha-script";
-      sc.src = "https://www.google.com/recaptcha/api.js?render=explicit";
-      sc.async = true;
-      sc.defer = true;
-      sc.onload = render;
-      document.head.appendChild(sc);
-    } else {
-      const iv = setInterval(() => {
-        if (window.grecaptcha && window.grecaptcha.render) { clearInterval(iv); render(); }
+    if (!render()) {
+      if (!document.getElementById("nz-recaptcha-script")) {
+        const sc = document.createElement("script");
+        sc.id = "nz-recaptcha-script";
+        sc.src = "https://www.google.com/recaptcha/api.js?render=explicit";
+        sc.async = true;
+        sc.defer = true;
+        document.head.appendChild(sc);
+      }
+      // grecaptcha.render does not exist at the script's own onload — the
+      // loader fetches its locale bundle first. Poll instead of trusting it.
+      iv = setInterval(() => {
+        if (render()) clearInterval(iv);
       }, 200);
-      return () => { cancelled = true; clearInterval(iv); };
     }
 
     return () => {
       cancelled = true;
+      if (iv) clearInterval(iv);
       if (widgetId !== null && window.grecaptcha && window.grecaptcha.reset) {
         try { window.grecaptcha.reset(widgetId); } catch (_) {}
       }
     };
   }, [step]);
-
   // Turns an API error into something a customer can act on.
   //
   // Resolution order: errors.payment.<CODE>, then errors.dates.<CODE>, then a
