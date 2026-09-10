@@ -226,7 +226,7 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
   // Skipped entirely when NEXT_PUBLIC_RECAPTCHA_SITE_KEY is unset, so the
   // checkout keeps working before the keys exist — the API mirrors this and
   // only enforces once RECAPTCHA_SECRET is configured.
-   useEffect(() => {
+  useEffect(() => {
     const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
     if (!siteKey || step !== 2) return;
 
@@ -259,8 +259,10 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
         sc.defer = true;
         document.head.appendChild(sc);
       }
-      // grecaptcha.render does not exist at the script's own onload — the
-      // loader fetches its locale bundle first. Poll instead of trusting it.
+      // grecaptcha.render does not exist at the script's own onload event --
+      // api.js fetches its locale bundle first, so onload fires too early.
+      // Poll instead of trusting it. This also covers the case where the
+      // container has not mounted yet.
       iv = setInterval(() => {
         if (render()) clearInterval(iv);
       }, 200);
@@ -274,6 +276,7 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
       }
     };
   }, [step]);
+
   // Turns an API error into something a customer can act on.
   //
   // Resolution order: errors.payment.<CODE>, then errors.dates.<CODE>, then a
@@ -641,7 +644,6 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
                     <strong>CIB</strong>
                     <em>{t("bk.cib_desc")}</em>
                   </span>
-                  <span className="bk-pay-logo">CIB</span>
                 </button>
 
                 <button
@@ -653,7 +655,6 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
                     <strong>Edahabia</strong>
                     <em>{t("bk.edahabia_desc")}</em>
                   </span>
-                  <span className="bk-pay-logo gold">ED</span>
                 </button>
 
                 {/*
@@ -773,10 +774,10 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
                 {/* "Le logo CIB doit figurer sur le bouton qui envoie vers le
                     lien de la Platform de paiement SATIM." Shown only for the
                     card methods, which are the ones that actually redirect. */}
-                                {(payMethod === "cib" || payMethod === "edahabia") && !processing && (
+                {(payMethod === "cib" || payMethod === "edahabia") && !processing && (
                   <img
                     className="bk-cta-mark"
-                    src="/Cib-edahabia.png"
+                    src="/cib-edahabia.png"
                     alt="CIB / Edahabia"
                     width={50}
                     height={32}
@@ -1112,19 +1113,6 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
         .bk-pay-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
         .bk-pay-info strong { font-size: 15px; font-weight: 700; color: var(--ink); }
         .bk-pay-info em { font-size: 12.5px; font-style: normal; color: var(--gray-400); }
-        .bk-pay-logo {
-          font-weight: 800; font-size: 13px; color: #fff; background: var(--ink);
-          padding: 6px 10px; border-radius: 6px; letter-spacing: 0.02em;
-        }
-        .bk-pay-logo.gold { background: #C8951C; }
-        /* For icon-based marks (Visa/Mastercard). Neutral chrome — holds the
-           Icon glyph centred. Replace the placeholder glyph in Icon.js with the
-           official brand SVGs; this box just frames them. */
-        .bk-pay-logo.card {
-          background: var(--cream); border: 1px solid var(--gray-200);
-          padding: 5px 9px; display: inline-flex; align-items: center; color: var(--ink);
-        }
-
         /* promo */
         .bk-promo { margin-bottom: 24px; }
         .bk-promo label {
@@ -1198,9 +1186,10 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
         .bk-cta-pay {
           display: flex; align-items: center; justify-content: center; gap: 10px;
         }
-               .bk-cta-mark {
-          display: block; height: 32px; width: auto;
-          border-radius: 4px; flex-shrink: 0;
+        .bk-cta-mark {
+          display: block; height: 38px; width: auto;
+          border-radius: 4px;
+          flex-shrink: 0;
         }
 
         .bk-satim-help {
