@@ -57,11 +57,21 @@ export default function HotelCard({ hotel, priority = false }) {
 
   // Cap at five. A 200px-wide card cannot show twenty dots without turning
   // them into a smear, and nobody browses twenty photos from a grid anyway.
+  //
+  // A gallery entry may be a bare URL string or a record ({ url, ... }) — the
+  // API returns records, primaryPhoto is a plain string. Anything not resolved
+  // to a string is dropped rather than rendered as [object Object].
   const photos = useMemo(() => {
-    const list = Array.isArray(hotel.photos) && hotel.photos.length
-      ? hotel.photos
-      : [hotel.primaryPhoto];
-    return list.filter(Boolean).slice(0, 5);
+    const toUrl = (p) => {
+      if (!p) return null;
+      if (typeof p === "string") return p;
+      return p.url || p.src || p.path || p.secure_url || null;
+    };
+    const gallery = Array.isArray(hotel.photos) ? hotel.photos.map(toUrl).filter(Boolean) : [];
+    const primary = toUrl(hotel.primaryPhoto);
+    // Keep the primary first and never repeat it if the gallery also has it.
+    const ordered = primary ? [primary, ...gallery.filter((u) => u !== primary)] : gallery;
+    return ordered.slice(0, 5);
   }, [hotel.photos, hotel.primaryPhoto]);
 
   const [idx, setIdx] = useState(0);
