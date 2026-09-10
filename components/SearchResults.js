@@ -1,16 +1,46 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import HotelCard from "./HotelCard";
 import { useLang } from "../lib/LangContext";
 import { parseQuery } from "../lib/nlSearch";
 
-export default function SearchResults({ initialHotels, cities, initialFilters }) {
+// Page numbers to render: always the first and last, plus a window around the
+// current page, with gaps marked. Keeps the control a fixed width however
+// large the catalogue grows.
+function pageWindow(current, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const out = [1];
+  const from = Math.max(2, current - 1);
+  const to = Math.min(total - 1, current + 1);
+  if (from > 2) out.push("gap");
+  for (let n = from; n <= to; n++) out.push(n);
+  if (to < total - 1) out.push("gap");
+  out.push(total);
+  return out;
+}
+
+// The filters and the page number live in the URL, not in component state.
+//
+// They used to be local state applied to a client-side array, which quietly
+// capped the entire catalogue at whatever 50 hotels the server sent first:
+// picking a wilaya filtered those 50, it did not search the other 85. Driving
+// everything through the URL means the server does the filtering it was always
+// able to do, results are linkable and indexable, and the back button works.
+export default function SearchResults({ hotels, pagination, loadError, cities, initialFilters }) {
   const { t, lang } = useLang();
-  const [city, setCity] = useState(initialFilters.city || "");
-  const [stars, setStars] = useState(Number(initialFilters.stars) || 0);
-  const [sort, setSort] = useState(initialFilters.sort || "popular");
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  const city = initialFilters.city || "";
+  const stars = Number(initialFilters.stars) || 0;
+  const sort = initialFilters.sort || "popular";
   const [tagDict, setTagDict] = useState(null);
+
+  const page = pagination?.page || 1;
+  const totalPages = pagination?.totalPages || 1;
+  const total = pagination?.total ?? hotels.length;
 
   // tags arrive on the URL as comma-separated keys
   const activeTags = useMemo(
@@ -26,9 +56,38 @@ export default function SearchResults({ initialHotels, cities, initialFilters })
 
   function tagLabel(key) {
     if (!tagDict) return key;
-    const t = tagDict.find((x) => x.key === key);
-    if (!t) return key;
-    return t[lang] || t.en || key;
+    const found = tagDict.find((x) => x.key === key);
+    if (!found) return key;
+    return found[lang] || found.en || key;
+  }
+
+  // Rebuilds the query string and navigates. Any filter change resets to page
+  // one — staying on page 4 of a result set that now has two pages shows an
+  // empty grid and looks broken.
+  function applyFilters(changes) {
+    const next = {
+      q: initialFilters.q || "",
+      city,
+      stars: stars || "",
+      sort: sort === "popular" ? "" : sort,
+      maxPrice: initialFilters.maxPrice || "",
+      minPrice: initialFilters.minPrice || "",
+      tags: initialFilters.tags || "",
+      ai: initialFilters.ai ? "1" : "",
+      page: "",
+      ...changes,
+    };
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(next)) {
+      if (v !== "" && v !== null && v !== undefined && v !== 0) params.set(k, String(v));
+    }
+    const qs = params.toString();
+    startTransition(() => router.push(qs ? `/hotels?${qs}` : "/hotels"));
+  }
+
+  function goToPage(n) {
+    applyFilters({ page: n > 1 ? n : "" });
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   // when arriving from natural-language search, re-parse the raw query so we
@@ -48,22 +107,9 @@ export default function SearchResults({ initialHotels, cities, initialFilters })
     return "";
   }
 
-  const hotels = useMemo(() => {
-    let list = [...initialHotels];
-    if (city) list = list.filter((h) => h.city.toLowerCase() === city.toLowerCase());
-    if (stars) list = list.filter((h) => h.stars >= stars);
-    if (activeTags.length) {
-      list = list.filter((h) => {
-        const hotelTags = Array.isArray(h.tags) ? h.tags : [];
-        return activeTags.every((t) => hotelTags.includes(t));
-      });
-    }
-    if (sort === "price_asc") list.sort((a, b) => a.priceFrom - b.priceFrom);
-    else if (sort === "price_desc") list.sort((a, b) => b.priceFrom - a.priceFrom);
-    else if (sort === "rating") list.sort((a, b) => b.rating - a.rating);
-    else list.sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured));
-    return list;
-  }, [initialHotels, city, stars, sort, activeTags]);
+  // No client-side filtering or sorting any more. `hotels` is exactly what the
+  // API returned for the current filters and page, so what the customer sees
+  // is the true result set rather than a subset of the first 50 rows.
 
   return (
     <>
@@ -73,7 +119,10 @@ export default function SearchResults({ initialHotels, cities, initialFilters })
           <h1 className="display">
             {initialFilters.q ? `${t("results.matching")} "${initialFilters.q}"` : t("results.title")}
           </h1>
-          <p>{hotels.length} {hotels.length === 1 ? t("search.hotel") : t("search.hotels")} · {t("results.verified_by")}</p>
+          {/* The real total from the API, not the length of the current page.
+              This line previously said "50 hotels" because it counted the
+              array it had been handed. */}
+          <p>{total} {total === 1 ? t("search.hotel") : t("search.hotels")} · {t("results.verified_by")}</p>
 
           {aiResult && (
             <div className="nz-ai-banner">
@@ -95,7 +144,7 @@ export default function SearchResults({ initialHotels, cities, initialFilters })
       <div className="wrap nz-sr-body">
         {/* filter bar */}
         <div className="nz-sr-filters">
-          <select value={city} onChange={(e) => setCity(e.target.value)}>
+          <select value={city} onChange={(e) => applyFilters({ city: e.target.value })}>
             <option value="">{t("results.all_dest")}</option>
             {cities.map((c) => (
               <option key={c.key} value={c.name}>{c.name} ({c.hotelCount})</option>
@@ -107,14 +156,18 @@ export default function SearchResults({ initialHotels, cities, initialFilters })
               <button
                 key={s}
                 className={stars === s ? "on" : ""}
-                onClick={() => setStars(s)}
+                onClick={() => applyFilters({ stars: s || "" })}
               >
                 {s === 0 ? t("results.any") : "★".repeat(s) + "+"}
               </button>
             ))}
           </div>
 
-          <select className="nz-sr-sort" value={sort} onChange={(e) => setSort(e.target.value)}>
+          <select
+            className="nz-sr-sort"
+            value={sort}
+            onChange={(e) => applyFilters({ sort: e.target.value === "popular" ? "" : e.target.value })}
+          >
             <option value="popular">{t("results.popular")}</option>
             <option value="price_asc">{t("results.price_low")}</option>
             <option value="price_desc">{t("results.price_high")}</option>
@@ -123,10 +176,56 @@ export default function SearchResults({ initialHotels, cities, initialFilters })
         </div>
 
         {/* results */}
-        {hotels.length > 0 ? (
-          <div className="nz-sr-grid">
-            {hotels.map((h) => <HotelCard key={h.id} hotel={h} />)}
+        {loadError ? (
+          <div className="nz-sr-empty">
+            <p className="display">{t("results.error_title")}</p>
+            <span>{t("results.error_sub")}</span>
           </div>
+        ) : hotels.length > 0 ? (
+          <>
+            <div className={`nz-sr-grid ${isPending ? "pending" : ""}`}>
+              {hotels.map((h) => <HotelCard key={h.id} hotel={h} />)}
+            </div>
+
+            {totalPages > 1 && (
+              <nav className="nz-sr-pager" aria-label="Pagination">
+                <button
+                  onClick={() => goToPage(page - 1)}
+                  disabled={page <= 1 || isPending}
+                  aria-label={t("results.prev")}
+                >
+                  ‹
+                </button>
+
+                {/* A sliding window rather than every page number: at 135
+                    hotels this is six pages, but the catalogue is meant to
+                    grow and a row of thirty buttons is unusable on a phone. */}
+                {pageWindow(page, totalPages).map((n, i) =>
+                  n === "gap" ? (
+                    <span className="nz-sr-gap" key={`gap-${i}`}>…</span>
+                  ) : (
+                    <button
+                      key={n}
+                      className={n === page ? "on" : ""}
+                      onClick={() => goToPage(n)}
+                      disabled={isPending}
+                      aria-current={n === page ? "page" : undefined}
+                    >
+                      {n}
+                    </button>
+                  )
+                )}
+
+                <button
+                  onClick={() => goToPage(page + 1)}
+                  disabled={page >= totalPages || isPending}
+                  aria-label={t("results.next")}
+                >
+                  ›
+                </button>
+              </nav>
+            )}
+          </>
         ) : (
           <div className="nz-sr-empty">
             <p className="display">{t("results.none_title")}</p>
@@ -172,17 +271,50 @@ export default function SearchResults({ initialHotels, cities, initialFilters })
           transition: all .15s;
         }
         .nz-sr-stars button.on { border-color: var(--red); background: var(--red-soft); color: var(--red-deep); }
-        .nz-sr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; }
+
+        /* Four across on desktop, stepping down rather than jumping straight
+           to a single column — three-up at laptop widths, two-up on tablets. */
+        .nz-sr-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; }
+
+        /* Dim the grid while the next page is being fetched so a slow
+           connection does not look like a dead click. */
+        .nz-sr-grid.pending { opacity: .45; transition: opacity .15s; pointer-events: none; }
+
+        .nz-sr-pager {
+          display: flex; align-items: center; justify-content: center;
+          gap: 6px; margin-top: 40px; flex-wrap: wrap;
+        }
+        .nz-sr-pager button {
+          min-width: 38px; height: 38px; padding: 0 10px;
+          border: 1.5px solid var(--gray-200); background: var(--white);
+          border-radius: 10px; font-size: 13px; font-weight: 700;
+          color: var(--ink); cursor: pointer; transition: all .15s;
+          font-family: inherit;
+        }
+        .nz-sr-pager button:hover:not(:disabled) { border-color: var(--ink); }
+        .nz-sr-pager button.on {
+          background: var(--ink); border-color: var(--ink); color: #fff;
+        }
+        .nz-sr-pager button:disabled { opacity: .35; cursor: default; }
+        .nz-sr-gap { color: var(--gray-400); padding: 0 2px; font-size: 13px; }
+
         .nz-sr-empty { text-align: center; padding: 80px 0; }
         .nz-sr-empty p { font-size: 22px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
         .nz-sr-empty span { font-size: 14px; color: var(--gray-400); }
+
+        @media (max-width: 1240px) {
+          .nz-sr-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+        @media (max-width: 980px) {
+          .nz-sr-grid { grid-template-columns: repeat(2, 1fr); }
+        }
         @media (max-width: 860px) {
-          .nz-sr-grid { grid-template-columns: 1fr; }
           .nz-sr-sort { margin-inline-start: 0; }
         }
         @media (max-width: 560px) {
           .nz-sr-head { padding: 32px 0; }
           .nz-sr-head h1 { font-size: 26px; }
+          .nz-sr-grid { grid-template-columns: 1fr; }
           .nz-sr-filters { flex-direction: column; align-items: stretch; gap: 10px; }
           .nz-sr-filters select { width: 100%; }
           .nz-sr-stars { justify-content: space-between; }
