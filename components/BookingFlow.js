@@ -791,7 +791,7 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
                 {(payMethod === "cib" || payMethod === "edahabia") && !processing && (
                   <img
                     className="bk-cta-mark"
-                    src="/cib-edahabia.png"
+                    src="/Cib-edahabia.png"
                     alt="CIB / Edahabia"
                     width={50}
                     height={32}
