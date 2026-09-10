@@ -180,11 +180,21 @@ export default function HotelCard({ hotel, priority = false }) {
       </div>
 
       <style jsx>{`
-        .nz-hcard { display: block; background: transparent; }
+        /* globals.css still carries a .nz-hcard rule from the old card — a
+           white panel with a border and shadow. Scoped styles cannot remove a
+           global rule, so it is nulled explicitly here. */
+        .nz-hcard {
+          display: block; background: transparent;
+          border: 0; box-shadow: none; border-radius: 0;
+          overflow: visible; transform: none;
+        }
+        .nz-hcard:hover { transform: none; box-shadow: none; border-color: transparent; }
 
         .nz-hcard-media {
           position: relative;
-          aspect-ratio: 4 / 5;
+          /* 3:2 matches how hotel photography is actually shot. A portrait
+             crop at four-across ran too tall and cut the buildings badly. */
+          aspect-ratio: 3 / 2;
           border-radius: 14px;
           overflow: hidden;
           background: var(--gray-100, #eee);
@@ -271,7 +281,7 @@ export default function HotelCard({ hotel, priority = false }) {
            permanently instead — there is only one card per row at this width,
            so nothing multiplies. */
         @media (max-width: 520px) {
-          .nz-hcard-media { aspect-ratio: 3 / 2; }
+          .nz-hcard-media { aspect-ratio: 16 / 10; }
           .nz-hcard-fav, .nz-hcard-dots { opacity: 1; }
           .nz-hcard-cta { transform: translateY(0); }
           .nz-hcard-name { font-size: 17px; min-height: 0; }
