@@ -687,7 +687,7 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
                   >
                     {t("bk.promo_toggle") !== "bk.promo_toggle"
                       ? t("bk.promo_toggle")
-                      : "Use a coupon"}
+                      : "Have a promo code?"}
                   </button>
                 ) : null}
                 {(coupon || promoOpen) && <label>{t("bk.promo")}</label>}
@@ -791,7 +791,7 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
                 {(payMethod === "cib" || payMethod === "edahabia") && !processing && (
                   <img
                     className="bk-cta-mark"
-                    src="/Cib-edahabia.png"
+                    src="/cib-edahabia.png"
                     alt="CIB / Edahabia"
                     width={50}
                     height={32}
