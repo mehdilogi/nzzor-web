@@ -773,10 +773,14 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
                 {/* "Le logo CIB doit figurer sur le bouton qui envoie vers le
                     lien de la Platform de paiement SATIM." Shown only for the
                     card methods, which are the ones that actually redirect. */}
-                {(payMethod === "cib" || payMethod === "edahabia") && !processing && (
-                  <span className="bk-cta-mark" aria-hidden="true">
-                    {payMethod === "cib" ? "CIB" : "ED"}
-                  </span>
+                                {(payMethod === "cib" || payMethod === "edahabia") && !processing && (
+                  <img
+                    className="bk-cta-mark"
+                    src="/cib-edahabia.png"
+                    alt="CIB / Edahabia"
+                    width={50}
+                    height={32}
+                  />
                 )}
               </button>
 
@@ -1194,13 +1198,9 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
         .bk-cta-pay {
           display: flex; align-items: center; justify-content: center; gap: 10px;
         }
-        .bk-cta-mark {
-          display: inline-flex; align-items: center; justify-content: center;
-          min-width: 34px; height: 21px; padding: 0 6px;
-          background: #fff; color: var(--ink);
-          border-radius: 4px;
-          font-size: 11px; font-weight: 800; letter-spacing: 0.02em;
-          flex-shrink: 0;
+               .bk-cta-mark {
+          display: block; height: 32px; width: auto;
+          border-radius: 4px; flex-shrink: 0;
         }
 
         .bk-satim-help {
