@@ -82,6 +82,9 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
   // payment
   const [payMethod, setPayMethod] = useState("cib");
   const [promoInput, setPromoInput] = useState("");
+  // The promo field starts collapsed behind a link. Most guests have no code,
+  // and an open input invites them to leave and hunt for one.
+  const [promoOpen, setPromoOpen] = useState(false);
   const [coupon, setCoupon] = useState(null);
   const [promoError, setPromoError] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -676,14 +679,25 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
 
               {/* promo code */}
               <div className="bk-promo">
-                <label>{t("bk.promo")}</label>
+                {!coupon && !promoOpen ? (
+                  <button
+                    type="button"
+                    className="bk-promo-toggle"
+                    onClick={() => setPromoOpen(true)}
+                  >
+                    {t("bk.promo_toggle") !== "bk.promo_toggle"
+                      ? t("bk.promo_toggle")
+                      : "Use a coupon"}
+                  </button>
+                ) : null}
+                {(coupon || promoOpen) && <label>{t("bk.promo")}</label>}
                 {coupon ? (
                   <div className="bk-promo-applied">
                     <Icon name="check" size={15} strokeWidth={3} style={{ color: "var(--teal)" }} />
                     <span><strong>{coupon.code}</strong> · {t("bk.promo_applied")}</span>
                     <button onClick={removePromo}>{t("bk.promo_remove")}</button>
                   </div>
-                ) : (
+                ) : promoOpen ? (
                   <div className="bk-promo-input">
                     <input
                       type="text"
@@ -694,7 +708,7 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
                     />
                     <button onClick={applyPromo}>{t("bk.promo_apply")}</button>
                   </div>
-                )}
+                ) : null}
                 {promoError && <span className="bk-err">{t("bk.promo_invalid")}</span>}
               </div>
 
@@ -777,7 +791,7 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
                 {(payMethod === "cib" || payMethod === "edahabia") && !processing && (
                   <img
                     className="bk-cta-mark"
-                    src="/Cib-edahabia.png"
+                    src="/cib-edahabia.png"
                     alt="CIB / Edahabia"
                     width={50}
                     height={32}
@@ -1115,6 +1129,12 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
         .bk-pay-info em { font-size: 12.5px; font-style: normal; color: var(--gray-400); }
         /* promo */
         .bk-promo { margin-bottom: 24px; }
+        .bk-promo-toggle {
+          background: none; border: 0; padding: 0; cursor: pointer;
+          font-size: 13.5px; font-weight: 600; color: var(--ink);
+          text-decoration: underline; text-underline-offset: 3px;
+        }
+        .bk-promo-toggle:hover { opacity: 0.65; }
         .bk-promo label {
           display: block; font-size: 13px; font-weight: 700; color: var(--ink-2); margin-bottom: 7px;
         }
