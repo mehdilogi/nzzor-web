@@ -12,7 +12,7 @@ export const metadata = {
   description: "Browse verified hotels across Algeria. Filter by wilaya, price, and rating.",
 };
 
-// Four cards per row on desktop, so a full page is six clean rows.
+// 24 = six clean rows at four across.
 const PER_PAGE = 24;
 
 export default async function HotelsPage({ searchParams }) {
@@ -24,6 +24,10 @@ export default async function HotelsPage({ searchParams }) {
   const minPrice = searchParams?.minPrice || "";
   const tags = searchParams?.tags || "";
   const ai = searchParams?.ai === "1";
+
+  // `page` stays a real server-rendered URL even though the UI uses a "show
+  // more" button. Google crawls /hotels?page=4; it does not click buttons. If
+  // this became client-only, pages 2+ would leave the index entirely.
   const page = Math.max(1, parseInt(searchParams?.page, 10) || 1);
 
   // Every filter now goes to the API. Previously this page fetched a fixed 50
@@ -50,7 +54,8 @@ export default async function HotelsPage({ searchParams }) {
         pagination={result.pagination}
         loadError={Boolean(result.error)}
         cities={cities}
-        initialFilters={{ q, city, stars, sort, maxPrice, minPrice, tags, ai }}
+        perPage={PER_PAGE}
+        initialFilters={{ q, city, stars, sort, maxPrice, minPrice, tags, ai, page }}
       />
       <Footer />
       <WhatsAppButton />
