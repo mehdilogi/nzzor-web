@@ -2,12 +2,18 @@ import Nav from "../../components/Nav";
 import Footer from "../../components/Footer";
 import WhatsAppButton from "../../components/WhatsAppButton";
 import SearchResults from "../../components/SearchResults";
-import { getHotels, getCities } from "../../lib/api";
+import { getHotelsPaged, getCities } from "../../lib/api";
 
 export const metadata = {
   title: "Hotels in Algeria — Nzzor",
-  description: "Browse 10 verified hotels across Algeria. Filter by city, price, and rating.",
+  // No hotel count here. The old description said "Browse 10 verified hotels"
+  // while the platform carried 135 — a number embedded in copy goes stale
+  // silently, and this string is what Google indexes.
+  description: "Browse verified hotels across Algeria. Filter by wilaya, price, and rating.",
 };
+
+// Four cards per row on desktop, so a full page is six clean rows.
+const PER_PAGE = 24;
 
 export default async function HotelsPage({ searchParams }) {
   const q = searchParams?.q || "";
@@ -16,10 +22,23 @@ export default async function HotelsPage({ searchParams }) {
   const sort = searchParams?.sort || "";
   const maxPrice = searchParams?.maxPrice || "";
   const minPrice = searchParams?.minPrice || "";
+  const tags = searchParams?.tags || "";
   const ai = searchParams?.ai === "1";
+  const page = Math.max(1, parseInt(searchParams?.page, 10) || 1);
 
-  const [hotels, cities] = await Promise.all([
-    getHotels({ lang: "en", q: ai ? "" : q, city, stars, sort, maxPrice, minPrice }),
+  // Every filter now goes to the API. Previously this page fetched a fixed 50
+  // rows and SearchResults filtered that array in the browser, so any hotel
+  // outside the top 50 by popularity could not be reached at all — not by
+  // city, not by stars, not by search. routes/hotels.js already supported all
+  // of this server-side; it simply was never asked.
+  const [result, cities] = await Promise.all([
+    getHotelsPaged({
+      lang: "en",
+      q: ai ? "" : q,
+      city, stars, sort, maxPrice, minPrice, tags,
+      page,
+      limit: PER_PAGE,
+    }),
     getCities({ lang: "en" }),
   ]);
 
@@ -27,9 +46,11 @@ export default async function HotelsPage({ searchParams }) {
     <>
       <Nav />
       <SearchResults
-        initialHotels={hotels}
+        hotels={result.hotels}
+        pagination={result.pagination}
+        loadError={Boolean(result.error)}
         cities={cities}
-        initialFilters={{ q, city, stars, sort, maxPrice, minPrice, ai }}
+        initialFilters={{ q, city, stars, sort, maxPrice, minPrice, tags, ai }}
       />
       <Footer />
       <WhatsAppButton />
