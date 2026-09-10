@@ -688,7 +688,24 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
                     {t("bk.promo_toggle")}
                   </button>
                 ) : null}
-                {(coupon || promoOpen) && <label>{t("bk.promo")}</label>}
+                {coupon && <label>{t("bk.promo")}</label>}
+                {!coupon && promoOpen && (
+                  <div className="bk-promo-head">
+                    <label>{t("bk.promo")}</label>
+                    <button
+                      type="button"
+                      className="bk-promo-close"
+                      aria-label={t("bk.promo_close")}
+                      onClick={() => {
+                        setPromoOpen(false);
+                        setPromoInput("");
+                        setPromoError(false);
+                      }}
+                    >
+                      &times;
+                    </button>
+                  </div>
+                )}
                 {coupon ? (
                   <div className="bk-promo-applied">
                     <Icon name="check" size={15} strokeWidth={3} style={{ color: "var(--teal)" }} />
@@ -1133,6 +1150,14 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
           text-decoration: underline; text-underline-offset: 3px;
         }
         .bk-promo-toggle:hover { opacity: 0.65; }
+        .bk-promo-head {
+          display: flex; align-items: center; justify-content: space-between;
+        }
+        .bk-promo-close {
+          background: none; border: 0; cursor: pointer; padding: 0 2px;
+          font-size: 20px; line-height: 1; color: var(--gray-400);
+        }
+        .bk-promo-close:hover { color: var(--ink); }
         .bk-promo label {
           display: block; font-size: 13px; font-weight: 700; color: var(--ink-2); margin-bottom: 7px;
         }
