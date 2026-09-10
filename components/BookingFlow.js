@@ -685,9 +685,7 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
                     className="bk-promo-toggle"
                     onClick={() => setPromoOpen(true)}
                   >
-                    {t("bk.promo_toggle") !== "bk.promo_toggle"
-                      ? t("bk.promo_toggle")
-                      : "Have a promo code?"}
+                    {t("bk.promo_toggle")}
                   </button>
                 ) : null}
                 {(coupon || promoOpen) && <label>{t("bk.promo")}</label>}
