@@ -474,9 +474,11 @@ export default function SearchResults({
                 "Show more" appends below and must NOT dim what is already
                 on screen — those cards are not going anywhere. */}
             <div className={`nz-sr-grid ${isPending ? "pending" : ""}`}>
-              {rows.map((h) => (
+              {rows.map((h, i) => (
                 <div key={h.id} onClick={rememberPosition}>
-                  <HotelCard hotel={h} />
+                  {/* The first row is above the fold on every viewport, so
+                      those images load eagerly; everything else stays lazy. */}
+                  <HotelCard hotel={h} priority={i < 4} />
                 </div>
               ))}
 
