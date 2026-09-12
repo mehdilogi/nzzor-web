@@ -111,9 +111,12 @@ function parse(md) {
       para.push(t);
       i += 1;
     }
-    // A line wrapped in single asterisks is the "last updated" note.
+    // A line wrapped in SINGLE asterisks is the "last updated" note. The
+    // negative character classes matter: without them this also matched a
+    // fully-bold line like **NZZOR** and stripped one asterisk from each end,
+    // leaving the other pair to render as literal text.
     const joined = para.join(" ");
-    const em = joined.match(/^\*(.+)\*$/);
+    const em = joined.match(/^\*([^*].*[^*])\*$/);
     if (em) blocks.push({ type: "em", text: em[1] });
     else blocks.push({ type: "p", text: joined });
   }
@@ -221,7 +224,7 @@ export default function TermsContent() {
           border-radius: 0 8px 8px 0;
           font-size: 14.5px; color: var(--ink);
         }
-        .nz-legal-tablewrap { overflow-x: auto; margin-bottom: 20px; }
+        .nz-legal-tablewrap { overflow-x: auto; margin-bottom: 20px; max-width: 100%; }
         .nz-legal-doc table {
           width: 100%; border-collapse: collapse; font-size: 14px;
         }
@@ -237,8 +240,10 @@ export default function TermsContent() {
         .nz-legal[dir="rtl"] .nz-legal-doc td:first-child { white-space: normal; }
 
         @media (max-width: 620px) {
+          /* The document sets its own inline padding rather than relying on
+             .wrap: at this width the text ran to the edges of the screen. */
           .nz-legal { padding: 28px 0 60px; }
-          .nz-legal-doc { font-size: 14.5px; }
+          .nz-legal-doc { font-size: 14.5px; padding-inline: 18px; }
           .nz-legal-doc h2 { font-size: 18px; margin-top: 30px; }
           .nz-legal-doc td:first-child { white-space: normal; }
         }
