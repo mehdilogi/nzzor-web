@@ -164,6 +164,12 @@ function fmtDateTime(value, lang) {
     const locale = lang === "ar" ? "ar-DZ" : lang === "en" ? "en-GB" : "fr-DZ";
     return new Date(value).toLocaleString(locale, {
       timeZone: "Africa/Algiers",
+      // 24-hour, forced. Left to the locale, fr-DZ and ar-DZ render a 12-hour
+      // clock with AM/PM on some ICU builds and 24-hour on others, so the same
+      // code produced different formats on Railway and locally. A payment
+      // timestamp is not somewhere to accept that. Verified to give 00:10 at
+      // midnight rather than the 24:10 that hour12 can yield in some locales.
+      hour12: false,
       day: "2-digit", month: "2-digit", year: "numeric",
       hour: "2-digit", minute: "2-digit", second: "2-digit",
     });
