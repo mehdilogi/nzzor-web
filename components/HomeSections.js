@@ -68,23 +68,26 @@ function useCountUp(target, active, { duration = 1100, decimals = 0 } = {}) {
 // The text-bearing homepage sections. Receives featured hotels as a prop
 // (fetched server-side in page.js). Everything here is translated.
 //
-// COUNTS: wilayaCount is a prop with a default so there is exactly ONE place
-// to update it, and so page.js can pass a live value later without touching
-// this file. It was previously hardcoded as "8" in two separate places and
-// both went stale.
+// COUNTS ARE LIVE. page.js reads them from the API — the hotel total from the
+// pagination envelope, the wilaya total from /meta/cities — and passes them in.
+// The defaults below exist only so this component still renders if it is ever
+// used without them; they are not a source of truth and should never be
+// updated by hand.
 //
-// Source of truth (Railway, 2026-08-20):
-//   SELECT COUNT(DISTINCT city) FILTER (WHERE "isActive") -> 9
+// This is the third framing of these numbers. They were hardcoded as "8", then
+// centralised here as 9, and both went stale against a catalogue that reached
+// 215 hotels across 47 wilayas. Copy that states a count will always drift,
+// because nothing breaks when it does.
+//
 // The `city` column stores wilaya keys (see lib/wilayas.js), so this is
 // WILAYAS, not cities — the stronger and more accurate claim locally.
-//
-// The hotel count is deliberately absent from the UI. See the stats band.
-export default function HomeSections({ featured, wilayaCount = 9 }) {
+export default function HomeSections({ featured, wilayaCount = 0, hotelCount = 0 }) {
   const { t } = useLang();
 
   const statsRef = useRef(null);
   const statsIn = useInView(statsRef);
   const nWilayas = useCountUp(wilayaCount, statsIn, { duration: 1000 });
+  const nHotels = useCountUp(hotelCount, statsIn, { duration: 1200 });
   const nSeconds = useCountUp(5, statsIn, { duration: 900 });
   const nRating = useCountUp(4.9, statsIn, { duration: 1300, decimals: 1 });
 
@@ -157,8 +160,13 @@ export default function HomeSections({ featured, wilayaCount = 9 }) {
             <h2 className="display">{t("featured.title")}</h2>
             <p>{t("featured.subtitle")}</p>
           </div>
+          {/* The count is interpolated, not baked into the string — the copy
+              used to read "All 10 hotels" on a catalogue of 215. */}
           <a href="/hotels" className="nz-viewall">
-            {t("featured.all")} <Icon name="arrow" size={15} strokeWidth={2.5} />
+            {hotelCount
+              ? `${t("featured.all")} ${hotelCount}`
+              : t("featured.all_plain")}{" "}
+            <Icon name="arrow" size={15} strokeWidth={2.5} />
           </a>
         </div>
         <div className="nz-hotels-grid">
