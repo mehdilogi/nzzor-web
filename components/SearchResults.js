@@ -13,13 +13,14 @@ const STAR_CHOICES = [5, 4, 3, 2];
 // the query string so two different filter sets don't restore into each other.
 const SCROLL_KEY = "nzzor:hotels:restore";
 
-// Price slider bounds. Fixed rather than derived: there is no facets endpoint,
-// so the real distribution is not available to the client. 50 000 sits above
-// every rate in the catalogue and the top of the range means "no ceiling" —
-// maxPrice is simply left out of the URL there.
+// Price slider bounds. The ceiling comes from the facets endpoint, which
+// reports the most expensive hotel in the catalogue rounded up to a whole
+// bucket. The fallback only applies if that call failed. The top of the range
+// means "no ceiling" — maxPrice is left out of the URL there, so a new hotel
+// priced above today's maximum is never silently excluded.
 const PRICE_MIN = 0;
-const PRICE_MAX = 50000;
-const PRICE_STEP = 1000;
+const PRICE_FALLBACK_MAX = 50000;
+const PRICE_STEP = 500;
 
 // Two labels the i18n dictionary has no keys for. Hardcoded per language
 // rather than adding keys, because t() humanises a missing key in production:
@@ -36,6 +37,7 @@ export default function SearchResults({
   pagination,
   loadError,
   cities,
+  facets,
   perPage = 24,
   initialFilters,
 }) {
@@ -75,13 +77,17 @@ export default function SearchResults({
 
   // Live slider values. Local so dragging stays smooth; the URL is written on
   // release only, or every pixel of travel would be a server round trip.
+  const priceMax = facets?.price?.max || PRICE_FALLBACK_MAX;
+  const buckets = facets?.price?.buckets || [];
+  const peak = buckets.reduce((m, b) => Math.max(m, b.count), 0) || 1;
+
   const [priceDraft, setPriceDraft] = useState({
     min: Number(minPrice) || PRICE_MIN,
-    max: Number(maxPrice) || PRICE_MAX,
+    max: Number(maxPrice) || priceMax,
   });
   useEffect(() => {
-    setPriceDraft({ min: Number(minPrice) || PRICE_MIN, max: Number(maxPrice) || PRICE_MAX });
-  }, [minPrice, maxPrice]);
+    setPriceDraft({ min: Number(minPrice) || PRICE_MIN, max: Number(maxPrice) || priceMax });
+  }, [minPrice, maxPrice, priceMax]);
 
   const sortRef = useRef(null);
   const wilayaRef = useRef(null);
@@ -206,8 +212,8 @@ export default function SearchResults({
   function commitPrice(draft) {
     applyFilters({
       minPrice: draft.min > PRICE_MIN ? String(draft.min) : "",
-      // The top of the slider means "no ceiling", not "50 000 exactly".
-      maxPrice: draft.max < PRICE_MAX ? String(draft.max) : "",
+      // The top of the slider means "no ceiling", not "the current maximum".
+      maxPrice: draft.max < priceMax ? String(draft.max) : "",
     });
   }
 
@@ -306,7 +312,17 @@ export default function SearchResults({
   ];
   const sortLabel = (SORT_OPTIONS.find((o) => o.value === sort) || SORT_OPTIONS[0]).label;
 
-  const visibleTags = tagDict ? (showAllTags ? tagDict : tagDict.slice(0, 6)) : [];
+  // Ordered by how many hotels actually carry the tag, and tags nothing
+  // matches are dropped entirely. The dictionary order is arbitrary, and an
+  // amenity that returns zero results is a dead end dressed as a choice.
+  const rankedTags = useMemo(() => {
+    if (!tagDict) return [];
+    const counts = facets?.tags || null;
+    const list = counts ? tagDict.filter((tg) => (counts[tg.key] || 0) > 0) : tagDict;
+    if (!counts) return list;
+    return [...list].sort((a, b) => (counts[b.key] || 0) - (counts[a.key] || 0));
+  }, [tagDict, facets]);
+  const visibleTags = showAllTags ? rankedTags : rankedTags.slice(0, 6);
   const activeCount = (stars ? 1 : 0) + activeTags.length + (minPrice || maxPrice ? 1 : 0);
 
   const remaining = Math.max(0, total - rows.length);
@@ -443,17 +459,32 @@ export default function SearchResults({
 
             <div className="nz-f-grp first">
               <h3>{t("results.filter_price")}</h3>
+              {/* The distribution, so the range means something before it is
+                  touched. Bars inside the selection go dark. Heights are
+                  relative to the tallest bucket, not absolute, or a catalogue
+                  with one dominant price band would render as a flat line. */}
+              {buckets.length > 0 && (
+                <div className="nz-f-hist" aria-hidden="true">
+                  {buckets.map((b) => (
+                    <i
+                      key={b.from}
+                      className={b.from >= priceDraft.min && b.from < priceDraft.max ? "in" : ""}
+                      style={{ height: `${Math.max(4, (b.count / peak) * 100)}%` }}
+                    />
+                  ))}
+                </div>
+              )}
               <div className="nz-f-slider">
                 <div className="nz-f-track" />
                 <div
                   className="nz-f-range"
                   style={{
-                    insetInlineStart: `${(priceDraft.min / PRICE_MAX) * 100}%`,
-                    width: `${((priceDraft.max - priceDraft.min) / PRICE_MAX) * 100}%`,
+                    insetInlineStart: `${(priceDraft.min / priceMax) * 100}%`,
+                    width: `${((priceDraft.max - priceDraft.min) / priceMax) * 100}%`,
                   }}
                 />
                 <input
-                  type="range" min={PRICE_MIN} max={PRICE_MAX} step={PRICE_STEP}
+                  type="range" min={PRICE_MIN} max={priceMax} step={PRICE_STEP}
                   value={priceDraft.min}
                   onChange={(e) =>
                     setPriceDraft((p) => ({ ...p, min: Math.min(Number(e.target.value), p.max - PRICE_STEP) }))
@@ -464,7 +495,7 @@ export default function SearchResults({
                   aria-label={t("results.min_price")}
                 />
                 <input
-                  type="range" min={PRICE_MIN} max={PRICE_MAX} step={PRICE_STEP}
+                  type="range" min={PRICE_MIN} max={priceMax} step={PRICE_STEP}
                   value={priceDraft.max}
                   onChange={(e) =>
                     setPriceDraft((p) => ({ ...p, max: Math.max(Number(e.target.value), p.min + PRICE_STEP) }))
@@ -478,7 +509,7 @@ export default function SearchResults({
               <div className="nz-f-prices">
                 <span>{fmt(priceDraft.min)} <em>DZD</em></span>
                 <span>
-                  {priceDraft.max >= PRICE_MAX ? `${fmt(PRICE_MAX)}+` : fmt(priceDraft.max)} <em>DZD</em>
+                  {priceDraft.max >= priceMax ? `${fmt(priceMax)}+` : fmt(priceDraft.max)} <em>DZD</em>
                 </span>
               </div>
             </div>
@@ -496,6 +527,7 @@ export default function SearchResults({
               </svg>
                 </span>
                 <span className="nz-f-lab">{t("results.any")}</span>
+                {facets?.starsAny != null && <span className="nz-f-cnt">{facets.starsAny}</span>}
               </button>
               {STAR_CHOICES.map((sVal) => (
                 <button
@@ -510,6 +542,9 @@ export default function SearchResults({
               </svg>
                   </span>
                   <span className="nz-f-lab">{"★".repeat(sVal)}</span>
+                  {facets?.stars?.[sVal] != null && (
+                    <span className="nz-f-cnt">{facets.stars[sVal]}</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -529,11 +564,14 @@ export default function SearchResults({
               </svg>
                   </span>
                   <span className="nz-f-lab">{tg[lang] || tg.en || tg.key}</span>
+                  {facets?.tags?.[tg.key] != null && (
+                    <span className="nz-f-cnt">{facets.tags[tg.key]}</span>
+                  )}
                 </button>
               ))}
-              {tagDict && tagDict.length > 6 && !showAllTags && (
+              {rankedTags.length > 6 && !showAllTags && (
                 <button type="button" className="nz-f-more" onClick={() => setShowAllTags(true)}>
-                  {ui.showAll} ({tagDict.length})
+                  {ui.showAll} ({rankedTags.length})
                 </button>
               )}
             </div>
@@ -740,11 +778,25 @@ export default function SearchResults({
         .nz-f-box svg { opacity: 0; color: #fff; }
         .nz-f-row.on .nz-f-box svg { opacity: 1; }
         .nz-f-lab { flex: 1; font-size: 13px; font-weight: 500; color: var(--ink); }
+        .nz-f-cnt {
+          font-size: 11.5px; color: var(--gray-400); font-weight: 500;
+          font-variant-numeric: tabular-nums;
+        }
         .nz-f-more {
           border: 0; background: none; cursor: pointer; font-family: inherit;
           font-size: 12.5px; font-weight: 700; color: var(--ink);
           text-decoration: underline; text-underline-offset: 3px; padding-top: 8px;
         }
+
+        .nz-f-hist {
+          display: flex; align-items: flex-end; gap: 2px;
+          height: 46px; margin-bottom: 2px;
+        }
+        .nz-f-hist i {
+          flex: 1; background: var(--gray-200); border-radius: 2px 2px 0 0;
+          transition: background .12s;
+        }
+        .nz-f-hist i.in { background: var(--ink); }
 
         .nz-f-slider { position: relative; height: 24px; }
         .nz-f-track {
