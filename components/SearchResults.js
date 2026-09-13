@@ -316,97 +316,6 @@ export default function SearchResults({
   const fmt = (n) =>
     Number(n).toLocaleString(lang === "ar" ? "ar-DZ" : lang === "en" ? "en-GB" : "fr-DZ");
 
-  function checkRow(label, checked, onClick, radio) {
-    return (
-      <button
-        type="button"
-        className={`nz-f-row ${checked ? "on" : ""} ${radio ? "radio" : ""}`}
-        onClick={onClick}
-      >
-        <span className="nz-f-box">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M5 13l4 4L19 7" />
-          </svg>
-        </span>
-        <span className="nz-f-lab">{label}</span>
-      </button>
-    );
-  }
-
-  const filterPanel = (
-    <>
-      <div className="nz-f-grp first">
-        <h3>{t("results.filter_price")}</h3>
-        <div className="nz-f-slider">
-          <div className="nz-f-track" />
-          <div
-            className="nz-f-range"
-            style={{
-              insetInlineStart: `${(priceDraft.min / PRICE_MAX) * 100}%`,
-              width: `${((priceDraft.max - priceDraft.min) / PRICE_MAX) * 100}%`,
-            }}
-          />
-          <input
-            type="range" min={PRICE_MIN} max={PRICE_MAX} step={PRICE_STEP}
-            value={priceDraft.min}
-            onChange={(e) =>
-              setPriceDraft((p) => ({ ...p, min: Math.min(Number(e.target.value), p.max - PRICE_STEP) }))
-            }
-            onMouseUp={() => commitPrice(priceDraft)}
-            onTouchEnd={() => commitPrice(priceDraft)}
-            onKeyUp={(e) => { if (e.key === "Enter") commitPrice(priceDraft); }}
-            aria-label={t("results.min_price")}
-          />
-          <input
-            type="range" min={PRICE_MIN} max={PRICE_MAX} step={PRICE_STEP}
-            value={priceDraft.max}
-            onChange={(e) =>
-              setPriceDraft((p) => ({ ...p, max: Math.max(Number(e.target.value), p.min + PRICE_STEP) }))
-            }
-            onMouseUp={() => commitPrice(priceDraft)}
-            onTouchEnd={() => commitPrice(priceDraft)}
-            onKeyUp={(e) => { if (e.key === "Enter") commitPrice(priceDraft); }}
-            aria-label={t("results.max_price")}
-          />
-        </div>
-        <div className="nz-f-prices">
-          <span>{fmt(priceDraft.min)} <em>DZD</em></span>
-          <span>
-            {priceDraft.max >= PRICE_MAX ? `${fmt(PRICE_MAX)}+` : fmt(priceDraft.max)} <em>DZD</em>
-          </span>
-        </div>
-      </div>
-
-      <div className="nz-f-grp">
-        <h3>{t("results.filter_rating")}</h3>
-        {checkRow(t("results.any"), !stars, () => applyFilters({ stars: "" }), true)}
-        {STAR_CHOICES.map((sVal) => (
-          <div key={sVal}>
-            {checkRow("★".repeat(sVal), stars === sVal, () => applyFilters({ stars: sVal }), true)}
-          </div>
-        ))}
-      </div>
-
-      <div className="nz-f-grp">
-        <h3>{t("results.filter_amenities")}</h3>
-        {visibleTags.map((tg) => (
-          <div key={tg.key}>
-            {checkRow(
-              tg[lang] || tg.en || tg.key,
-              activeTags.includes(tg.key),
-              () => toggleTag(tg.key)
-            )}
-          </div>
-        ))}
-        {tagDict && tagDict.length > 6 && !showAllTags && (
-          <button type="button" className="nz-f-more" onClick={() => setShowAllTags(true)}>
-            {ui.showAll} ({tagDict.length})
-          </button>
-        )}
-      </div>
-    </>
-  );
-
   return (
     <>
       <div className="wrap nz-sr-top">
@@ -523,7 +432,111 @@ export default function SearchResults({
                 {t("results.clear_all")}
               </button>
             </div>
-            {filterPanel}
+
+            {/* Inlined, not built in a helper. styled-jsx under SWC only adds
+                its scoping class to JSX in the component's return path, so
+                JSX returned from a function or held in a const arrives with
+                class names that no rule matches — the whole filter column
+                rendered as raw browser defaults. Same family as the next/link
+                trap already documented in this codebase. Do not extract these
+                rows into a component-local helper. */}
+
+            <div className="nz-f-grp first">
+              <h3>{t("results.filter_price")}</h3>
+              <div className="nz-f-slider">
+                <div className="nz-f-track" />
+                <div
+                  className="nz-f-range"
+                  style={{
+                    insetInlineStart: `${(priceDraft.min / PRICE_MAX) * 100}%`,
+                    width: `${((priceDraft.max - priceDraft.min) / PRICE_MAX) * 100}%`,
+                  }}
+                />
+                <input
+                  type="range" min={PRICE_MIN} max={PRICE_MAX} step={PRICE_STEP}
+                  value={priceDraft.min}
+                  onChange={(e) =>
+                    setPriceDraft((p) => ({ ...p, min: Math.min(Number(e.target.value), p.max - PRICE_STEP) }))
+                  }
+                  onMouseUp={() => commitPrice(priceDraft)}
+                  onTouchEnd={() => commitPrice(priceDraft)}
+                  onKeyUp={(e) => { if (e.key === "Enter") commitPrice(priceDraft); }}
+                  aria-label={t("results.min_price")}
+                />
+                <input
+                  type="range" min={PRICE_MIN} max={PRICE_MAX} step={PRICE_STEP}
+                  value={priceDraft.max}
+                  onChange={(e) =>
+                    setPriceDraft((p) => ({ ...p, max: Math.max(Number(e.target.value), p.min + PRICE_STEP) }))
+                  }
+                  onMouseUp={() => commitPrice(priceDraft)}
+                  onTouchEnd={() => commitPrice(priceDraft)}
+                  onKeyUp={(e) => { if (e.key === "Enter") commitPrice(priceDraft); }}
+                  aria-label={t("results.max_price")}
+                />
+              </div>
+              <div className="nz-f-prices">
+                <span>{fmt(priceDraft.min)} <em>DZD</em></span>
+                <span>
+                  {priceDraft.max >= PRICE_MAX ? `${fmt(PRICE_MAX)}+` : fmt(priceDraft.max)} <em>DZD</em>
+                </span>
+              </div>
+            </div>
+
+            <div className="nz-f-grp">
+              <h3>{t("results.filter_rating")}</h3>
+              <button
+                type="button"
+                className={`nz-f-row radio ${!stars ? "on" : ""}`}
+                onClick={() => applyFilters({ stars: "" })}
+              >
+                <span className="nz-f-box">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M5 13l4 4L19 7" />
+              </svg>
+                </span>
+                <span className="nz-f-lab">{t("results.any")}</span>
+              </button>
+              {STAR_CHOICES.map((sVal) => (
+                <button
+                  key={sVal}
+                  type="button"
+                  className={`nz-f-row radio ${stars === sVal ? "on" : ""}`}
+                  onClick={() => applyFilters({ stars: sVal })}
+                >
+                  <span className="nz-f-box">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M5 13l4 4L19 7" />
+              </svg>
+                  </span>
+                  <span className="nz-f-lab">{"★".repeat(sVal)}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="nz-f-grp">
+              <h3>{t("results.filter_amenities")}</h3>
+              {visibleTags.map((tg) => (
+                <button
+                  key={tg.key}
+                  type="button"
+                  className={`nz-f-row ${activeTags.includes(tg.key) ? "on" : ""}`}
+                  onClick={() => toggleTag(tg.key)}
+                >
+                  <span className="nz-f-box">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M5 13l4 4L19 7" />
+              </svg>
+                  </span>
+                  <span className="nz-f-lab">{tg[lang] || tg.en || tg.key}</span>
+                </button>
+              ))}
+              {tagDict && tagDict.length > 6 && !showAllTags && (
+                <button type="button" className="nz-f-more" onClick={() => setShowAllTags(true)}>
+                  {ui.showAll} ({tagDict.length})
+                </button>
+              )}
+            </div>
           </div>
           <div className="nz-sr-sheetfoot">
             <button className="nz-sr-apply" onClick={() => setSheetOpen(false)}>
@@ -724,8 +737,8 @@ export default function SearchResults({
         .nz-f-row.radio .nz-f-box { border-radius: 50%; }
         .nz-f-row:hover .nz-f-box { border-color: var(--ink); }
         .nz-f-row.on .nz-f-box { background: var(--ink); border-color: var(--ink); }
-        .nz-f-box :global(svg) { opacity: 0; color: #fff; }
-        .nz-f-row.on .nz-f-box :global(svg) { opacity: 1; }
+        .nz-f-box svg { opacity: 0; color: #fff; }
+        .nz-f-row.on .nz-f-box svg { opacity: 1; }
         .nz-f-lab { flex: 1; font-size: 13px; font-weight: 500; color: var(--ink); }
         .nz-f-more {
           border: 0; background: none; cursor: pointer; font-family: inherit;
