@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import LogoMark from "./LogoMark";
-import Icon from "./Icon";
 import { useLang } from "../lib/LangContext";
 
 export default function Footer() {
@@ -21,12 +20,18 @@ export default function Footer() {
           <p>{t("footer.tagline")}</p>
           <div className="nz-pay-wrap">
             <h5 className="nz-pay-label">{t("footer.weaccept") || "We accept"}</h5>
+            {/* CIB and Edahabia only. Article 5 of the BNA merchant agreement
+                states that international cards issued by Algerian banks cannot
+                be used on an Algerian merchant site, so advertising Visa and
+                Mastercard promised a method we cannot accept. Article 17 also
+                lists a fault in displaying the CIB interbank logo as grounds
+                for suspension, which is why these are the official assets
+                supplied by SATIM rather than redrawn icons. */}
             <div className="nz-pay">
-              <span><Icon name="cib" size={18} strokeWidth={1.6} /> CIB</span>
-              <span><Icon name="edahabia" size={18} strokeWidth={1.6} /> Edahabia</span>
-              <span><Icon name="visa" size={18} strokeWidth={1.6} /> Visa</span>
-              <span><Icon name="mastercard" size={18} strokeWidth={1.6} /> Mastercard</span>
-              <span><Icon name="banktransfer" size={18} strokeWidth={1.6} /> Bank transfer</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/cib-edahabia.png" alt="CIB / Edahabia" width={62} height={40} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="satim" src="/satim.png" alt="SATIM" width={80} height={40} />
             </div>
           </div>
         </div>
@@ -47,9 +52,11 @@ export default function Footer() {
         </div>
         <div className="nz-fcol">
           <h5>{t("footer.legal")}</h5>
-          <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.terms")}</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/terms">{t("footer.terms")}</Link>
           <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.privacy")}</Link>
-          <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.cancellation")}</Link>
+          {/* Cancellation is Article 9 of the sale conditions — there is no
+              separate page, so point at the document that actually states it. */}
+          <Link className="nz-flink" style={{ display: "block" }} href="/terms">{t("footer.cancellation")}</Link>
           <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.agrement")}</Link>
         </div>
       </div>
@@ -71,14 +78,14 @@ export default function Footer() {
         .nz-footer-brand p { font-size: 14px; color: var(--gray-400); line-height: 1.7; max-width: 300px; margin-bottom: 18px; }
         .nz-pay-label { display: none; }
         .nz-pay { display: flex; gap: 8px; flex-wrap: wrap; }
-        .nz-pay span {
-          display: inline-flex; align-items: center; gap: 8px;
-          background: var(--cream); border: 1px solid var(--gray-200);
-          padding: 8px 13px; border-radius: 8px; font-size: 12px; font-weight: 700; color: var(--ink-2);
+        .nz-pay :global(img) {
+          display: block; height: 40px; width: auto;
+          background: #fff; border: 1px solid var(--gray-200);
+          border-radius: 8px; padding: 5px 9px; flex-shrink: 0;
         }
-        .nz-pay span :global(svg) {
-          color: var(--ink); flex-shrink: 0;
-        }
+        /* The SATIM mark is wider and sits on white already, so it needs less
+           breathing room than the bordered CIB/Edahabia block. */
+        .nz-pay :global(img.satim) { padding: 7px 10px; }
         .nz-fcol h5 {
           font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
           color: var(--ink); margin-bottom: 14px;
@@ -123,10 +130,7 @@ export default function Footer() {
             color: var(--gray-400);
             margin-bottom: 12px;
           }
-          .nz-pay span {
-            padding: 9px 14px;
-            font-size: 12.5px;
-          }
+          .nz-pay :global(img) { height: 44px; }
           /* Each link column becomes its own block with a top divider */
           .nz-fcol {
             border-top: 1px solid var(--gray-100);
