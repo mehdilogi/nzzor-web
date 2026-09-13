@@ -13,6 +13,10 @@ const STAR_CHOICES = [3, 4, 5];
 // the query string so two different filter sets don't restore into each other.
 const SCROLL_KEY = "nzzor:hotels:restore";
 
+// Used only as a starting value; the real offset is measured from the nav on
+// mount. The nav is position:fixed, so a sticky bar at top:0 hides under it.
+const NAV_FALLBACK_PX = 64;
+
 export default function SearchResults({
   hotels: initialHotels,
   pagination,
@@ -53,7 +57,9 @@ export default function SearchResults({
   const [wilayaQuery, setWilayaQuery] = useState("");
   const [priceDraft, setPriceDraft] = useState({ min: minPrice, max: maxPrice });
   const [tagDict, setTagDict] = useState(null);
+  const [barTop, setBarTop] = useState(NAV_FALLBACK_PX);
   const filterBarRef = useRef(null);
+  const railRef = useRef(null);
 
   // A new server render (filter change, or a direct ?page= hit) replaces the
   // accumulated list entirely — those results are genuinely different rows.
@@ -69,6 +75,21 @@ export default function SearchResults({
       .then((r) => r.json())
       .then((j) => setTagDict(j.data || []))
       .catch(() => {});
+  }, []);
+
+  // The nav is fixed, so "sticky at the top of the viewport" is the wrong
+  // target — the bar has to stop below the nav instead. Measured rather than
+  // hardcoded so it survives any nav height change, including the taller
+  // Arabic rendering.
+  useEffect(() => {
+    function measure() {
+      const nav = document.querySelector(".nzn");
+      const h = nav ? Math.round(nav.getBoundingClientRect().height) : 0;
+      setBarTop(h || NAV_FALLBACK_PX);
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
   }, []);
 
   // close a popover on outside click or Escape
@@ -244,6 +265,38 @@ export default function SearchResults({
     return cities.filter((c) => c.name.toLowerCase().includes(needle));
   }, [cities, wilayaQuery]);
 
+  // Ordered by inventory, not alphabetically. A guest scanning the rail should
+  // meet the wilayas that actually have somewhere to stay first; an A–Z list
+  // leads with Adrar and buries Béjaïa. Empty wilayas are dropped entirely —
+  // a destination that returns nothing is worse than a destination absent.
+  const railCities = useMemo(
+    () =>
+      [...cities]
+        .filter((c) => (c.hotelCount ?? 0) > 0)
+        .sort((a, b) => (b.hotelCount || 0) - (a.hotelCount || 0)),
+    [cities]
+  );
+
+  // Bring the selected wilaya into view when arriving on a filtered URL —
+  // otherwise a shared link to Tindouf opens with the rail scrolled to Béjaïa
+  // and nothing visibly selected. scrollLeft rather than scrollIntoView, which
+  // would also scroll the page vertically.
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+    const el = rail.querySelector('[data-active="true"]');
+    if (!el) return;
+    rail.scrollLeft = el.offsetLeft - rail.clientWidth / 2 + el.clientWidth / 2;
+  }, [city]);
+
+  const SORT_OPTIONS = [
+    { value: "popular", label: t("results.popular") },
+    { value: "price_asc", label: t("results.price_low") },
+    { value: "price_desc", label: t("results.price_high") },
+    { value: "rating", label: t("results.top_rated") },
+  ];
+  const sortLabel = (SORT_OPTIONS.find((o) => o.value === sort) || SORT_OPTIONS[0]).label;
+
   const chips = [];
   if (city) chips.push({ label: city, clear: { city: "" } });
   if (stars) chips.push({ label: `${stars}★ ${t("results.and_up")}`, clear: { stars: "" } });
@@ -266,29 +319,15 @@ export default function SearchResults({
     <>
       <div className="wrap nz-sr-top">
         <div className="nz-sr-titlerow">
-          <div>
-            <h1 className="display">
-              {initialFilters.q ? `${t("results.matching")} "${initialFilters.q}"` : t("results.title")}
-            </h1>
-            {/* The real total from the API, not the length of what is on
-                screen. This line previously read "50 hotels" because it
-                counted the array it had been handed. */}
-            <p className="nz-sr-sub">
-              {total} {t("results.stays")} · {wilayaCount} {t("results.wilayas")} · {t("results.verified_by")}
-            </p>
-          </div>
-
-          <select
-            className="nz-sr-sort"
-            value={sort}
-            aria-label={t("results.popular")}
-            onChange={(e) => applyFilters({ sort: e.target.value === "popular" ? "" : e.target.value })}
-          >
-            <option value="popular">{t("results.popular")}</option>
-            <option value="price_asc">{t("results.price_low")}</option>
-            <option value="price_desc">{t("results.price_high")}</option>
-            <option value="rating">{t("results.top_rated")}</option>
-          </select>
+          <h1 className="display">
+            {initialFilters.q ? `${t("results.matching")} "${initialFilters.q}"` : t("results.title")}
+          </h1>
+          {/* The real total from the API, not the length of what is on
+              screen. This line previously read "50 hotels" because it
+              counted the array it had been handed. */}
+          <p className="nz-sr-sub">
+            {total} {t("results.stays")} · {wilayaCount} {t("results.wilayas")} · {t("results.verified_by")}
+          </p>
         </div>
 
         {aiResult && (
@@ -307,22 +346,55 @@ export default function SearchResults({
         )}
       </div>
 
-      <div className="nz-sr-bar" ref={filterBarRef}>
+      {/* `top` is the measured nav height — see the effect above. */}
+      <div className="nz-sr-bar" ref={filterBarRef} style={{ top: barTop }}>
         <div className="wrap nz-sr-barinner">
-          <div className="nz-sr-pills">
-            <div className="nz-sr-pillwrap">
+          {/* Destination is not a peer of rating and price. In this market
+              people search a place first and refine second, so wilaya gets
+              the full row, with live inventory counts. The counts are doing
+              double duty: they are a useful filter signal, and they are the
+              coverage argument the whole brand rests on. */}
+          <div className="nz-sr-railrow">
+            <div className="nz-sr-rail" ref={railRef}>
               <button
-                className={`nz-sr-pill ${city ? "on" : ""}`}
+                className={`nz-sr-railitem ${!city ? "on" : ""}`}
+                data-active={!city ? "true" : "false"}
+                onClick={() => applyFilters({ city: "" })}
+              >
+                <span className="nz-sr-railname">{t("results.all_dest")}</span>
+                <span className="nz-sr-railcount">{total}</span>
+              </button>
+
+              {railCities.map((c) => (
+                <button
+                  key={c.key}
+                  className={`nz-sr-railitem ${city === c.name ? "on" : ""}`}
+                  data-active={city === c.name ? "true" : "false"}
+                  onClick={() => applyFilters({ city: c.name })}
+                >
+                  <span className="nz-sr-railname">{c.name}</span>
+                  <span className="nz-sr-railcount">{c.hotelCount}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Pinned outside the scroller so it never scrolls away. 47
+                wilayas is a long rail; someone who knows they want Tlemcen
+                should not have to swipe to it. */}
+            <div className="nz-sr-pillwrap nz-sr-railfind">
+              <button
+                className="nz-sr-pill icon"
                 onClick={() => setOpenPanel(openPanel === "wilaya" ? null : "wilaya")}
                 aria-expanded={openPanel === "wilaya"}
+                aria-label={t("results.search_wilaya")}
               >
-                {city || t("results.filter_wilaya")}
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M16 16l4.5 4.5" />
+                </svg>
               </button>
               {openPanel === "wilaya" && (
-                <div className="nz-sr-panel">
-                  {/* 48 wilayas is far too many for a checkbox list, which is
-                      the main reason these filters are pills rather than a
-                      sidebar. Search is the only workable control here. */}
+                <div className="nz-sr-panel end">
                   <input
                     type="text"
                     className="nz-sr-search"
@@ -352,96 +424,128 @@ export default function SearchResults({
                 </div>
               )}
             </div>
+          </div>
 
-            <div className="nz-sr-pillwrap">
-              <button
-                className={`nz-sr-pill ${stars ? "on" : ""}`}
-                onClick={() => setOpenPanel(openPanel === "stars" ? null : "stars")}
-                aria-expanded={openPanel === "stars"}
-              >
-                {stars ? `${stars}★+` : t("results.filter_rating")}
-              </button>
-              {openPanel === "stars" && (
-                <div className="nz-sr-panel narrow">
-                  <button
-                    className={`nz-sr-opt ${!stars ? "on" : ""}`}
-                    onClick={() => applyFilters({ stars: "" })}
-                  >
-                    {t("results.any")}
-                  </button>
-                  {STAR_CHOICES.map((s) => (
+          <div className="nz-sr-controls">
+            <div className="nz-sr-pills">
+              <div className="nz-sr-pillwrap">
+                <button
+                  className={`nz-sr-pill ${stars ? "on" : ""}`}
+                  onClick={() => setOpenPanel(openPanel === "stars" ? null : "stars")}
+                  aria-expanded={openPanel === "stars"}
+                >
+                  {stars ? `${stars}★+` : t("results.filter_rating")}
+                </button>
+                {openPanel === "stars" && (
+                  <div className="nz-sr-panel narrow">
                     <button
-                      key={s}
-                      className={`nz-sr-opt ${stars === s ? "on" : ""}`}
-                      onClick={() => applyFilters({ stars: s })}
+                      className={`nz-sr-opt ${!stars ? "on" : ""}`}
+                      onClick={() => applyFilters({ stars: "" })}
                     >
-                      {"★".repeat(s)}+
+                      {t("results.any")}
                     </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="nz-sr-pillwrap">
-              <button
-                className={`nz-sr-pill ${minPrice || maxPrice ? "on" : ""}`}
-                onClick={() => setOpenPanel(openPanel === "price" ? null : "price")}
-                aria-expanded={openPanel === "price"}
-              >
-                {t("results.filter_price")}
-              </button>
-              {openPanel === "price" && (
-                <div className="nz-sr-panel narrow">
-                  <div className="nz-sr-prices">
-                    <input
-                      type="number"
-                      min="0"
-                      inputMode="numeric"
-                      placeholder={t("results.min_price")}
-                      value={priceDraft.min}
-                      onChange={(e) => setPriceDraft({ ...priceDraft, min: e.target.value })}
-                    />
-                    <span>–</span>
-                    <input
-                      type="number"
-                      min="0"
-                      inputMode="numeric"
-                      placeholder={t("results.max_price")}
-                      value={priceDraft.max}
-                      onChange={(e) => setPriceDraft({ ...priceDraft, max: e.target.value })}
-                    />
-                  </div>
-                  <button
-                    className="nz-sr-applybtn"
-                    onClick={() => applyFilters({ minPrice: priceDraft.min, maxPrice: priceDraft.max })}
-                  >
-                    {t("results.apply")}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="nz-sr-pillwrap">
-              <button
-                className={`nz-sr-pill ${activeTags.length ? "on" : ""}`}
-                onClick={() => setOpenPanel(openPanel === "tags" ? null : "tags")}
-                aria-expanded={openPanel === "tags"}
-              >
-                {t("results.filter_amenities")}
-              </button>
-              {openPanel === "tags" && (
-                <div className="nz-sr-panel">
-                  <div className="nz-sr-scroll">
-                    {(tagDict || []).map((tg) => (
+                    {STAR_CHOICES.map((s) => (
                       <button
-                        key={tg.key}
-                        className={`nz-sr-opt ${activeTags.includes(tg.key) ? "on" : ""}`}
-                        onClick={() => toggleTag(tg.key)}
+                        key={s}
+                        className={`nz-sr-opt ${stars === s ? "on" : ""}`}
+                        onClick={() => applyFilters({ stars: s })}
                       >
-                        {tg[lang] || tg.en || tg.key}
+                        {"★".repeat(s)}+
                       </button>
                     ))}
                   </div>
+                )}
+              </div>
+
+              <div className="nz-sr-pillwrap">
+                <button
+                  className={`nz-sr-pill ${minPrice || maxPrice ? "on" : ""}`}
+                  onClick={() => setOpenPanel(openPanel === "price" ? null : "price")}
+                  aria-expanded={openPanel === "price"}
+                >
+                  {t("results.filter_price")}
+                </button>
+                {openPanel === "price" && (
+                  <div className="nz-sr-panel narrow">
+                    <div className="nz-sr-prices">
+                      <input
+                        type="number"
+                        min="0"
+                        inputMode="numeric"
+                        placeholder={t("results.min_price")}
+                        value={priceDraft.min}
+                        onChange={(e) => setPriceDraft({ ...priceDraft, min: e.target.value })}
+                      />
+                      <span>–</span>
+                      <input
+                        type="number"
+                        min="0"
+                        inputMode="numeric"
+                        placeholder={t("results.max_price")}
+                        value={priceDraft.max}
+                        onChange={(e) => setPriceDraft({ ...priceDraft, max: e.target.value })}
+                      />
+                    </div>
+                    <button
+                      className="nz-sr-applybtn"
+                      onClick={() => applyFilters({ minPrice: priceDraft.min, maxPrice: priceDraft.max })}
+                    >
+                      {t("results.apply")}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="nz-sr-pillwrap">
+                <button
+                  className={`nz-sr-pill ${activeTags.length ? "on" : ""}`}
+                  onClick={() => setOpenPanel(openPanel === "tags" ? null : "tags")}
+                  aria-expanded={openPanel === "tags"}
+                >
+                  {t("results.filter_amenities")}
+                </button>
+                {openPanel === "tags" && (
+                  <div className="nz-sr-panel">
+                    <div className="nz-sr-scroll">
+                      {(tagDict || []).map((tg) => (
+                        <button
+                          key={tg.key}
+                          className={`nz-sr-opt ${activeTags.includes(tg.key) ? "on" : ""}`}
+                          onClick={() => toggleTag(tg.key)}
+                        >
+                          {tg[lang] || tg.en || tg.key}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Was a native <select>. A browser-chrome dropdown sitting beside
+                hand-built pills is most of what made this bar look unfinished. */}
+            <div className="nz-sr-pillwrap nz-sr-sortwrap">
+              <button
+                className="nz-sr-pill caret"
+                onClick={() => setOpenPanel(openPanel === "sort" ? null : "sort")}
+                aria-expanded={openPanel === "sort"}
+              >
+                {sortLabel}
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+              {openPanel === "sort" && (
+                <div className="nz-sr-panel narrow end">
+                  {SORT_OPTIONS.map((o) => (
+                    <button
+                      key={o.value}
+                      className={`nz-sr-opt ${sort === o.value ? "on" : ""}`}
+                      onClick={() => applyFilters({ sort: o.value === "popular" ? "" : o.value })}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -514,21 +618,23 @@ export default function SearchResults({
         )}
       </div>
 
-      <style>{`
-        .nz-sr-top { padding: 34px 0 18px; }
-        .nz-sr-titlerow {
-          display: flex; align-items: flex-end; justify-content: space-between; gap: 18px;
-        }
+      <style jsx>{`
+        /* Was a raw <style> tag. Unscoped, and injected after globals.css, so
+           every rule here silently outranked a .wrap rule of equal specificity
+           — which is exactly how the padding below went wrong. */
+
+        /* Horizontal padding is NEVER set here. These elements also carry
+           .wrap, which supplies padding-left/right: 52px (20px under 720px).
+           The old shorthand `padding: 34px 0 18px` reset that to zero, which
+           is why the heading and the filter bar sat ~52px to the left of the
+           card grid. Longhand only, from here on. */
+        .nz-sr-top { padding-top: 34px; padding-bottom: 18px; }
+        .nz-sr-titlerow { display: flex; flex-direction: column; gap: 6px; }
         .nz-sr-top h1 {
           font-size: clamp(26px, 3vw, 38px); font-weight: 600;
           letter-spacing: -0.03em; color: var(--ink);
         }
-        .nz-sr-sub { color: var(--gray-400); margin-top: 6px; font-size: 13.5px; font-weight: 500; }
-        .nz-sr-sort {
-          padding: 9px 14px; border: 1.5px solid var(--gray-200); border-radius: var(--r-sm);
-          font-size: 13px; font-weight: 600; outline: none; color: var(--ink);
-          background: var(--white); font-family: inherit; flex-shrink: 0;
-        }
+        .nz-sr-sub { color: var(--gray-400); font-size: 13.5px; font-weight: 500; }
 
         .nz-ai-banner { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
         .nz-ai-banner-label { font-size: 13px; font-weight: 600; color: var(--gray-400); }
@@ -541,22 +647,64 @@ export default function SearchResults({
           line-height: 1.5; max-width: 560px;
         }
 
-        /* Sticky so the filters stay reachable through a long list — the one
-           real advantage a sidebar would have had. */
+        /* `top` is set inline from the measured nav height. The nav is fixed,
+           so top:0 parked this underneath it and the bar was never actually
+           reachable once the page scrolled. */
         .nz-sr-bar {
-          position: sticky; top: 0; z-index: 40;
+          position: sticky; z-index: 40;
           background: var(--white); border-bottom: 1px solid var(--gray-200);
         }
-        .nz-sr-barinner { padding: 12px 0; }
-        .nz-sr-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+        .nz-sr-barinner { padding-top: 10px; padding-bottom: 10px; }
+
+        /* ---- wilaya rail ---- */
+        .nz-sr-railrow { display: flex; align-items: center; gap: 10px; }
+        .nz-sr-rail {
+          flex: 1; min-width: 0;
+          display: flex; align-items: stretch; gap: 2px;
+          overflow-x: auto; overflow-y: hidden;
+          scroll-behavior: smooth;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: none;
+        }
+        .nz-sr-rail::-webkit-scrollbar { display: none; }
+
+        .nz-sr-railitem {
+          flex: 0 0 auto;
+          display: inline-flex; align-items: baseline; gap: 6px;
+          padding: 8px 13px; border: 0; background: none; cursor: pointer;
+          border-radius: 980px; font-family: inherit; white-space: nowrap;
+          color: var(--gray-400); transition: background .15s, color .15s;
+        }
+        .nz-sr-railname { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+        .nz-sr-railcount {
+          font-size: 11.5px; font-weight: 600; color: var(--gray-300);
+          font-variant-numeric: tabular-nums;
+        }
+        .nz-sr-railitem:hover { background: var(--cream); }
+        /* Ink rather than red: red is already carrying the score pill, the CTA
+           and the active-filter chips. A rail of red would flatten all of it. */
+        .nz-sr-railitem.on { background: var(--ink); }
+        .nz-sr-railitem.on .nz-sr-railname { color: #fff; }
+        .nz-sr-railitem.on .nz-sr-railcount { color: rgba(255,255,255,0.6); }
+
+        .nz-sr-railfind { flex: 0 0 auto; }
+
+        .nz-sr-controls {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 10px; margin-top: 8px;
+        }
+        .nz-sr-pills { display: flex; gap: 8px; min-width: 0; }
         .nz-sr-pillwrap { position: relative; }
         .nz-sr-pill {
+          display: inline-flex; align-items: center; gap: 6px;
           padding: 8px 15px; border-radius: 980px; font-size: 13px; font-weight: 600;
           border: 1.5px solid var(--gray-200); background: var(--white); color: var(--ink);
           cursor: pointer; font-family: inherit; transition: all .15s; white-space: nowrap;
         }
+        .nz-sr-pill.icon { padding: 8px 10px; }
         .nz-sr-pill:hover { border-color: var(--ink); }
         .nz-sr-pill.on { border-color: var(--red); background: var(--red-soft); color: var(--red-deep); }
+        .nz-sr-sortwrap { flex: 0 0 auto; }
 
         .nz-sr-panel {
           position: absolute; top: calc(100% + 8px); inset-inline-start: 0; z-index: 50;
@@ -564,6 +712,9 @@ export default function SearchResults({
           border-radius: var(--r-md); box-shadow: var(--shadow-md); padding: 10px;
         }
         .nz-sr-panel.narrow { width: 220px; }
+        /* Anchors to the trailing edge so a right-hand control's panel does not
+           run off the viewport. Logical properties, so it flips in Arabic. */
+        .nz-sr-panel.end { inset-inline-start: auto; inset-inline-end: 0; }
         .nz-sr-search {
           width: 100%; padding: 9px 12px; border: 1.5px solid var(--gray-200);
           border-radius: var(--r-sm); font-size: 13px; font-family: inherit;
@@ -593,7 +744,7 @@ export default function SearchResults({
           cursor: pointer; font-family: inherit;
         }
 
-        .nz-sr-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+        .nz-sr-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 9px; }
         .nz-sr-chip {
           padding: 6px 12px; border-radius: 980px; border: 0;
           background: var(--red-soft); color: var(--red-deep);
@@ -615,7 +766,10 @@ export default function SearchResults({
            of our traffic runs on. Opacity is composited. */
         @keyframes nzskpulse { 0%, 100% { opacity: 1 } 50% { opacity: .5 } }
         .nz-sk { animation: nzskpulse 1.6s ease-in-out infinite; }
-        .nz-sk-img { aspect-ratio: 4 / 5; background: var(--gray-100, #eee); border-radius: 12px; }
+        /* Must match HotelCard's media box. It was 4/5 against the card's 3/2,
+           so every "show more" jolted the layout as placeholders resolved into
+           shorter cards. */
+        .nz-sk-img { aspect-ratio: 3 / 2; background: var(--gray-100, #eee); border-radius: 14px; }
         .nz-sk-line { height: 10px; background: var(--gray-100, #eee); border-radius: 4px; margin-top: 10px; }
         .nz-sk-line.sm { height: 8px; margin-top: 7px; }
 
@@ -639,14 +793,18 @@ export default function SearchResults({
         @media (max-width: 1240px) { .nz-sr-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
         @media (max-width: 980px)  { .nz-sr-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         @media (max-width: 620px) {
-          .nz-sr-top { padding: 22px 0 14px; }
-          .nz-sr-titlerow { flex-direction: column; align-items: stretch; gap: 12px; }
-          .nz-sr-sort { width: 100%; }
-          .nz-sr-pills { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+          .nz-sr-top { padding-top: 22px; padding-bottom: 14px; }
+          /* The refinements scroll sideways here; the rail above already does.
+             Two scrollers is acceptable because they carry different jobs and
+             sit on different rows. */
+          .nz-sr-pills { overflow-x: auto; scrollbar-width: none; }
+          .nz-sr-pills::-webkit-scrollbar { display: none; }
           .nz-sr-panel { width: 260px; }
+          .nz-sr-railitem { padding: 7px 11px; }
         }
         @media (max-width: 520px) {
           .nz-sr-grid { grid-template-columns: 1fr; }
+          .nz-sk-img { aspect-ratio: 16 / 10; }
         }
       `}</style>
     </>
