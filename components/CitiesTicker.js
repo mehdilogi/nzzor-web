@@ -19,58 +19,37 @@
    in and out rather than getting hard-cut at the section boundaries.
    ============================================================================= */
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLang } from "../lib/LangContext";
 
-// ---- Cities with rating + price-from data ---------------------------------
-// Prices reflect actual mock data in lib/mockData.js. Ratings are 1-10 scale
-// matching the Booking.com convention you use across the platform.
-const CITIES = [
-  { name: "Algiers",     rating: 9.4, price: 18000 },
-  { name: "Oran",        rating: 9.1, price: 22000 },
-  { name: "Constantine", rating: 9.0, price: 25000 },
-  { name: "Djanet",      rating: 9.3, price: 22000 },
-  { name: "Tipaza",      rating: 8.9, price: 16000 },
-  { name: "Ghardaia",    rating: 9.2, price: 19000 },
-  { name: "Bejaia",      rating: 8.8, price: 15000 },
-  { name: "Batna",       rating: 8.7, price: 14000 },
-];
+// ---------------------------------------------------------------------------
+// The wilaya list comes from the API, not from this file.
+//
+// It used to be eight hardcoded cities carrying a rating and a "from" price
+// copied out of lib/mockData.js — invented numbers on a live booking site. A
+// guest who clicked through from "Constantine · from 25,000 DZD" and found
+// nothing at that price has been told something untrue by a platform whose
+// entire pitch is trust.
+//
+// What is shown now is the wilaya name and how many hotels we actually have
+// there, both straight from /api/hotels/meta/cities. If it is on screen, it is
+// true, and it stays true as the catalogue grows.
+// ---------------------------------------------------------------------------
 
-// Translated city names per language. Falls back to English if missing.
-const CITY_NAMES = {
-  Algiers:     { en: "Algiers",     fr: "Alger",       ar: "الجزائر" },
-  Oran:        { en: "Oran",        fr: "Oran",        ar: "وهران" },
-  Constantine: { en: "Constantine", fr: "Constantine", ar: "قسنطينة" },
-  Djanet:      { en: "Djanet",      fr: "Djanet",      ar: "جانت" },
-  Tipaza:      { en: "Tipaza",      fr: "Tipaza",      ar: "تيبازة" },
-  Ghardaia:    { en: "Ghardaia",    fr: "Ghardaïa",    ar: "غرداية" },
-  Bejaia:      { en: "Bejaia",      fr: "Béjaïa",      ar: "بجاية" },
-  Batna:       { en: "Batna",       fr: "Batna",       ar: "باتنة" },
-};
-
-// Format a price like "18,000" with a thin grouping separator
-function formatPrice(n) {
-  return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
-
-// Shuffle deterministically with a seed so each row gets a different order
-// (but the same order across renders — no flicker)
-function shuffleSeed(arr, seed) {
-  const a = arr.slice();
-  let s = seed;
-  for (let i = a.length - 1; i > 0; i--) {
-    s = (s * 1664525 + 1013904223) % 4294967296;
-    const j = s % (i + 1);
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
+// Rows are built by dealing the list out round-robin rather than shuffling the
+// whole list into each row: with 47 wilayas, repeating all of them three times
+// would put ~280 nodes on screen, and every one of them animates.
+function dealRows(list, rows) {
+  const out = Array.from({ length: rows }, () => []);
+  list.forEach((c, i) => out[i % rows].push(c));
+  return out;
 }
 
 // One "row" of the ticker. The CSS marquee duplicates the content twice
 // end-to-end and animates `transform: translateX(-50%)` so the loop is
 // seamless — when the first copy has moved fully off-screen, the second
 // copy is exactly where the first was, with no visible jump.
-function TickerRow({ cities, direction, speed, weight, lang, fromLabel }) {
+function TickerRow({ cities, direction, speed, weight, hotelLabel, hotelsLabel }) {
   const [hovered, setHovered] = useState(null);
 
   // Each row gets a unique animation name so direction/speed don't conflict
@@ -81,11 +60,12 @@ function TickerRow({ cities, direction, speed, weight, lang, fromLabel }) {
   // Each "card" is one city block; we render the cities twice so the loop
   // is seamless.
   const items = cities.map((c, i) => {
-    const localName = CITY_NAMES[c.name]?.[lang] || c.name;
+    // The API already returns the name in the active language.
+    const localName = c.name;
     const isHovered = hovered === i;
     return (
       <span
-        key={`${c.name}-${i}`}
+        key={`${c.key || c.name}-${i}`}
         className={`nz-ticker-item ${isHovered ? "is-hovered" : ""}`}
         onMouseEnter={() => setHovered(i)}
         onMouseLeave={() => setHovered(null)}
@@ -94,10 +74,9 @@ function TickerRow({ cities, direction, speed, weight, lang, fromLabel }) {
       >
         <span className="nz-ticker-name display">{localName}</span>
         <span className="nz-ticker-meta">
-          <span className="nz-ticker-rating">{c.rating.toFixed(1)}</span>
-          <span className="nz-ticker-sep">·</span>
+          <span className="nz-ticker-rating">{c.hotelCount}</span>
           <span className="nz-ticker-price">
-            {fromLabel} {formatPrice(c.price)} <span className="nz-ticker-cur">DZD</span>
+            {c.hotelCount === 1 ? hotelLabel : hotelsLabel}
           </span>
         </span>
         <span className="nz-ticker-bullet" aria-hidden />
@@ -121,14 +100,42 @@ function TickerRow({ cities, direction, speed, weight, lang, fromLabel }) {
   );
 }
 
-export default function CitiesTicker() {
+export default function CitiesTicker({ initialCities = [] }) {
   const { t, lang } = useLang();
-  const fromLabel = t("globe.from") || "from";
+  const hotelLabel = t("search.hotel");
+  const hotelsLabel = t("search.hotels");
 
-  // Three different shuffles of the city list — one per row
-  const row1 = shuffleSeed(CITIES, 7);   // top, slow, faded
-  const row2 = shuffleSeed(CITIES, 19);  // middle, fast, full opacity
-  const row3 = shuffleSeed(CITIES, 31);  // bottom, medium, faded
+  // Server-rendered in English so the section is not empty on first paint,
+  // then refetched in the active language. /meta/cities localises the names,
+  // and page.js cannot know the language because it lives in localStorage.
+  const [cities, setCities] = useState(initialCities);
+
+  useEffect(() => {
+    if (lang === "en" && initialCities.length) return;
+    let cancelled = false;
+    const API = process.env.NEXT_PUBLIC_API_URL || "";
+    fetch(`${API}/api/hotels/meta/cities?lang=${lang}`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!cancelled && Array.isArray(j.data) && j.data.length) setCities(j.data);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [lang, initialCities]);
+
+  // Busiest wilayas first, so the rows open on names a guest recognises.
+  const ordered = useMemo(
+    () => [...cities].sort((a, b) => (b.hotelCount || 0) - (a.hotelCount || 0)),
+    [cities]
+  );
+
+  const rows = useMemo(() => dealRows(ordered, 3), [ordered]);
+
+  // Duration scales with row length, or a row of 16 would race past at the
+  // speed tuned for a row of 8.
+  const speedFor = (n, base) => Math.max(24, Math.round(base * (n / 8)));
+
+  if (!ordered.length) return null;
 
   return (
     <section className="nz-cities-section">
@@ -138,10 +145,10 @@ export default function CitiesTicker() {
         <p className="nz-cities-sub">{t("globe.sub")}</p>
       </div>
 
-      <div className="nz-cities-stage" aria-label="Cities across Algeria" dir="ltr">
-        <TickerRow cities={row1} direction="right" speed={70} weight="faded"   lang={lang} fromLabel={fromLabel} />
-        <TickerRow cities={row2} direction="left"  speed={50} weight="hero"    lang={lang} fromLabel={fromLabel} />
-        <TickerRow cities={row3} direction="right" speed={60} weight="faded-r" lang={lang} fromLabel={fromLabel} />
+      <div className="nz-cities-stage" aria-label="Wilayas across Algeria" dir="ltr">
+        <TickerRow cities={rows[0]} direction="right" speed={speedFor(rows[0].length, 70)} weight="faded"   hotelLabel={hotelLabel} hotelsLabel={hotelsLabel} />
+        <TickerRow cities={rows[1]} direction="left"  speed={speedFor(rows[1].length, 50)} weight="hero"    hotelLabel={hotelLabel} hotelsLabel={hotelsLabel} />
+        <TickerRow cities={rows[2]} direction="right" speed={speedFor(rows[2].length, 60)} weight="faded-r" hotelLabel={hotelLabel} hotelsLabel={hotelsLabel} />
       </div>
 
       <style>{`
@@ -261,7 +268,7 @@ export default function CitiesTicker() {
           letter-spacing: 0.04em;
         }
         .nz-ticker-row--hero .nz-ticker-rating { font-size: 15px; }
-        .nz-ticker-sep { display: none; }
+
         .nz-ticker-price {
           font-size: 11.5px;
           font-weight: 500;

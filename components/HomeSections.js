@@ -81,7 +81,7 @@ function useCountUp(target, active, { duration = 1100, decimals = 0 } = {}) {
 //
 // The `city` column stores wilaya keys (see lib/wilayas.js), so this is
 // WILAYAS, not cities — the stronger and more accurate claim locally.
-export default function HomeSections({ featured, wilayaCount = 0, hotelCount = 0 }) {
+export default function HomeSections({ featured, cities = [], wilayaCount = 0, hotelCount = 0 }) {
   const { t } = useLang();
 
   const statsRef = useRef(null);
@@ -205,10 +205,10 @@ export default function HomeSections({ featured, wilayaCount = 0, hotelCount = 0
           </div>
         </div>
 
-        {/* CITIES TICKER — three layered horizontal scrolling rows of the
-            wilayas we cover. NOTE: CitiesTicker may still carry its own
-            hardcoded list; check it against the live count. */}
-        <CitiesTicker />
+        {/* CITIES TICKER — three layered scrolling rows covering every wilaya
+            we operate in. The list is live: it used to be eight hardcoded
+            cities with prices copied from mockData.js. */}
+        <CitiesTicker initialCities={cities} />
 
         {/* FOUR CLEAN FEATURE COLUMNS */}
         <div className="wrap nz-why-cols">
