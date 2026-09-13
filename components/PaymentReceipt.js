@@ -43,7 +43,7 @@ const S = {
     unknown_sub: "If you were charged, contact us with your booking reference and we'll sort it out.",
     receipt: "Payment receipt",
     reference: "Booking reference",
-    order_id: "Transaction ID (SATIM)",
+    order_id: "Transaction ID",
     order_number: "Order number",
     approval: "Authorization code",
     datetime: "Date and time",
@@ -80,7 +80,7 @@ const S = {
     unknown_sub: "Si vous avez été débité, contactez-nous avec votre référence de réservation.",
     receipt: "Reçu de paiement",
     reference: "Référence de réservation",
-    order_id: "Identifiant de transaction (SATIM)",
+    order_id: "Identifiant de transaction",
     order_number: "Numéro de commande",
     approval: "Numéro d'autorisation",
     datetime: "Date et heure",
@@ -117,7 +117,7 @@ const S = {
     unknown_sub: "إذا تم خصم المبلغ، يرجى التواصل معنا مع رقم الحجز.",
     receipt: "إيصال الدفع",
     reference: "رقم الحجز",
-    order_id: "معرّف المعاملة (ساتيم)",
+    order_id: "معرّف المعاملة",
     order_number: "رقم الطلب",
     approval: "رمز التفويض",
     datetime: "التاريخ والوقت",
@@ -254,7 +254,12 @@ export default function PaymentReceipt({ status, reference, message, rejectionCo
                 <strong>{fmtAmount(receipt.amount, lang)} {receipt.currency || "DZD"}</strong>
               )}
               {row(s.method, receipt.method)}
-              {receipt.pan && row(s.card, receipt.pan)}
+              {/* The masked card number is deliberately NOT shown.
+                  SATIM's certification review (13/09/2026): "Veuillez retirer
+                  le numéro de carte." It is still returned by the receipt
+                  endpoint and still stored on the Payment row for support and
+                  dispute handling — it is only withheld from display, here and
+                  in the PDF. */}
               {receipt.guestName && row(s.guest, receipt.guestName)}
               {receipt.hotelName && row(s.stay, `${receipt.hotelName} · ${receipt.nights} ${s.nights}`)}
 
