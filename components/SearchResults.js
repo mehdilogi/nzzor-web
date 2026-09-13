@@ -376,12 +376,25 @@ export default function SearchResults({
     };
   }
 
+  // `weight` drives the type size, `count` is the number printed above the
+  // name. They differ only for "All Algeria": it is sized like the deepest
+  // wilaya so it reads as the head of the list, but it shows the catalogue
+  // total. That total comes from summing the cities rather than from the
+  // filtered result count, which would make it shrink to the selected wilaya's
+  // own number the moment one was picked.
+  const catalogueTotal = useMemo(
+    () => railCities.reduce((n, c) => n + (c.hotelCount || 0), 0),
+    [railCities]
+  );
+
   const railRows = useMemo(
     () =>
-      [{ key: "__all", name: t("results.all_dest"), hotelCount: maxCount, value: "" }].concat(
-        railCities.map((c) => ({ key: c.key, name: c.name, hotelCount: c.hotelCount, value: c.name }))
+      [{ key: "__all", name: t("results.all_dest"), weight: maxCount, count: catalogueTotal, value: "" }].concat(
+        railCities.map((c) => ({
+          key: c.key, name: c.name, weight: c.hotelCount, count: c.hotelCount, value: c.name,
+        }))
       ),
-    [railCities, maxCount, t]
+    [railCities, maxCount, catalogueTotal, t]
   );
 
   const SORT_OPTIONS = [
@@ -627,9 +640,10 @@ export default function SearchResults({
                     tabIndex={ghost ? -1 : undefined}
                     onClick={() => applyFilters({ city: c.value })}
                   >
-                    <span className="nz-sr-railname display" style={railSize(c.hotelCount)}>
+                    <span className="nz-sr-railname display" style={railSize(c.weight)}>
                       {c.name}
                     </span>
+                    <span className="nz-sr-railcount">{c.count}</span>
                   </button>
                 ))
               )}
@@ -1060,6 +1074,17 @@ export default function SearchResults({
         .nz-sr-railitem:hover { background: var(--cream); }
         .nz-sr-railitem.on { background: var(--red-soft); }
         .nz-sr-railname { letter-spacing: -0.02em; line-height: 1; }
+        /* Superscript rather than a second line: the rail is one baseline and
+           a stacked number would double its height. vertical-align works here
+           because the button lays its children out inline — do not give
+           .nz-sr-railitem display:flex. */
+        .nz-sr-railcount {
+          font-size: 10px; font-weight: 700; color: var(--gray-300);
+          vertical-align: super; margin-inline-start: 3px;
+          font-variant-numeric: tabular-nums;
+        }
+        .nz-sr-railitem:hover .nz-sr-railcount { color: var(--gray-400); }
+        .nz-sr-railitem.on .nz-sr-railcount { color: var(--red-deep); }
         /* The size and colour are inline (they encode the hotel count), so the
            selected state needs the weight to win. */
         .nz-sr-railitem.on .nz-sr-railname { color: var(--red-deep) !important; }
