@@ -1,14 +1,16 @@
 import "./globals.css";
+import StyledJsxRegistry from "./registry";
 import Providers from "./Providers";
 import AnalyticsBeacon from "./components/AnalyticsBeacon";
 
 export const metadata = {
   title: "Nzzor — Premium Hotel Booking in Algeria",
-  // No hotel count here. This string is what Google indexes and what shows in
+  // No counts here at all. This string is what Google indexes and what shows in
   // search results, so a number that goes stale is worse than no number — it
-  // said "10 verified hotels" while the platform carried 25.
+  // said "10 verified hotels" while the platform carried 25, then "9 wilayas"
+  // while it covered 47. Live counts belong on the page, not in metadata.
   description:
-    "Book Algeria's finest hotels instantly. Verified hotels across 9 wilayas, instant confirmation, CIB & Edahabia payments. Operated by Allouni Travel Agency, licensed by the Algerian Ministry of Tourism.",
+    "Book Algeria's finest hotels instantly. Verified hotels across Algeria, instant confirmation, CIB & Edahabia payments. Operated by Allouni Travel Agency, licensed by the Algerian Ministry of Tourism.",
   keywords: ["Algeria hotels", "book hotel Algeria", "Nzzor", "Allouni Travel Agency", "CIB", "Edahabia"],
   openGraph: {
     title: "Nzzor — Premium Hotel Booking in Algeria",
@@ -34,13 +36,18 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        {/* AnalyticsBeacon listens for Next.js route changes and fires a
-            pageview to /api/analytics/beacon on every navigation. It renders
-            nothing visually and is internally wrapped in <Suspense> so it
-            won't opt static routes out of prerendering (the documented
-            useSearchParams gotcha). */}
-        <AnalyticsBeacon />
-        <Providers>{children}</Providers>
+        {/* StyledJsxRegistry must be the outermost wrapper in <body> so it
+            captures styled-jsx from every client component beneath it. See
+            app/registry.js for why this exists. */}
+        <StyledJsxRegistry>
+          {/* AnalyticsBeacon listens for Next.js route changes and fires a
+              pageview to /api/analytics/beacon on every navigation. It renders
+              nothing visually and is internally wrapped in <Suspense> so it
+              won't opt static routes out of prerendering (the documented
+              useSearchParams gotcha). */}
+          <AnalyticsBeacon />
+          <Providers>{children}</Providers>
+        </StyledJsxRegistry>
       </body>
     </html>
   );
