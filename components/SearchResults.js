@@ -625,7 +625,7 @@ export default function SearchResults({
 
         /* Horizontal padding is NEVER set here. These elements also carry
            .wrap, which supplies padding-left/right: 52px (20px under 720px).
-           The old shorthand `padding: 34px 0 18px` reset that to zero, which
+           The old shorthand "padding: 34px 0 18px" reset that to zero, which
            is why the heading and the filter bar sat ~52px to the left of the
            card grid. Longhand only, from here on. */
         .nz-sr-top { padding-top: 34px; padding-bottom: 18px; }
@@ -647,8 +647,8 @@ export default function SearchResults({
           line-height: 1.5; max-width: 560px;
         }
 
-        /* `top` is set inline from the measured nav height. The nav is fixed,
-           so top:0 parked this underneath it and the bar was never actually
+        /* The "top" value is set inline from the measured nav height. The nav
+           is fixed, so top:0 parked this underneath it and the bar was never
            reachable once the page scrolled. */
         .nz-sr-bar {
           position: sticky; z-index: 40;
