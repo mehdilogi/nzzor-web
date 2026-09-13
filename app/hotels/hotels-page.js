@@ -60,6 +60,14 @@ export default async function HotelsPage({ searchParams }) {
   const tags = searchParams?.tags || "";
   const ai = searchParams?.ai === "1";
 
+  // Booking context. Not filters — getHotelsPaged takes no dates — but the
+  // listing now lets the guest see and change them, and HotelCard forwards
+  // them to the hotel page so occupancy and dates survive through to booking.
+  const checkIn = searchParams?.checkIn || "";
+  const checkOut = searchParams?.checkOut || "";
+  const adultsParam = searchParams?.adults || "";
+  const roomsParam = searchParams?.rooms || "";
+
   // `page` stays a real server-rendered URL even though the UI uses a "show
   // more" button. Google crawls /hotels?page=4; it does not click buttons.
   const page = Math.max(1, parseInt(searchParams?.page, 10) || 1);
@@ -89,7 +97,10 @@ export default async function HotelsPage({ searchParams }) {
         cities={cities}
         facets={facets}
         perPage={PER_PAGE}
-        initialFilters={{ q, city, stars, sort, maxPrice, minPrice, tags, ai, page }}
+        initialFilters={{
+          q, city, stars, sort, maxPrice, minPrice, tags, ai, page,
+          checkIn, checkOut, adults: adultsParam, rooms: roomsParam,
+        }}
       />
       <Footer />
       <WhatsAppButton />
