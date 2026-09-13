@@ -29,6 +29,7 @@ export default async function HomePage() {
       <Suspense fallback={null}>
         <HomeSections
           featured={featured}
+          cities={cities}
           hotelCount={hotelCount}
           wilayaCount={wilayaCount}
         />
