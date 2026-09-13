@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Icon from "./Icon";
@@ -10,6 +10,10 @@ import { useLang } from "../lib/LangContext";
 // Cloudflare Image Transformations. Off until the zone has it enabled, so the
 // card keeps working untouched in the meantime — set NEXT_PUBLIC_CF_IMAGES=true
 // once Transformations are switched on for nzzor.com.
+//
+// While this is false there is no srcSet at all, so a 250px grid slot downloads
+// the full-resolution original straight from R2 — several MB of PNG per card,
+// twenty-four at a time. That is the real reason the grid fills in raggedly.
 //
 // The width ladder is deliberately short and fixed. Cloudflare bills per unique
 // source+parameter combination, so letting device pixel ratios generate
@@ -84,6 +88,30 @@ export default function HotelCard({ hotel, priority = false }) {
   // per card would mean 120 requests for a full page of 24 — on a mobile
   // connection that page never finishes loading.
   const [seen, setSeen] = useState(() => new Set([0]));
+  // Which images have finished downloading. Separate from `seen` on purpose:
+  // an <img> in the DOM is not the same thing as an <img> worth showing.
+  // Browsers paint a large photo progressively as bytes arrive, so without
+  // this gate the card displays images that are half picture, half blank —
+  // which reads as a broken page rather than a loading one.
+  const [loaded, setLoaded] = useState(() => new Set());
+
+  const markLoaded = useCallback((i) => {
+    setLoaded((prev) => (prev.has(i) ? prev : new Set(prev).add(i)));
+  }, []);
+
+  // A cached image can finish before React attaches the onLoad handler, in
+  // which case the event never fires and the photo would stay hidden forever.
+  // The ref callback catches that case on mount.
+  const imgRef = useCallback(
+    (el) => {
+      if (el && el.complete && el.naturalWidth > 0) {
+        markLoaded(Number(el.dataset.i));
+      }
+    },
+    [markLoaded]
+  );
+
+  const ready = loaded.has(idx);
 
   // Live gesture state. A ref rather than state because none of it should
   // cause a render — only the final photo change does.
@@ -214,33 +242,50 @@ export default function HotelCard({ hotel, priority = false }) {
           Hovering this inner div instead keeps every rule scoped and working. */}
       <div className="nz-hcard-inner">
         <div
-          className="nz-hcard-media"
+          className={`nz-hcard-media${ready ? " ready" : ""}`}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerCancel}
         >
-        {hotel.reviewCount > 0 && (
+        {/* Held in the DOM until the current photo is complete. A flat grey
+            rectangle with a floating rating pill on it looks like a failed
+            image; a skeleton looks like a page that is still arriving. */}
+        {!ready && <span className="nz-hcard-skel" aria-hidden="true" />}
+
+        {/* Every overlay waits for the photo. None of them mean anything on
+            top of an empty box, and showing them early is most of what makes
+            a half-loaded grid feel broken. */}
+        {ready && hotel.reviewCount > 0 && (
           <span className="nz-hcard-score">
             <Icon name="star" size={10} style={{ color: "var(--red)" }} strokeWidth={0} />
             {hotel.rating}
           </span>
         )}
 
-        <span className="nz-hcard-fav" aria-hidden="true">
-          <Icon name="heart" size={15} />
-        </span>
+        {ready && (
+          <span className="nz-hcard-fav" aria-hidden="true">
+            <Icon name="heart" size={15} />
+          </span>
+        )}
 
         {photos.map((src, i) =>
           seen.has(i) ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
               key={i}
+              ref={imgRef}
+              data-i={i}
               src={cf(src, 480)}
               srcSet={srcSet(src)}
               sizes="(max-width: 520px) 100vw, (max-width: 980px) 50vw, (max-width: 1240px) 33vw, 25vw"
               alt={i === 0 ? hotel.name : ""}
-              className={i === idx ? "on" : ""}
+              className={i === idx && loaded.has(i) ? "on" : ""}
+              onLoad={() => markLoaded(i)}
+              /* A photo that 404s or dies mid-transfer would otherwise leave
+                 the skeleton shimmering forever. Treat it as settled and let
+                 the empty frame show. */
+              onError={() => markLoaded(i)}
               /* The first row is the LCP candidate — queueing it behind
                  twenty lazy images is the difference between a fast page
                  and a slow one. */
@@ -252,7 +297,7 @@ export default function HotelCard({ hotel, priority = false }) {
           ) : null
         )}
 
-        {multi && (
+        {multi && ready && (
           <>
             <button
               type="button"
@@ -278,9 +323,11 @@ export default function HotelCard({ hotel, priority = false }) {
           </>
         )}
 
-        <span className="nz-hcard-cta">
-          {t("card.view_rooms")} <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="4" y1="12" x2="19" y2="12" /><polyline points="13 6 19 12 13 18" /></svg>
-        </span>
+        {ready && (
+          <span className="nz-hcard-cta">
+            {t("card.view_rooms")} <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="4" y1="12" x2="19" y2="12" /><polyline points="13 6 19 12 13 18" /></svg>
+          </span>
+        )}
       </div>
 
         <div className="nz-hcard-info">
@@ -319,16 +366,47 @@ export default function HotelCard({ hotel, priority = false }) {
              React's passive listeners would refuse anyway. */
           touch-action: pan-y;
         }
-        .nz-hcard-media img {
+
+        .nz-hcard-skel {
+          position: absolute; inset: 0; z-index: 2;
+          background: var(--gray-100, #f0f0f2);
+          overflow: hidden;
+        }
+        /* A single slow pass of light. Faster or more contrasty than this and
+           a grid of twenty-four of them turns into a disco. */
+        .nz-hcard-skel::after {
+          content: "";
           position: absolute; inset: 0;
+          transform: translateX(-100%);
+          background: linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(255,255,255,0.55) 50%,
+            transparent 100%
+          );
+          animation: nz-sheen 1.6s ease-in-out infinite;
+        }
+        @keyframes nz-sheen {
+          100% { transform: translateX(100%); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .nz-hcard-skel::after { animation: none; }
+        }
+
+        .nz-hcard-media img {
+          position: absolute; inset: 0; z-index: 1;
           width: 100%; height: 100%; object-fit: cover;
-          opacity: 0; transition: opacity .3s, transform .8s cubic-bezier(0.16,1,0.3,1);
+          /* Zero until the file is complete. The browser paints a large photo
+             progressively from the top as bytes land, and this is what stops
+             that partial render from ever being visible. */
+          opacity: 0;
+          transition: opacity .45s ease, transform .8s cubic-bezier(0.16,1,0.3,1);
           /* Stops iOS offering the image to a long press mid-swipe. */
           -webkit-touch-callout: none;
           user-select: none; -webkit-user-select: none;
         }
         .nz-hcard-media img.on { opacity: 1; }
-        .nz-hcard-inner:hover .nz-hcard-media img.on { transform: scale(1.05); }
+        .nz-hcard-inner:hover .nz-hcard-media.ready img.on { transform: scale(1.05); }
 
         .nz-hcard-score {
           position: absolute; top: 10px; inset-inline-start: 10px; z-index: 3;
