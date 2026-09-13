@@ -80,7 +80,10 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
   }, [user]);
 
   // payment
-  const [payMethod, setPayMethod] = useState("cib");
+  // Fixed. There is one payment option now (CIB/Edahabia combined), so nothing
+  // sets this any more — but the value is still fed through METHOD_CODES below
+  // so an unmapped method fails loudly instead of silently defaulting to CIB.
+  const [payMethod] = useState("cib");
   const [promoInput, setPromoInput] = useState("");
   // The promo field starts collapsed behind a link. Most guests have no code,
   // and an open input invites them to leave and hunt for one.
@@ -325,9 +328,13 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
     // SATIM-EPG is a CIB card acceptance system; the "Verified by Visa /
     // MasterCard SecureCode" in their docs refers to the 3-D Secure protocol,
     // not to accepting foreign scheme cards.
+    //
+    // EDDAHABIA is no longer selectable: the CIB and Edahabia options are now a
+    // single combined case, so every new booking is recorded as CIB. The value
+    // still exists in the Prisma enum and is still accepted by /satim/initiate,
+    // because bookings taken before this change hold it and must stay payable.
     const METHOD_CODES = {
       cib: "CIB",
-      edahabia: "EDDAHABIA",
     };
     const methodCode = METHOD_CODES[payMethod];
     if (!methodCode) {
@@ -637,27 +644,39 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
             <div className="bk-card">
               <h2 className="display">{t("bk.pay_method")}</h2>
 
+              {/* ONE combined option, not two.
+                  SATIM's certification review (13/09/2026): "le mode e paiement
+                  CIB/Edahabia sont séparer, veuillez les jumeler dans une seule
+                  case."
+
+                  It was always cosmetic anyway — register.do has no card-type
+                  parameter, so CIB and Edahabia produced an identical call and
+                  the gateway decides acceptance when the card number is
+                  entered. Asking the customer to declare a card type before
+                  leaving the site added a step and told us nothing.
+
+                  The label stays untranslated because CIB and Edahabia are
+                  brand names. The description reuses bk.cib_desc rather than
+                  introducing a new key: t() humanises missing keys in
+                  production, so a key that exists in only one language would
+                  ship as English-looking copy instead of failing loudly. */}
               <div className="bk-pay-methods">
-                <button
-                  className={`bk-pay ${payMethod === "cib" ? "on" : ""}`}
-                  onClick={() => setPayMethod("cib")}
-                >
+                <button className="bk-pay on" aria-pressed="true">
                   <span className="bk-pay-radio" />
                   <span className="bk-pay-info">
-                    <strong>CIB</strong>
+                    <strong>CIB / Edahabia</strong>
                     <em>{t("bk.cib_desc")}</em>
                   </span>
-                </button>
-
-                <button
-                  className={`bk-pay ${payMethod === "edahabia" ? "on" : ""}`}
-                  onClick={() => setPayMethod("edahabia")}
-                >
-                  <span className="bk-pay-radio" />
-                  <span className="bk-pay-info">
-                    <strong>Edahabia</strong>
-                    <em>{t("bk.edahabia_desc")}</em>
-                  </span>
+                  {/* Same asset SATIM supplied by email. Never redraw or crop
+                      it — Art. 17 of the bank contract makes a fault in
+                      displaying the CIB mark grounds for suspension. */}
+                  <img
+                    className="bk-pay-mark"
+                    src="/cib-edahabia.png"
+                    alt="CIB / Edahabia"
+                    width={50}
+                    height={32}
+                  />
                 </button>
 
                 {/*
@@ -803,7 +822,7 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
                 {/* "Le logo CIB doit figurer sur le bouton qui envoie vers le
                     lien de la Platform de paiement SATIM." Shown only for the
                     card methods, which are the ones that actually redirect. */}
-                {(payMethod === "cib" || payMethod === "edahabia") && !processing && (
+                {!processing && (
                   <img
                     className="bk-cta-mark"
                     src="/cib-edahabia.png"
@@ -814,9 +833,15 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
                 )}
               </button>
 
-              {/* SATIM's green number, required wherever payment problems can
-                  occur — not only on the return page. */}
-              <p className="bk-satim-help">{t("bk.satim_helpline")}</p>
+              {/* SATIM's green number used to sit here. Removed at their
+                  request (13/09/2026): "Veuillez retirer le numéro de la
+                  SATIM, ce dernier doit apparaitre uniquement sur la page de
+                  retour ainsi que le reçu de paiement."
+
+                  It is already rendered in both required places and must stay
+                  there: components/PaymentReceipt.js (outside the paid/failed
+                  branches, so accepted and rejected returns both show it) and
+                  the PDF footer in api/src/services/receiptService.js. */}
 
               <button className="bk-back" onClick={() => setStep(1)}>
                 <Icon name="arrow" size={15} strokeWidth={2.5} className="icon-flip" />
@@ -1140,6 +1165,7 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
           content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--red);
         }
         .bk-pay-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+        .bk-pay-mark { flex-shrink: 0; object-fit: contain; }
         .bk-pay-info strong { font-size: 15px; font-weight: 700; color: var(--ink); }
         .bk-pay-info em { font-size: 12.5px; font-style: normal; color: var(--gray-400); }
         /* promo */
@@ -1233,11 +1259,6 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
           display: block; height: 38px; width: auto;
           border-radius: 4px;
           flex-shrink: 0;
-        }
-
-        .bk-satim-help {
-          margin-top: 10px; text-align: center;
-          font-size: 12px; color: var(--gray-400); line-height: 1.5;
         }
 
         .bk-secure {
