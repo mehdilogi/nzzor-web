@@ -27,10 +27,60 @@ const PRICE_STEP = 500;
 // a key present in only one language would ship as English-looking copy in the
 // other two instead of failing loudly.
 const UI = {
-  en: { filters: "Filters", showAll: "Show all" },
-  fr: { filters: "Filtres", showAll: "Tout afficher" },
-  ar: { filters: "عوامل التصفية", showAll: "عرض الكل" },
+  en: {
+    filters: "Filters", showAll: "Show all",
+    where: "Where", dates: "Check in — check out", addDates: "Add dates",
+    guests: "Guests", guest: "guest", guestPl: "guests", room: "room", roomPl: "rooms",
+    adults: "Guests", adultsSub: "Adults and children",
+    roomsLabel: "Rooms", roomsSub: "Each room is booked separately",
+    dow: ["M", "T", "W", "T", "F", "S", "S"],
+    pickOut: "Pick a check-out date.",
+    noAvail: "Dates are carried through to your booking. They do not filter the list yet.",
+  },
+  fr: {
+    filters: "Filtres", showAll: "Tout afficher",
+    where: "Où", dates: "Arrivée — départ", addDates: "Ajouter des dates",
+    guests: "Voyageurs", guest: "voyageur", guestPl: "voyageurs", room: "chambre", roomPl: "chambres",
+    adults: "Voyageurs", adultsSub: "Adultes et enfants",
+    roomsLabel: "Chambres", roomsSub: "Chaque chambre est réservée séparément",
+    dow: ["L", "M", "M", "J", "V", "S", "D"],
+    pickOut: "Choisissez une date de départ.",
+    noAvail: "Les dates sont reprises lors de la réservation. Elles ne filtrent pas encore la liste.",
+  },
+  ar: {
+    filters: "عوامل التصفية", showAll: "عرض الكل",
+    where: "الوجهة", dates: "الوصول — المغادرة", addDates: "أضف التواريخ",
+    guests: "النزلاء", guest: "نزيل", guestPl: "نزلاء", room: "غرفة", roomPl: "غرف",
+    adults: "النزلاء", adultsSub: "بالغون وأطفال",
+    roomsLabel: "الغرف", roomsSub: "تُحجز كل غرفة على حدة",
+    dow: ["ن", "ث", "ر", "خ", "ج", "س", "ح"],
+    pickOut: "اختر تاريخ المغادرة.",
+    noAvail: "تُنقل التواريخ إلى الحجز، لكنها لا تُصفّي القائمة بعد.",
+  },
 };
+
+// Local calendar date <-> YYYY-MM-DD, without going through Date.toISOString.
+// toISOString converts to UTC first, so a date picked late in the evening in
+// Algiers comes back as the previous day.
+function toKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function fromKey(k) {
+  if (!k) return null;
+  const [y, m, d] = String(k).split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+// Monday-first grid. Returns nulls for the leading blanks so the markup can
+// map over one flat array instead of nesting loops in JSX.
+function monthCells(month) {
+  const first = new Date(month.getFullYear(), month.getMonth(), 1);
+  const lead = (first.getDay() + 6) % 7;
+  const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  return Array.from({ length: lead }, () => null).concat(
+    Array.from({ length: days }, (_, i) => new Date(month.getFullYear(), month.getMonth(), i + 1))
+  );
+}
 
 export default function SearchResults({
   hotels: initialHotels,
@@ -68,6 +118,20 @@ export default function SearchResults({
   const [loadingMore, setLoadingMore] = useState(false);
   const [restoring, setRestoring] = useState(false);
 
+  // Booking context, carried in the URL and forwarded to the hotel page by
+  // HotelCard. These do NOT filter the list — getHotelsPaged takes no dates —
+  // so the panel says so rather than implying availability has been checked.
+  const checkIn = initialFilters.checkIn || "";
+  const checkOut = initialFilters.checkOut || "";
+  const adults = Number(initialFilters.adults) || 2;
+  const roomCount = Number(initialFilters.rooms) || 1;
+
+  const [openField, setOpenField] = useState(null);
+  const [calMonth, setCalMonth] = useState(() => fromKey(checkIn) || new Date());
+  const [draftAdults, setDraftAdults] = useState(adults);
+  const [draftRooms, setDraftRooms] = useState(roomCount);
+  useEffect(() => { setDraftAdults(adults); setDraftRooms(roomCount); }, [adults, roomCount]);
+
   const [sortOpen, setSortOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [wilayaOpen, setWilayaOpen] = useState(false);
@@ -91,6 +155,7 @@ export default function SearchResults({
 
   const sortRef = useRef(null);
   const wilayaRef = useRef(null);
+  const ctxRef = useRef(null);
 
   useEffect(() => {
     setRows(initialHotels);
@@ -106,13 +171,16 @@ export default function SearchResults({
   }, []);
 
   useEffect(() => {
-    if (!sortOpen && !wilayaOpen) return;
+    if (!sortOpen && !wilayaOpen && !openField) return;
     function onDown(e) {
       if (sortRef.current && !sortRef.current.contains(e.target)) setSortOpen(false);
       if (wilayaRef.current && !wilayaRef.current.contains(e.target)) setWilayaOpen(false);
+      if (ctxRef.current && !ctxRef.current.contains(e.target)) setOpenField(null);
     }
     function onKey(e) {
-      if (e.key === "Escape") { setSortOpen(false); setWilayaOpen(false); setSheetOpen(false); }
+      if (e.key === "Escape") {
+        setSortOpen(false); setWilayaOpen(false); setSheetOpen(false); setOpenField(null);
+      }
     }
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
@@ -120,7 +188,7 @@ export default function SearchResults({
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [sortOpen, wilayaOpen]);
+  }, [sortOpen, wilayaOpen, openField]);
 
   // The sheet covers the viewport on mobile; the page behind it must not
   // scroll under the finger.
@@ -134,6 +202,10 @@ export default function SearchResults({
   const currentQs = useMemo(() => {
     const params = new URLSearchParams();
     if (initialFilters.q) params.set("q", initialFilters.q);
+    if (checkIn) params.set("checkIn", checkIn);
+    if (checkOut) params.set("checkOut", checkOut);
+    if (adults !== 2) params.set("adults", String(adults));
+    if (roomCount !== 1) params.set("rooms", String(roomCount));
     if (city) params.set("city", city);
     if (stars) params.set("stars", String(stars));
     if (sort && sort !== "popular") params.set("sort", sort);
@@ -142,7 +214,8 @@ export default function SearchResults({
     if (activeTags.length) params.set("tags", activeTags.join(","));
     if (initialFilters.ai) params.set("ai", "1");
     return params.toString();
-  }, [initialFilters.q, initialFilters.ai, city, stars, sort, minPrice, maxPrice, activeTags]);
+  }, [initialFilters.q, initialFilters.ai, city, stars, sort, minPrice, maxPrice, activeTags,
+      checkIn, checkOut, adults, roomCount]);
 
   // Restore an accumulated list after a back-navigation: one request for N ×
   // perPage rows rather than replaying N requests, then put the scroll back.
@@ -196,6 +269,12 @@ export default function SearchResults({
       maxPrice,
       tags: activeTags.join(","),
       ai: initialFilters.ai ? "1" : "",
+      // Booking context survives every filter change. Losing the guest's dates
+      // because they ticked "pool" is the kind of thing nobody reports and
+      // everybody resents.
+      checkIn, checkOut,
+      adults: adults !== 2 ? adults : "",
+      rooms: roomCount !== 1 ? roomCount : "",
       ...changes,
     };
     const params = new URLSearchParams();
@@ -205,6 +284,7 @@ export default function SearchResults({
     const qs = params.toString();
     setSortOpen(false);
     setWilayaOpen(false);
+    setOpenField(null);
     try { window.sessionStorage.removeItem(SCROLL_KEY); } catch { /* ignore */ }
     startTransition(() => router.push(qs ? `/hotels?${qs}` : "/hotels"));
   }
@@ -329,8 +409,26 @@ export default function SearchResults({
   const skeletonCount = Math.min(perPage, remaining) || perPage;
   const showSkeletons = loadingMore || restoring;
 
-  const fmt = (n) =>
-    Number(n).toLocaleString(lang === "ar" ? "ar-DZ" : lang === "en" ? "en-GB" : "fr-DZ");
+  const locale = lang === "ar" ? "ar-DZ" : lang === "en" ? "en-GB" : "fr-DZ";
+  const fmt = (n) => Number(n).toLocaleString(locale);
+  const fmtDay = (d) =>
+    d ? d.toLocaleDateString(locale, { day: "numeric", month: "short" }) : "";
+
+  const ci = fromKey(checkIn);
+  const co = fromKey(checkOut);
+  const datesLabel = ci && co ? `${fmtDay(ci)} — ${fmtDay(co)}` : ci ? `${fmtDay(ci)} — …` : "";
+  const guestsLabel =
+    `${adults} ${adults === 1 ? ui.guest : ui.guestPl} · ${roomCount} ${roomCount === 1 ? ui.room : ui.roomPl}`;
+  const cells = monthCells(calMonth);
+  const monthLabel = calMonth.toLocaleDateString(locale, { month: "long", year: "numeric" });
+  // Midnight today, so "today" is selectable and yesterday is not.
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  function pickDate(d) {
+    if (!ci || co) { applyFilters({ checkIn: toKey(d), checkOut: "" }); return; }
+    if (d > ci) { applyFilters({ checkOut: toKey(d) }); setOpenField(null); return; }
+    applyFilters({ checkIn: toKey(d), checkOut: "" });
+  }
 
   return (
     <>
@@ -356,6 +454,159 @@ export default function SearchResults({
             )}
           </div>
         )}
+      </div>
+
+      {/* Where / when / who. This is the booking, not a filter — which is why
+          it sits in its own row above the rail rather than competing with
+          amenities for attention. Dates and occupancy are written to the URL
+          and forwarded to the hotel page by HotelCard; they do not filter the
+          list, because getHotelsPaged takes no dates. The calendar says so
+          rather than implying availability has been checked. */}
+      <div className="nz-sr-ctx">
+        <div className="wrap">
+          <div className="nz-sr-ctxbar" ref={ctxRef}>
+            <div className={`nz-sr-field ${openField === "where" ? "open" : ""}`}>
+              <button type="button" onClick={() => setOpenField(openField === "where" ? null : "where")}>
+                <span className="lb">{ui.where}</span>
+                <span className={`vl ${city ? "" : "ph"}`}>{city || t("results.all_dest")}</span>
+              </button>
+              {openField === "where" && (
+                <div className="nz-sr-panel">
+                  <input
+                    type="text"
+                    className="nz-sr-search"
+                    placeholder={t("results.search_wilaya")}
+                    value={wilayaQuery}
+                    onChange={(e) => setWilayaQuery(e.target.value)}
+                    autoFocus
+                  />
+                  <div className="nz-sr-scroll">
+                    <button className={`nz-sr-opt ${!city ? "on" : ""}`} onClick={() => applyFilters({ city: "" })}>
+                      {t("results.all_dest")}
+                    </button>
+                    {wilayaMatches.map((c) => (
+                      <button
+                        key={c.key}
+                        className={`nz-sr-opt ${city === c.name ? "on" : ""}`}
+                        onClick={() => applyFilters({ city: c.name })}
+                      >
+                        <span>{c.name}</span>
+                        <span className="nz-sr-optcount">{c.hotelCount}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className={`nz-sr-field ${openField === "dates" ? "open" : ""}`}>
+              <button type="button" onClick={() => setOpenField(openField === "dates" ? null : "dates")}>
+                <span className="lb">{ui.dates}</span>
+                <span className={`vl ${datesLabel ? "" : "ph"}`}>{datesLabel || ui.addDates}</span>
+              </button>
+              {openField === "dates" && (
+                <div className="nz-sr-panel cal">
+                  <div className="nz-sr-calhead">
+                    <button
+                      type="button"
+                      aria-label="−"
+                      onClick={() => setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1))}
+                    >‹</button>
+                    <b>{monthLabel}</b>
+                    <button
+                      type="button"
+                      aria-label="+"
+                      onClick={() => setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1))}
+                    >›</button>
+                  </div>
+                  <div className="nz-sr-calgrid">
+                    {ui.dow.map((d, i) => (
+                      <span className="dow" key={`d${i}`}>{d}</span>
+                    ))}
+                    {cells.map((d, i) =>
+                      d === null ? (
+                        <span key={`b${i}`} />
+                      ) : (
+                        <button
+                          key={toKey(d)}
+                          type="button"
+                          disabled={d < today}
+                          className={
+                            (ci && d.getTime() === ci.getTime()) || (co && d.getTime() === co.getTime())
+                              ? "edge"
+                              : ci && co && d > ci && d < co
+                              ? "mid"
+                              : ""
+                          }
+                          onClick={() => pickDate(d)}
+                        >
+                          {d.getDate()}
+                        </button>
+                      )
+                    )}
+                  </div>
+                  <p className="nz-sr-calnote">{ci && !co ? ui.pickOut : ui.noAvail}</p>
+                </div>
+              )}
+            </div>
+
+            <div className={`nz-sr-field ${openField === "guests" ? "open" : ""}`}>
+              <button type="button" onClick={() => setOpenField(openField === "guests" ? null : "guests")}>
+                <span className="lb">{ui.guests}</span>
+                <span className="vl">{guestsLabel}</span>
+              </button>
+              {openField === "guests" && (
+                <div className="nz-sr-panel narrow">
+                  <div className="nz-sr-step">
+                    <span>
+                      <b>{ui.adults}</b>
+                      <em>{ui.adultsSub}</em>
+                    </span>
+                    <span className="ctrl">
+                      <button type="button" disabled={draftAdults <= 1} onClick={() => setDraftAdults((n) => Math.max(1, n - 1))}>−</button>
+                      <i>{draftAdults}</i>
+                      <button type="button" disabled={draftAdults >= 16} onClick={() => setDraftAdults((n) => Math.min(16, n + 1))}>+</button>
+                    </span>
+                  </div>
+                  <div className="nz-sr-step">
+                    <span>
+                      <b>{ui.roomsLabel}</b>
+                      <em>{ui.roomsSub}</em>
+                    </span>
+                    <span className="ctrl">
+                      <button type="button" disabled={draftRooms <= 1} onClick={() => setDraftRooms((n) => Math.max(1, n - 1))}>−</button>
+                      <i>{draftRooms}</i>
+                      <button type="button" disabled={draftRooms >= 8} onClick={() => setDraftRooms((n) => Math.min(8, n + 1))}>+</button>
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="nz-sr-applybtn"
+                    onClick={() =>
+                      applyFilters({
+                        adults: draftAdults !== 2 ? draftAdults : "",
+                        rooms: draftRooms !== 1 ? draftRooms : "",
+                      })
+                    }
+                  >
+                    {t("results.apply")}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="nz-sr-go"
+              aria-label={t("results.search_wilaya")}
+              onClick={() => setOpenField(null)}
+            >
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" /><path d="M16 16l4.5 4.5" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="nz-sr-railband">
@@ -684,6 +935,95 @@ export default function SearchResults({
           line-height: 1.5; max-width: 560px;
         }
 
+        /* ---- where / when / who ---- */
+        .nz-sr-ctx { padding-top: 4px; padding-bottom: 14px; }
+        .nz-sr-ctxbar {
+          display: flex; align-items: stretch; position: relative;
+          border: 1.5px solid var(--gray-200); border-radius: 980px; background: var(--white);
+        }
+        .nz-sr-ctxbar:focus-within { border-color: var(--ink); }
+        .nz-sr-field { flex: 1; min-width: 0; position: relative; }
+        .nz-sr-field > button {
+          display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
+          width: 100%; padding: 11px 22px; border: 0; background: none; cursor: pointer;
+          text-align: start; border-radius: 980px; font-family: inherit;
+        }
+        .nz-sr-field + .nz-sr-field > button::before {
+          content: ""; position: absolute; inset-inline-start: 0; top: 10px; bottom: 10px;
+          width: 1px; background: var(--gray-200);
+        }
+        .nz-sr-field > button:hover, .nz-sr-field.open > button { background: var(--cream); }
+        .nz-sr-field .lb {
+          font-size: 10.5px; font-weight: 700; color: var(--gray-400); letter-spacing: .03em;
+        }
+        .nz-sr-field .vl {
+          font-size: 13.5px; font-weight: 600; color: var(--ink);
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+        }
+        .nz-sr-field .vl.ph { color: var(--gray-300); font-weight: 500; }
+        .nz-sr-go {
+          flex: 0 0 auto; margin: 6px; width: 46px; border-radius: 50%; border: 0;
+          background: var(--red); color: #fff; cursor: pointer;
+          display: flex; align-items: center; justify-content: center; transition: background .15s;
+        }
+        .nz-sr-go:hover { background: var(--red-deep); }
+
+        .nz-sr-panel.cal { width: 300px; }
+        .nz-sr-calhead {
+          display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+        }
+        .nz-sr-calhead b { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+        .nz-sr-calhead button {
+          width: 28px; height: 28px; border-radius: 50%; border: 0; background: none;
+          cursor: pointer; color: var(--ink); font-size: 16px; line-height: 1; font-family: inherit;
+        }
+        .nz-sr-calhead button:hover { background: var(--cream); }
+        .nz-sr-calgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+        .nz-sr-calgrid .dow {
+          font-size: 10.5px; font-weight: 700; color: var(--gray-400);
+          text-align: center; padding-top: 4px; padding-bottom: 4px;
+        }
+        .nz-sr-calgrid button {
+          aspect-ratio: 1; border: 0; background: none; cursor: pointer;
+          font-size: 12.5px; font-weight: 600; color: var(--ink);
+          border-radius: 8px; font-family: inherit;
+        }
+        .nz-sr-calgrid button:hover:not(:disabled) { background: var(--cream); }
+        .nz-sr-calgrid button:disabled { color: var(--gray-300); cursor: default; }
+        .nz-sr-calgrid button.edge { background: var(--ink); color: #fff; }
+        .nz-sr-calgrid button.mid { background: var(--cream); border-radius: 0; }
+        .nz-sr-calnote {
+          font-size: 11.5px; color: var(--gray-400); font-weight: 500;
+          margin-top: 10px; line-height: 1.5;
+        }
+
+        .nz-sr-step {
+          display: flex; align-items: center; justify-content: space-between; gap: 12px;
+          padding-top: 11px; padding-bottom: 11px; border-bottom: 1px solid var(--gray-100);
+        }
+        .nz-sr-step b { display: block; font-size: 13.5px; font-weight: 600; color: var(--ink); }
+        .nz-sr-step em {
+          display: block; font-style: normal; font-size: 11.5px;
+          color: var(--gray-400); font-weight: 500;
+        }
+        .nz-sr-step .ctrl { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
+        .nz-sr-step .ctrl button {
+          width: 29px; height: 29px; border-radius: 50%; border: 1.5px solid var(--gray-200);
+          background: none; color: var(--ink); font-size: 16px; line-height: 1;
+          cursor: pointer; font-family: inherit;
+        }
+        .nz-sr-step .ctrl button:hover:not(:disabled) { border-color: var(--ink); }
+        .nz-sr-step .ctrl button:disabled { opacity: .35; cursor: default; }
+        .nz-sr-step .ctrl i {
+          font-style: normal; font-size: 14px; font-weight: 700;
+          min-width: 16px; text-align: center; font-variant-numeric: tabular-nums;
+        }
+        .nz-sr-applybtn {
+          width: 100%; margin-top: 10px; padding: 9px; border: 0; background: var(--ink);
+          color: #fff; border-radius: var(--r-sm); font-size: 13px; font-weight: 700;
+          cursor: pointer; font-family: inherit;
+        }
+
         /* ---- wilaya marquee ---- */
         .nz-sr-railband { border-bottom: 1px solid var(--gray-200); }
         .nz-sr-railrow {
@@ -942,6 +1282,17 @@ export default function SearchResults({
             cursor: pointer; font-family: inherit;
           }
           .nz-sr-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 620px) {
+          /* Stacked. Three fields side by side under 620px leaves each one too
+             narrow to show its value without truncating. */
+          .nz-sr-ctxbar { flex-direction: column; border-radius: var(--r-lg); }
+          .nz-sr-field > button { border-radius: var(--r-lg); }
+          .nz-sr-field + .nz-sr-field > button::before {
+            inset-inline: 14px; top: 0; bottom: auto; width: auto; height: 1px;
+          }
+          .nz-sr-go { width: auto; margin: 8px; border-radius: 980px; padding: 12px; }
+          .nz-sr-panel, .nz-sr-panel.cal, .nz-sr-panel.narrow { width: 100%; }
         }
         @media (max-width: 560px) {
           .nz-sr-grid { grid-template-columns: 1fr; }
