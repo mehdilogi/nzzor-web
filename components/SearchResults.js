@@ -629,7 +629,13 @@ export default function SearchResults({
               keyboard focus pauses it — without that every wilaya is a moving
               target and the rail stops being a control. */}
           <div className="nz-sr-rail">
-            <div className="nz-sr-track">
+            {/* Arabic reverses the flex axis: the track lays out from the
+                right and overflows to the LEFT, so the default keyframe drags
+                it away from the viewport and the rail runs empty. The class
+                swaps in a mirrored keyframe. It cannot be done with an inline
+                animationName — styled-jsx rewrites @keyframes names, so a raw
+                name set from JS matches nothing. */}
+            <div className={`nz-sr-track ${lang === "ar" ? "rtl" : ""}`}>
               {[false, true].map((ghost) =>
                 railRows.map((c) => (
                   <button
@@ -1059,6 +1065,11 @@ export default function SearchResults({
           from { transform: translateX(0); }
           to { transform: translateX(-50%); }
         }
+        @keyframes nz-rail-rtl {
+          from { transform: translateX(0); }
+          to { transform: translateX(50%); }
+        }
+        .nz-sr-track.rtl { animation-name: nz-rail-rtl; }
         /* No motion: fall back to a scrollable row so every wilaya stays
            reachable rather than parked off-screen forever. */
         @media (prefers-reduced-motion: reduce) {
