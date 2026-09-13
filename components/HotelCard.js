@@ -101,7 +101,14 @@ export default function HotelCard({ hotel, priority = false }) {
 
   return (
     <Link href={href} className="nz-hcard" onMouseEnter={warm}>
-      <div className="nz-hcard-media">
+      {/* styled-jsx scopes by adding a generated class to the elements it
+          renders, and the <a> that next/link produces never receives it — so
+          any rule written as `.nz-hcard:hover ...` silently never matches.
+          (The old globals.css carried a comment about this: the card's border
+          was moved there "so border/shadow survive on the <Link> element".)
+          Hovering this inner div instead keeps every rule scoped and working. */}
+      <div className="nz-hcard-inner">
+        <div className="nz-hcard-media">
         {hotel.reviewCount > 0 && (
           <span className="nz-hcard-score">
             <Icon name="star" size={10} style={{ color: "var(--red)" }} strokeWidth={0} />
@@ -165,7 +172,7 @@ export default function HotelCard({ hotel, priority = false }) {
         </span>
       </div>
 
-      <div className="nz-hcard-info">
+        <div className="nz-hcard-info">
         <div className="nz-hcard-loc">
           {"★".repeat(hotel.stars)} · {hotel.city}
         </div>
@@ -177,18 +184,16 @@ export default function HotelCard({ hotel, priority = false }) {
           <span className="amt display">{formatPriceShort(hotel.priceFrom)}</span>
           <span className="unit">{t("card.per_night")}</span>
         </div>
+        </div>
       </div>
 
       <style jsx>{`
         /* globals.css still carries a .nz-hcard rule from the old card — a
            white panel with a border and shadow. Scoped styles cannot remove a
            global rule, so it is nulled explicitly here. */
-        .nz-hcard {
-          display: block; background: transparent;
-          border: 0; box-shadow: none; border-radius: 0;
-          overflow: visible; transform: none;
-        }
-        .nz-hcard:hover { transform: none; box-shadow: none; border-color: transparent; }
+        /* The <a> itself carries no styling — see the note in the JSX above.
+           Everything visual lives on .nz-hcard-inner. */
+        .nz-hcard-inner { display: block; background: transparent; }
 
         .nz-hcard-media {
           position: relative;
@@ -205,7 +210,7 @@ export default function HotelCard({ hotel, priority = false }) {
           opacity: 0; transition: opacity .3s, transform .8s cubic-bezier(0.16,1,0.3,1);
         }
         .nz-hcard-media img.on { opacity: 1; }
-        .nz-hcard:hover .nz-hcard-media img.on { transform: scale(1.05); }
+        .nz-hcard-inner:hover .nz-hcard-media img.on { transform: scale(1.05); }
 
         .nz-hcard-score {
           position: absolute; top: 10px; inset-inline-start: 10px; z-index: 3;
@@ -221,7 +226,7 @@ export default function HotelCard({ hotel, priority = false }) {
           display: flex; align-items: center; justify-content: center;
           color: var(--ink); transition: all .2s; opacity: 0;
         }
-        .nz-hcard:hover .nz-hcard-fav { opacity: 1; }
+        .nz-hcard-inner:hover .nz-hcard-fav { opacity: 1; }
         .nz-hcard-fav:hover { background: var(--red); color: #fff; }
 
         .nz-hcard-arrow {
@@ -233,14 +238,14 @@ export default function HotelCard({ hotel, priority = false }) {
         }
         .nz-hcard-arrow.start { inset-inline-start: 8px; }
         .nz-hcard-arrow.end { inset-inline-end: 8px; }
-        .nz-hcard:hover .nz-hcard-arrow { opacity: 1; }
+        .nz-hcard-inner:hover .nz-hcard-arrow { opacity: 1; }
 
         .nz-hcard-dots {
           position: absolute; inset-inline: 0; bottom: 36px; z-index: 3;
           display: flex; gap: 4px; justify-content: center;
           opacity: 0; transition: opacity .2s;
         }
-        .nz-hcard:hover .nz-hcard-dots { opacity: 1; }
+        .nz-hcard-inner:hover .nz-hcard-dots { opacity: 1; }
         .nz-hcard-dots span {
           width: 5px; height: 5px; border-radius: 50%;
           background: rgba(255,255,255,0.5);
@@ -254,7 +259,7 @@ export default function HotelCard({ hotel, priority = false }) {
           color: #fff; font-size: 12px; font-weight: 600;
           transform: translateY(100%); transition: transform .25s cubic-bezier(0.16,1,0.3,1);
         }
-        .nz-hcard:hover .nz-hcard-cta { transform: translateY(0); }
+        .nz-hcard-inner:hover .nz-hcard-cta { transform: translateY(0); }
 
         .nz-hcard-info { padding: 11px 2px 0; }
         .nz-hcard-loc {
@@ -268,7 +273,7 @@ export default function HotelCard({ hotel, priority = false }) {
           display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
           overflow: hidden;
         }
-        .nz-hcard:hover .nz-hcard-name { text-decoration: underline; text-underline-offset: 3px; }
+        .nz-hcard-inner:hover .nz-hcard-name { text-decoration: underline; text-underline-offset: 3px; }
         .nz-hcard-price { margin-top: 6px; }
         .nz-hcard-price .amt {
           font-size: 15.5px; font-weight: 600; letter-spacing: -0.015em; color: var(--ink);
