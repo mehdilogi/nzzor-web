@@ -345,10 +345,32 @@ export default function SearchResults({
     return "";
   }
 
+  // The wilaya's name in the language being read. `name` stays the canonical
+  // English value — it is what goes in the URL and what the API matches on —
+  // so only the label changes, never the filter.
+  const cityLabel = useMemo(() => {
+    const key = lang === "ar" ? "nameAr" : lang === "fr" ? "nameFr" : "nameEn";
+    return (c) => (c && (c[key] || c.name)) || "";
+  }, [lang]);
+
+  // The URL holds the English name; the field and chips have to show the
+  // reader's language, so map it back through the cities list.
+  const selectedCityLabel = useMemo(() => {
+    if (!city) return "";
+    const match = cities.find((c) => c.name === city);
+    return match ? cityLabel(match) : city;
+  }, [city, cities, cityLabel]);
+
   const wilayaMatches = useMemo(() => {
     const needle = wilayaQuery.trim().toLowerCase();
     if (!needle) return cities;
-    return cities.filter((c) => c.name.toLowerCase().includes(needle));
+    // Match against every name, so typing "قسنطينة" or "Constantine" both work
+    // whichever language the site is in.
+    return cities.filter((c) =>
+      [c.name, c.nameEn, c.nameFr, c.nameAr]
+        .filter(Boolean)
+        .some((n) => String(n).toLowerCase().includes(needle))
+    );
   }, [cities, wilayaQuery]);
 
   // Ordered by inventory, not alphabetically: the wilayas that actually have
@@ -391,10 +413,15 @@ export default function SearchResults({
     () =>
       [{ key: "__all", name: t("results.all_dest"), weight: maxCount, count: catalogueTotal, value: "" }].concat(
         railCities.map((c) => ({
-          key: c.key, name: c.name, weight: c.hotelCount, count: c.hotelCount, value: c.name,
+          key: c.key,
+          name: cityLabel(c),
+          weight: c.hotelCount,
+          count: c.hotelCount,
+          // Canonical English name — the filter value, never the label.
+          value: c.name,
         }))
       ),
-    [railCities, maxCount, catalogueTotal, t]
+    [railCities, maxCount, catalogueTotal, cityLabel, t]
   );
 
   const SORT_OPTIONS = [
@@ -481,7 +508,9 @@ export default function SearchResults({
             <div className={`nz-sr-field ${openField === "where" ? "open" : ""}`}>
               <button type="button" onClick={() => setOpenField(openField === "where" ? null : "where")}>
                 <span className="lb">{ui.where}</span>
-                <span className={`vl ${city ? "" : "ph"}`}>{city || t("results.all_dest")}</span>
+                <span className={`vl ${city ? "" : "ph"}`}>
+                  {selectedCityLabel || t("results.all_dest")}
+                </span>
               </button>
               {openField === "where" && (
                 <div className="nz-sr-panel">
@@ -503,7 +532,7 @@ export default function SearchResults({
                         className={`nz-sr-opt ${city === c.name ? "on" : ""}`}
                         onClick={() => applyFilters({ city: c.name })}
                       >
-                        <span>{c.name}</span>
+                        <span>{cityLabel(c)}</span>
                         <span className="nz-sr-optcount">{c.hotelCount}</span>
                       </button>
                     ))}
@@ -690,7 +719,7 @@ export default function SearchResults({
                       className={`nz-sr-opt ${city === c.name ? "on" : ""}`}
                       onClick={() => applyFilters({ city: c.name })}
                     >
-                      <span>{c.name}</span>
+                      <span>{cityLabel(c)}</span>
                       <span className="nz-sr-optcount">{c.hotelCount}</span>
                     </button>
                   ))}
