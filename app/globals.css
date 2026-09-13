@@ -415,21 +415,12 @@ input, select, textarea { font-family: inherit; }
 }
 .nz-flink:hover { color: var(--red); }
 
-/* hotel card base — global so border/shadow survive on the <Link> element */
-.nz-hcard {
-  display: block !important;
-  background: #fff;
-  border-radius: var(--r-lg);
-  overflow: hidden;
-  border: 1.5px solid var(--gray-200) !important;
-  box-shadow: 0 6px 20px -6px rgba(20,20,30,0.14) !important;
-  transition: transform .35s cubic-bezier(0.16,1,0.3,1), box-shadow .35s, border-color .35s;
-}
-.nz-hcard:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 30px 70px -24px rgba(20,20,30,0.28) !important;
-  border-color: var(--gray-300) !important;
-}
+/* The hotel card carries no panel chrome. It used to be a white card with a
+   border and a lifting shadow, declared here as !important so it would win on
+   the <Link> element — which also meant HotelCard could not override it from
+   its own scoped styles, since !important beats specificity.
+   The card now presents as an image with text beneath it, styled entirely in
+   components/HotelCard.js. Nothing global is needed. */
 
 /* =============================================================================
    ARABIC / RTL SUPPORT
