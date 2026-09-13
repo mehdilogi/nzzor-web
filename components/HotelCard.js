@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Icon from "./Icon";
@@ -28,6 +28,11 @@ function srcSet(url) {
   if (!CF_IMAGES || !url) return undefined;
   return WIDTHS.map((w) => `${cf(url, w)} ${w}w`).join(", ");
 }
+
+// A finger has to travel this far before the gesture counts as a swipe rather
+// than a tap. Below it, the tap falls through to the link as normal.
+const AXIS_LOCK_PX = 8;
+const TAP_SLOP_PX = 10;
 
 export default function HotelCard({ hotel, priority = false }) {
   const { t } = useLang();
@@ -80,14 +85,26 @@ export default function HotelCard({ hotel, priority = false }) {
   // connection that page never finishes loading.
   const [seen, setSeen] = useState(() => new Set([0]));
 
+  // Live gesture state. A ref rather than state because none of it should
+  // cause a render — only the final photo change does.
+  const dragRef = useRef(null);
+  // Set when a gesture turned out to be a swipe, read by the link's click
+  // handler. Without it, every swipe ends in a navigation to the hotel page,
+  // because a click still fires after the pointer sequence completes.
+  const swipedRef = useRef(false);
+
+  function show(next) {
+    const n = (next + photos.length) % photos.length;
+    setIdx(n);
+    setSeen((prev) => (prev.has(n) ? prev : new Set(prev).add(n)));
+  }
+
   function step(e, dir) {
     // These controls sit inside a <Link>; without this a tap on an arrow
     // navigates to the hotel instead of changing the photo.
     e.preventDefault();
     e.stopPropagation();
-    const next = (idx + dir + photos.length) % photos.length;
-    setIdx(next);
-    setSeen((prev) => (prev.has(next) ? prev : new Set(prev).add(next)));
+    show(idx + dir);
   }
 
   // Warm the second photo on hover so the first arrow click feels instant,
@@ -97,10 +114,98 @@ export default function HotelCard({ hotel, priority = false }) {
     setSeen((prev) => (prev.has(1) ? prev : new Set(prev).add(1)));
   }
 
+  // Both neighbours, because at the moment a swipe is recognised the direction
+  // is known but not yet committed — the finger can still reverse. Runs only
+  // once a horizontal drag is confirmed, so a plain tap never triggers it.
+  function warmNeighbours() {
+    if (photos.length < 2) return;
+    const next = (idx + 1) % photos.length;
+    const prevI = (idx - 1 + photos.length) % photos.length;
+    setSeen((prev) => {
+      if (prev.has(next) && prev.has(prevI)) return prev;
+      const s = new Set(prev);
+      s.add(next);
+      s.add(prevI);
+      return s;
+    });
+  }
+
+  // Touch and pen only. Mouse is deliberately excluded: on desktop the arrows
+  // are visible on hover and already do the job, and claiming mouse drags would
+  // break click-to-open and fight the browser's own link dragging.
+  function onPointerDown(e) {
+    swipedRef.current = false;
+    if (!multi || e.pointerType === "mouse") return;
+    dragRef.current = { id: e.pointerId, x: e.clientX, y: e.clientY, axis: null };
+  }
+
+  function onPointerMove(e) {
+    const d = dragRef.current;
+    if (!d || e.pointerId !== d.id) return;
+    const dx = e.clientX - d.x;
+    const dy = e.clientY - d.y;
+
+    if (!d.axis) {
+      if (Math.abs(dx) < AXIS_LOCK_PX && Math.abs(dy) < AXIS_LOCK_PX) return;
+      // Vertical wins ties — scrolling the page past a card must never be
+      // mistaken for browsing its photos.
+      if (Math.abs(dx) <= Math.abs(dy)) {
+        dragRef.current = null;
+        return;
+      }
+      d.axis = "x";
+      warmNeighbours();
+      // Keep receiving events even once the finger leaves the card, so a fast
+      // swipe that exits the image doesn't just stop halfway.
+      try {
+        e.currentTarget.setPointerCapture(d.id);
+      } catch {
+        /* capture is best-effort; the gesture still works without it */
+      }
+    }
+
+    if (Math.abs(dx) > TAP_SLOP_PX) swipedRef.current = true;
+  }
+
+  function onPointerUp(e) {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (!d || d.axis !== "x" || e.pointerId !== d.id) return;
+
+    const dx = e.clientX - d.x;
+    // Proportional, with a floor. A fixed pixel threshold that feels right on
+    // a full-width phone card feels impossible on a 200px one in the grid.
+    const width = e.currentTarget.getBoundingClientRect().width || 1;
+    if (Math.abs(dx) < Math.max(36, width * 0.12)) return;
+
+    // Read direction off the element rather than from LangContext, so this
+    // stays correct wherever the dir attribute is actually set. In Arabic the
+    // previous arrow renders on the right, so the swipe has to flip with it.
+    const rtl = typeof window !== "undefined"
+      && window.getComputedStyle(e.currentTarget).direction === "rtl";
+    const dir = dx < 0 ? 1 : -1;
+    show(idx + (rtl ? -dir : dir));
+  }
+
+  // Fired when the browser takes the gesture over (a vertical scroll winning,
+  // an incoming call, the app backgrounding). Abandon quietly.
+  function onPointerCancel() {
+    dragRef.current = null;
+  }
+
+  // Capture phase, so it runs before the arrow buttons' own handlers and
+  // before next/link's navigation.
+  function onClickCapture(e) {
+    if (!swipedRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    swipedRef.current = false;
+  }
+
   const multi = photos.length > 1;
 
   return (
-    <Link href={href} className="nz-hcard" onMouseEnter={warm}>
+    <Link href={href} className="nz-hcard" onMouseEnter={warm} onClickCapture={onClickCapture}>
       {/* styled-jsx scopes by adding a generated class to the elements it
           renders, and the <a> that next/link produces never receives it — so
           any rule written as `.nz-hcard:hover ...` silently never matches.
@@ -108,7 +213,13 @@ export default function HotelCard({ hotel, priority = false }) {
           was moved there "so border/shadow survive on the <Link> element".)
           Hovering this inner div instead keeps every rule scoped and working. */}
       <div className="nz-hcard-inner">
-        <div className="nz-hcard-media">
+        <div
+          className="nz-hcard-media"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
+        >
         {hotel.reviewCount > 0 && (
           <span className="nz-hcard-score">
             <Icon name="star" size={10} style={{ color: "var(--red)" }} strokeWidth={0} />
@@ -203,11 +314,18 @@ export default function HotelCard({ hotel, priority = false }) {
           border-radius: 14px;
           overflow: hidden;
           background: var(--gray-100, #eee);
+          /* Hands vertical panning to the browser and horizontal to us. This
+             is what makes the swipe possible without preventDefault, which
+             React's passive listeners would refuse anyway. */
+          touch-action: pan-y;
         }
         .nz-hcard-media img {
           position: absolute; inset: 0;
           width: 100%; height: 100%; object-fit: cover;
           opacity: 0; transition: opacity .3s, transform .8s cubic-bezier(0.16,1,0.3,1);
+          /* Stops iOS offering the image to a long press mid-swipe. */
+          -webkit-touch-callout: none;
+          user-select: none; -webkit-user-select: none;
         }
         .nz-hcard-media img.on { opacity: 1; }
         .nz-hcard-inner:hover .nz-hcard-media img.on { transform: scale(1.05); }
@@ -249,6 +367,7 @@ export default function HotelCard({ hotel, priority = false }) {
         .nz-hcard-dots span {
           width: 5px; height: 5px; border-radius: 50%;
           background: rgba(255,255,255,0.5);
+          transition: background .2s, width .2s;
         }
         .nz-hcard-dots span.on { background: #fff; }
 
@@ -291,6 +410,17 @@ export default function HotelCard({ hotel, priority = false }) {
           .nz-hcard-cta { transform: translateY(0); }
           .nz-hcard-name { font-size: 17px; min-height: 0; }
           .nz-hcard-price .amt { font-size: 17px; }
+
+          /* The arrows stay hidden here and swipe replaces them — but an
+             opacity:0 button is still a live tap target. Left as-is they sat
+             invisibly on both edges of every photo, swallowing taps meant for
+             the hotel link and changing the picture instead. */
+          .nz-hcard-arrow { pointer-events: none; }
+
+          /* Slightly larger, and the active dot widens into a pill, because
+             at arm's length five identical 5px circles read as one smudge. */
+          .nz-hcard-dots span { width: 6px; height: 6px; }
+          .nz-hcard-dots span.on { width: 14px; border-radius: 980px; }
         }
       `}</style>
     </Link>
