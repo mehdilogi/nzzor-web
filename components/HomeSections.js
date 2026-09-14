@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import HotelCard from "./HotelCard";
 import Icon from "./Icon";
 import CitiesTicker from "./CitiesTicker";
+import RegionStage from "./RegionStage";
 import { useLang } from "../lib/LangContext";
 
 // ---------------------------------------------------------------------------
@@ -209,6 +210,16 @@ export default function HomeSections({ featured, cities = [], wilayaCount = 0, h
             we operate in. The list is live: it used to be eight hardcoded
             cities with prices copied from mockData.js. */}
         <CitiesTicker initialCities={cities} />
+
+        {/* REGION STAGE — one region at a time, photograph on the background,
+            numbered index with the red rule running for as long as each one
+            holds the frame. Sits directly under the ticker: the ticker names
+            every wilaya, this gives five of them somewhere to go.
+
+            Full-bleed by design. .nz-why-v2 sets only a background and bottom
+            padding, so it does not constrain this. Needs five images at
+            /public/regions/ — see the note at the top of RegionStage.js. */}
+        <RegionStage />
 
         {/* FOUR CLEAN FEATURE COLUMNS */}
         <div className="wrap nz-why-cols">
