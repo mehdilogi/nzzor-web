@@ -245,29 +245,13 @@ export default function HomeSections({ featured, cities = [], wilayaCount = 0, h
           </div>
         </div>
 
-        {/* CLOSING BAND — wraps the section emotionally */}
-        <div className="wrap nz-why-close">
-          <div className="nz-why-close-stats">
-            <div className="nz-why-close-stat">
-              <span className="num display">{wilayaCount}</span>
-              <span className="lbl">{t("trust.cities")}</span>
-            </div>
-            <div className="nz-why-close-divider" />
-            <div className="nz-why-close-stat">
-              <span className="num display">4.9</span>
-              <span className="lbl">{t("trust.rating")}</span>
-            </div>
-            <div className="nz-why-close-divider" />
-            <div className="nz-why-close-stat">
-              <span className="num display">24/7</span>
-              <span className="lbl">{t("trust.support")}</span>
-            </div>
-          </div>
-          <p className="nz-why-close-line">{t("why.closing")}</p>
-          <a href="/hotels" className="nz-why-close-cta">
-            {t("why.cta")} <Icon name="arrow" size={15} strokeWidth={2.5} />
-          </a>
-        </div>
+        {/* The closing band that used to sit here — 47 / 4.9 / 24-7, a line of
+            copy and an "explore all hotels" button — has been removed. Every
+            one of those claims is already made above: the counts are in the
+            stats band, the trust line is in the Allouni strip below, and the
+            call to action now lives on the region stage where someone has just
+            been given a reason to press it. Saying it twice weakened both. */}
+
       </section>
 
       {/* ALLOUNI STRIP */}
@@ -291,6 +275,21 @@ export default function HomeSections({ featured, cities = [], wilayaCount = 0, h
         </div>
       </div>
       <style jsx>{`
+        /* The four columns are now the final block in this section, so they
+           carry their own top margin instead of leaning on the closing band
+           that used to follow them.
+
+           Longhand only: this element also carries .wrap, and a shorthand
+           "padding: Xpx 0" would reset the horizontal padding .wrap supplies
+           and drop the columns out of alignment with the rest of the page. */
+        .nz-why-cols {
+          padding-top: 84px;
+          padding-bottom: 8px;
+        }
+        @media (max-width: 860px) {
+          .nz-why-cols { padding-top: 56px; }
+        }
+
         /* ---- STATS BAND ----
            One styled-jsx block only. The rest of this component's CSS lives in
            globals.css; these rules are scoped here so the band ships as a
