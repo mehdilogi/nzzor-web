@@ -87,6 +87,11 @@ export default function HomeSections({ featured, cities = [], wilayaCount = 0, h
 
   const statsRef = useRef(null);
   const statsIn = useInView(statsRef);
+
+  // The four promise columns animate in on first sight, reusing the same
+  // observer hook as the stats band rather than adding a second mechanism.
+  const colsRef = useRef(null);
+  const colsIn = useInView(colsRef, 0.3);
   const nWilayas = useCountUp(wilayaCount, statsIn, { duration: 1000 });
   const nHotels = useCountUp(hotelCount, statsIn, { duration: 1200 });
   const nSeconds = useCountUp(5, statsIn, { duration: 900 });
@@ -222,7 +227,7 @@ export default function HomeSections({ featured, cities = [], wilayaCount = 0, h
         <RegionStage />
 
         {/* FOUR CLEAN FEATURE COLUMNS */}
-        <div className="wrap nz-why-cols">
+        <div className={`wrap nz-why-cols ${colsIn ? "in" : ""}`} ref={colsRef}>
           <div className="nz-why-col">
             <Icon name="clock" size={26} strokeWidth={1.7} style={{ color: "var(--red)" }} />
             <h3 className="display">{t("why.instant_t")}</h3>
@@ -275,6 +280,78 @@ export default function HomeSections({ featured, cities = [], wilayaCount = 0, h
         </div>
       </div>
       <style jsx>{`
+        /* ---- THE FOUR PROMISES ----
+           Two things happen here, both built from transitions rather than
+           keyframes so that hovering never replays the entrance.
+
+           1. On first sight each icon rises and settles, and a short red rule
+              draws under each title — staggered left to right so the row reads
+              as one gesture rather than four.
+           2. On hover the rule runs the full width of the column and the icon
+              performs a motion that belongs to what it means: the clock turns,
+              the card swipes, the bubble pops, the seal stamps.
+
+           The icon selector has to be :global(svg) — the markup comes from the
+           Icon component, so styled-jsx never puts its scoping class on it.
+           globals.css already targets it the same way. */
+        .nz-why-col :global(svg) {
+          opacity: 0;
+          transform: translateY(12px) scale(.82);
+          transition: opacity .55s ease, transform .6s cubic-bezier(.16, 1, .3, 1);
+        }
+        .nz-why-cols.in .nz-why-col :global(svg) { opacity: 1; transform: none; }
+
+        .nz-why-col h3 { position: relative; padding-bottom: 14px; }
+        .nz-why-col h3::after {
+          content: "";
+          position: absolute; inset-inline-start: 0; bottom: 0;
+          height: 2px; width: 0; background: var(--red);
+          transition: width .45s cubic-bezier(.16, 1, .3, 1);
+        }
+        .nz-why-cols.in .nz-why-col h3::after { width: 30px; }
+        .nz-why-col:hover h3::after { width: 100%; }
+
+        /* Left to right, 120ms apart. Fast enough to feel like one sweep,
+           slow enough that the order is legible. */
+        .nz-why-cols.in .nz-why-col:nth-child(1) :global(svg),
+        .nz-why-cols.in .nz-why-col:nth-child(1) h3::after { transition-delay: .05s; }
+        .nz-why-cols.in .nz-why-col:nth-child(2) :global(svg),
+        .nz-why-cols.in .nz-why-col:nth-child(2) h3::after { transition-delay: .17s; }
+        .nz-why-cols.in .nz-why-col:nth-child(3) :global(svg),
+        .nz-why-cols.in .nz-why-col:nth-child(3) h3::after { transition-delay: .29s; }
+        .nz-why-cols.in .nz-why-col:nth-child(4) :global(svg),
+        .nz-why-cols.in .nz-why-col:nth-child(4) h3::after { transition-delay: .41s; }
+        /* The hover rule must react instantly, not wait out the entrance delay. */
+        .nz-why-col:hover h3::after { transition-delay: 0s; }
+
+        .nz-why-col:nth-child(1):hover :global(svg) { animation: nz-icon-turn 1.1s cubic-bezier(.34, 1.2, .64, 1); }
+        .nz-why-col:nth-child(2):hover :global(svg) { animation: nz-icon-swipe .8s cubic-bezier(.16, 1, .3, 1); }
+        .nz-why-col:nth-child(3):hover :global(svg) { animation: nz-icon-pop .78s cubic-bezier(.34, 1.56, .64, 1); }
+        .nz-why-col:nth-child(4):hover :global(svg) { animation: nz-icon-stamp .7s cubic-bezier(.34, 1.56, .64, 1); }
+
+        @keyframes nz-icon-turn { to { transform: rotate(360deg); } }
+        @keyframes nz-icon-swipe {
+          0%, 100% { transform: none; }
+          42% { transform: translateX(9px) rotate(5deg); }
+          70% { transform: translateX(-2px); }
+        }
+        @keyframes nz-icon-pop {
+          0%, 100% { transform: none; }
+          34% { transform: scale(1.22) translateY(-3px); }
+          62% { transform: scale(.96); }
+        }
+        @keyframes nz-icon-stamp {
+          0%, 100% { transform: none; }
+          28% { transform: scale(.82); }
+          62% { transform: scale(1.14) rotate(-5deg); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .nz-why-col :global(svg) { opacity: 1; transform: none; transition: none; }
+          .nz-why-col h3::after { transition: none; width: 30px; }
+          .nz-why-col:nth-child(n):hover :global(svg) { animation: none; }
+        }
+
         /* The four columns are now the final block in this section, so they
            carry their own top margin instead of leaning on the closing band
            that used to follow them.
