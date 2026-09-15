@@ -227,26 +227,34 @@ export default function HomeSections({ featured, cities = [], wilayaCount = 0, h
         <RegionStage />
 
         {/* FOUR CLEAN FEATURE COLUMNS */}
-        <div className={`wrap nz-why-cols ${colsIn ? "in" : ""}`} ref={colsRef}>
-          <div className="nz-why-col">
-            <Icon name="clock" size={26} strokeWidth={1.7} style={{ color: "var(--red)" }} />
-            <h3 className="display">{t("why.instant_t")}</h3>
-            <p>{t("why.instant_d")}</p>
+        <div className={`wrap nz-why-promises ${colsIn ? "in" : ""}`} ref={colsRef}>
+          {/* The line. Its own element rather than a pseudo on .nz-why-cols —
+              that is a grid container, so a ::before would become a fifth grid
+              item and break the four columns. */}
+          <div className="nz-why-rule" aria-hidden="true">
+            <span className="nz-why-rule-fill" />
           </div>
-          <div className="nz-why-col">
-            <Icon name="card" size={26} strokeWidth={1.7} style={{ color: "var(--red)" }} />
-            <h3 className="display">{t("why.pay_t")}</h3>
-            <p>{t("why.pay_d")}</p>
-          </div>
-          <div className="nz-why-col">
-            <Icon name="whatsapp" size={26} strokeWidth={1.7} style={{ color: "var(--red)" }} />
-            <h3 className="display">{t("why.support_t")}</h3>
-            <p>{t("why.support_d")}</p>
-          </div>
-          <div className="nz-why-col">
-            <Icon name="shield" size={26} strokeWidth={1.7} style={{ color: "var(--red)" }} />
-            <h3 className="display">{t("why.allouni_t")}</h3>
-            <p>{t("why.allouni_d")}</p>
+          <div className="nz-why-cols">
+            <div className="nz-why-col">
+              <Icon name="clock" size={26} strokeWidth={1.7} style={{ color: "var(--red)" }} />
+              <h3 className="display">{t("why.instant_t")}</h3>
+              <p>{t("why.instant_d")}</p>
+            </div>
+            <div className="nz-why-col">
+              <Icon name="card" size={26} strokeWidth={1.7} style={{ color: "var(--red)" }} />
+              <h3 className="display">{t("why.pay_t")}</h3>
+              <p>{t("why.pay_d")}</p>
+            </div>
+            <div className="nz-why-col">
+              <Icon name="whatsapp" size={26} strokeWidth={1.7} style={{ color: "var(--red)" }} />
+              <h3 className="display">{t("why.support_t")}</h3>
+              <p>{t("why.support_d")}</p>
+            </div>
+            <div className="nz-why-col">
+              <Icon name="shield" size={26} strokeWidth={1.7} style={{ color: "var(--red)" }} />
+              <h3 className="display">{t("why.allouni_t")}</h3>
+              <p>{t("why.allouni_d")}</p>
+            </div>
           </div>
         </div>
 
@@ -294,35 +302,47 @@ export default function HomeSections({ featured, cities = [], wilayaCount = 0, h
            The icon selector has to be :global(svg) — the markup comes from the
            Icon component, so styled-jsx never puts its scoping class on it.
            globals.css already targets it the same way. */
+        /* Longhand only — this element carries .wrap, and the shorthand would
+           reset the horizontal padding .wrap supplies. */
+        .nz-why-promises { padding-top: 84px; padding-bottom: 8px; }
+
+        /* The line. A grey rule the full width of the row, with a red bar that
+           draws across it on first sight. This is the event in the section:
+           the icons and the columns follow it, they do not compete with it. */
+        .nz-why-rule {
+          position: relative; height: 1px; background: var(--gray-200);
+          margin-bottom: 46px;
+        }
+        .nz-why-rule-fill {
+          position: absolute; inset-inline-start: 0; top: -1px;
+          height: 3px; width: 0; background: var(--red);
+          transition: width 1.15s cubic-bezier(.65, 0, .35, 1);
+        }
+        .nz-why-promises.in .nz-why-rule-fill { width: 100%; }
+
         .nz-why-col :global(svg) {
           opacity: 0;
           transform: translateY(12px) scale(.82);
           transition: opacity .55s ease, transform .6s cubic-bezier(.16, 1, .3, 1);
         }
-        .nz-why-cols.in .nz-why-col :global(svg) { opacity: 1; transform: none; }
+        .nz-why-promises.in .nz-why-col :global(svg) { opacity: 1; transform: none; }
 
         .nz-why-col h3 { position: relative; padding-bottom: 14px; }
         .nz-why-col h3::after {
           content: "";
           position: absolute; inset-inline-start: 0; bottom: 0;
           height: 2px; width: 0; background: var(--red);
-          transition: width .45s cubic-bezier(.16, 1, .3, 1);
+          transition: width .42s cubic-bezier(.16, 1, .3, 1);
         }
-        .nz-why-cols.in .nz-why-col h3::after { width: 30px; }
         .nz-why-col:hover h3::after { width: 100%; }
 
-        /* Left to right, 120ms apart. Fast enough to feel like one sweep,
-           slow enough that the order is legible. */
-        .nz-why-cols.in .nz-why-col:nth-child(1) :global(svg),
-        .nz-why-cols.in .nz-why-col:nth-child(1) h3::after { transition-delay: .05s; }
-        .nz-why-cols.in .nz-why-col:nth-child(2) :global(svg),
-        .nz-why-cols.in .nz-why-col:nth-child(2) h3::after { transition-delay: .17s; }
-        .nz-why-cols.in .nz-why-col:nth-child(3) :global(svg),
-        .nz-why-cols.in .nz-why-col:nth-child(3) h3::after { transition-delay: .29s; }
-        .nz-why-cols.in .nz-why-col:nth-child(4) :global(svg),
-        .nz-why-cols.in .nz-why-col:nth-child(4) h3::after { transition-delay: .41s; }
-        /* The hover rule must react instantly, not wait out the entrance delay. */
-        .nz-why-col:hover h3::after { transition-delay: 0s; }
+        /* Each column waits for the bar to reach it. The delays are the bar's
+           own 1.15s split four ways, so the row reads as one motion rather
+           than five things starting at once. */
+        .nz-why-promises.in .nz-why-col:nth-child(1) :global(svg) { transition-delay: .24s; }
+        .nz-why-promises.in .nz-why-col:nth-child(2) :global(svg) { transition-delay: .50s; }
+        .nz-why-promises.in .nz-why-col:nth-child(3) :global(svg) { transition-delay: .76s; }
+        .nz-why-promises.in .nz-why-col:nth-child(4) :global(svg) { transition-delay: 1.02s; }
 
         .nz-why-col:nth-child(1):hover :global(svg) { animation: nz-icon-turn 1.1s cubic-bezier(.34, 1.2, .64, 1); }
         .nz-why-col:nth-child(2):hover :global(svg) { animation: nz-icon-swipe .8s cubic-bezier(.16, 1, .3, 1); }
@@ -347,24 +367,15 @@ export default function HomeSections({ featured, cities = [], wilayaCount = 0, h
         }
 
         @media (prefers-reduced-motion: reduce) {
+          .nz-why-rule-fill { transition: none; width: 100%; }
           .nz-why-col :global(svg) { opacity: 1; transform: none; transition: none; }
-          .nz-why-col h3::after { transition: none; width: 30px; }
+          .nz-why-col h3::after { transition: none; }
           .nz-why-col:nth-child(n):hover :global(svg) { animation: none; }
         }
 
-        /* The four columns are now the final block in this section, so they
-           carry their own top margin instead of leaning on the closing band
-           that used to follow them.
-
-           Longhand only: this element also carries .wrap, and a shorthand
-           "padding: Xpx 0" would reset the horizontal padding .wrap supplies
-           and drop the columns out of alignment with the rest of the page. */
-        .nz-why-cols {
-          padding-top: 84px;
-          padding-bottom: 8px;
-        }
         @media (max-width: 860px) {
-          .nz-why-cols { padding-top: 56px; }
+          .nz-why-promises { padding-top: 56px; }
+          .nz-why-rule { margin-bottom: 34px; }
         }
 
         /* ---- STATS BAND ----
