@@ -36,11 +36,11 @@ const REGIONS = [
     from: "8 000",
     href: "/hotels?city=B%C3%A9ja%C3%AFa",
     en: { pre: "The", main: "Mediterranean", short: "Coast", season: "Best June — September",
-          wilayas: "Béjaïa, Skikda, El Tarf, Algiers, Oran, Jijel, Tipaza" },
+          wilayas: "Béjaïa, Skikda, El Tarf, Algiers, Oran, Jijel, Tipaza", cta: "Explore the Mediterranean" },
     fr: { pre: "La", main: "Méditerranée", short: "Côte", season: "Juin — septembre",
-          wilayas: "Béjaïa, Skikda, El Tarf, Alger, Oran, Jijel, Tipaza" },
+          wilayas: "Béjaïa, Skikda, El Tarf, Alger, Oran, Jijel, Tipaza", cta: "Découvrir la Méditerranée" },
     ar: { pre: "الساحل", main: "المتوسط", short: "الساحل", season: "الأفضل: جوان — سبتمبر",
-          wilayas: "بجاية، سكيكدة، الطارف، الجزائر، وهران، جيجل، تيبازة" },
+          wilayas: "بجاية، سكيكدة، الطارف، الجزائر، وهران، جيجل، تيبازة", cta: "اكتشف الساحل المتوسط" },
   },
   {
     key: "tell",
@@ -49,11 +49,11 @@ const REGIONS = [
     from: "4 500",
     href: "/hotels?city=Setif",
     en: { pre: "Kabylie &", main: "the Tell", short: "Tell", season: "Best April — October",
-          wilayas: "Setif, Tizi Ouzou, Batna, Mila, Guelma, Constantine, Khenchela" },
+          wilayas: "Setif, Tizi Ouzou, Batna, Mila, Guelma, Constantine, Khenchela", cta: "Explore Kabylie & the Tell" },
     fr: { pre: "La Kabylie &", main: "le Tell", short: "Tell", season: "Avril — octobre",
-          wilayas: "Sétif, Tizi Ouzou, Batna, Mila, Guelma, Constantine, Khenchela" },
+          wilayas: "Sétif, Tizi Ouzou, Batna, Mila, Guelma, Constantine, Khenchela", cta: "Découvrir la Kabylie et le Tell" },
     ar: { pre: "القبائل و", main: "التل", short: "التل", season: "الأفضل: أفريل — أكتوبر",
-          wilayas: "سطيف، تيزي وزو، باتنة، ميلة، قالمة، قسنطينة، خنشلة" },
+          wilayas: "سطيف، تيزي وزو، باتنة، ميلة، قالمة، قسنطينة، خنشلة", cta: "اكتشف القبائل والتل" },
   },
   {
     key: "plateau",
@@ -62,11 +62,11 @@ const REGIONS = [
     from: "5 000",
     href: "/hotels?city=Laghouat",
     en: { pre: "The High", main: "Plateau", short: "Plateau", season: "Best March & October",
-          wilayas: "Naama, El Bayadh, Laghouat, Tissemsilt, Relizane, Tiaret" },
+          wilayas: "Naama, El Bayadh, Laghouat, Tissemsilt, Relizane, Tiaret", cta: "Explore the High Plateau" },
     fr: { pre: "Les Hauts", main: "Plateaux", short: "Plateaux", season: "Mars & octobre",
-          wilayas: "Naâma, El Bayadh, Laghouat, Tissemsilt, Relizane, Tiaret" },
+          wilayas: "Naâma, El Bayadh, Laghouat, Tissemsilt, Relizane, Tiaret", cta: "Découvrir les Hauts Plateaux" },
     ar: { pre: "الهضاب", main: "العليا", short: "الهضاب", season: "الأفضل: مارس وأكتوبر",
-          wilayas: "النعامة، البيض، الأغواط، تيسمسيلت، غليزان، تيارت" },
+          wilayas: "النعامة، البيض، الأغواط، تيسمسيلت، غليزان، تيارت", cta: "اكتشف الهضاب العليا" },
   },
   {
     key: "gate",
@@ -75,11 +75,11 @@ const REGIONS = [
     from: "7 000",
     href: "/hotels?city=Ouargla",
     en: { pre: "The Saharan", main: "Gate", short: "Gate", season: "Best October — March",
-          wilayas: "Ouargla, Hassi Messaoud, El Meniaa, Ghardaia, Biskra, Béchar" },
+          wilayas: "Ouargla, Hassi Messaoud, El Meniaa, Ghardaia, Biskra, Béchar", cta: "Explore the Saharan Gate" },
     fr: { pre: "La Porte du", main: "Sahara", short: "Porte", season: "Octobre — mars",
-          wilayas: "Ouargla, Hassi Messaoud, El Meniaa, Ghardaïa, Biskra, Béchar" },
+          wilayas: "Ouargla, Hassi Messaoud, El Meniaa, Ghardaïa, Biskra, Béchar", cta: "Découvrir la Porte du Sahara" },
     ar: { pre: "بوابة", main: "الصحراء", short: "البوابة", season: "الأفضل: أكتوبر — مارس",
-          wilayas: "ورقلة، حاسي مسعود، المنيعة، غرداية، بسكرة، بشار" },
+          wilayas: "ورقلة، حاسي مسعود، المنيعة، غرداية، بسكرة، بشار", cta: "اكتشف بوابة الصحراء" },
   },
   {
     key: "sahara",
@@ -88,11 +88,11 @@ const REGIONS = [
     from: "9 500",
     href: "/hotels?city=Timimoun",
     en: { pre: "The Deep", main: "Sahara", short: "Sahara", season: "Best November — March",
-          wilayas: "Timimoun, Adrar, Beni Abbes, Tamanrasset, Djanet, In Salah" },
+          wilayas: "Timimoun, Adrar, Beni Abbes, Tamanrasset, Djanet, In Salah", cta: "Explore the Deep Sahara" },
     fr: { pre: "Le Grand", main: "Sud", short: "Grand Sud", season: "Novembre — mars",
-          wilayas: "Timimoun, Adrar, Béni Abbès, Tamanrasset, Djanet, In Salah" },
+          wilayas: "Timimoun, Adrar, Béni Abbès, Tamanrasset, Djanet, In Salah", cta: "Découvrir le Grand Sud" },
     ar: { pre: "الصحراء", main: "الكبرى", short: "الجنوب", season: "الأفضل: نوفمبر — مارس",
-          wilayas: "تيميمون، أدرار، بني عباس، تمنراست، جانت، عين صالح" },
+          wilayas: "تيميمون، أدرار، بني عباس، تمنراست، جانت، عين صالح", cta: "اكتشف الصحراء الكبرى" },
   },
 ];
 
@@ -207,15 +207,30 @@ export default function RegionStage() {
               <span className="nz-rs-pill season">{t.season}</span>
               <span className="nz-rs-pill">{r.hotels} {L.hotels}</span>
               <span className="nz-rs-pill">{L.from} <b>{r.from}</b> {L.night}</span>
-              <Link href={r.href} className="nz-rs-go">
-                {L.explore}
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M5 12h13M12 6l6 6-6 6" />
-                </svg>
-              </Link>
             </div>
 
             <p key={`wil-${active}`} className="nz-rs-wil">{t.wilayas}</p>
+
+            {/* The action gets its own line and its own weight. Sat among the
+                pills it read as a fourth label rather than the thing to press.
+
+                The visual lives on the inner span, NOT on the Link: styled-jsx
+                does not add its scoping class to the <a> that next/link
+                renders, so a className on Link matches nothing. Same trap as
+                .nz-hcard. The :global() rule below strips the anchor's own
+                decoration, which a descendant cannot undo on its own. */}
+            <div key={`cta-${active}`} className="nz-rs-ctarow">
+              <Link href={r.href}>
+                <span className="nz-rs-go">
+                  <span className="nz-rs-golabel">{t.cta}</span>
+                  <span className="nz-rs-goarrow" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 12h13M12 6l6 6-6 6" />
+                    </svg>
+                  </span>
+                </span>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -322,15 +337,58 @@ export default function RegionStage() {
         }
         .nz-rs-pill.season { background: var(--red); border-color: transparent; }
         .nz-rs-pill b { font-weight: 800; }
-        .nz-rs-go {
-          display: inline-flex; align-items: center; gap: 9px;
-          padding: 13px 24px; border-radius: 980px;
-          background: #fff; color: var(--ink); font-size: 13.5px; font-weight: 700;
-          text-decoration: none; white-space: nowrap;
-          transition: background .2s, color .2s, transform .2s;
-          margin-inline-start: 6px;
+        .nz-rs-ctarow {
+          margin-top: 26px;
+          animation: nz-rs-rise .5s cubic-bezier(.16,1,.3,1) both;
+          animation-delay: .08s;
         }
-        .nz-rs-go:hover { background: var(--red); color: #fff; transform: translateX(4px); }
+        .nz-rs-ctarow :global(a) { text-decoration: none; display: inline-block; }
+
+        .nz-rs-go {
+          position: relative; display: inline-flex; align-items: center; gap: 16px;
+          padding-block: 9px; padding-inline: 26px 9px;
+          border-radius: 980px; background: #fff; color: var(--ink);
+          font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden;
+          box-shadow: 0 16px 40px -16px rgba(0,0,0,.65);
+          transition: color .3s ease, box-shadow .3s ease;
+        }
+        /* The fill sweeps in from the leading edge instead of the whole pill
+           flipping colour — the eye follows the direction of travel, which is
+           the same direction the arrow is pointing. */
+        .nz-rs-go::before {
+          content: ""; position: absolute; inset: 0; z-index: 0;
+          background: var(--red); transform: scaleX(0); transform-origin: left center;
+          transition: transform .42s cubic-bezier(.16,1,.3,1);
+        }
+        [dir="rtl"] .nz-rs-go::before { transform-origin: right center; }
+        .nz-rs-go:hover { color: #fff; box-shadow: 0 20px 46px -16px rgba(230,57,70,.6); }
+        .nz-rs-go:hover::before { transform: scaleX(1); }
+        .nz-rs-golabel { position: relative; z-index: 1; }
+        .nz-rs-goarrow {
+          position: relative; z-index: 1; flex: 0 0 auto;
+          width: 38px; height: 38px; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          background: var(--red); color: #fff;
+          transition: background .3s ease, color .3s ease, transform .42s cubic-bezier(.16,1,.3,1);
+        }
+        [dir="rtl"] .nz-rs-goarrow svg { transform: scaleX(-1); }
+        .nz-rs-go:hover .nz-rs-goarrow {
+          background: #fff; color: var(--red); transform: translateX(4px);
+        }
+        [dir="rtl"] .nz-rs-go:hover .nz-rs-goarrow { transform: translateX(-4px); }
+        /* A slow pulse so the button is alive before anyone touches it — this
+           is the only thing on the band asking to be pressed. */
+        .nz-rs-go::after {
+          content: ""; position: absolute; inset: 0; border-radius: 980px;
+          border: 2px solid rgba(255,255,255,.5); pointer-events: none;
+          animation: nz-rs-pulse 2.8s cubic-bezier(.16,1,.3,1) infinite;
+        }
+        @keyframes nz-rs-pulse {
+          0% { transform: scale(1); opacity: .55 }
+          70% { transform: scale(1.14); opacity: 0 }
+          100% { transform: scale(1.14); opacity: 0 }
+        }
+        .nz-rs-go:hover::after { animation: none; opacity: 0; }
 
         .nz-rs-wil {
           margin-top: 18px; font-size: 12.5px; color: rgba(255,255,255,.5);
@@ -355,7 +413,8 @@ export default function RegionStage() {
         }
         @media (prefers-reduced-motion: reduce) {
           .nz-rs-bg, .nz-rs-go { transition: none; }
-          .nz-rs-main span, .nz-rs-main.whole, .nz-rs-meta, .nz-rs-wil { animation: none; opacity: 1; transform: none; }
+          .nz-rs-main span, .nz-rs-main.whole, .nz-rs-meta, .nz-rs-wil, .nz-rs-ctarow { animation: none; opacity: 1; transform: none; }
+          .nz-rs-go::after { animation: none; opacity: 0; }
           .nz-rs-idx.on i { animation: none; height: 100%; }
         }
       `}</style>
