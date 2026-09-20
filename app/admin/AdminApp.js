@@ -649,7 +649,11 @@ const FILTER_STORAGE_KEY = "NZAD_HOTEL_FILTERS";
 const BLANK_FILTERS = {
   q: "",            // free-text search
   city: "",         // exact match against h.city (the lowercase slug)
-  stars: 0,         // 0 = any; 3, 4, 5 = exact
+  // A STRING, not a number. 0 now means non-classé (a real rating state), so
+  // it can no longer double as "any" — "" is any, "nc" is non-classé, "3".."5"
+  // are exact. Stored filters from before this change hold a number; the
+  // coercion on read below turns a legacy 0 back into "".
+  stars: "",        // "" = any; "nc" = non-classé; "3" | "4" | "5" = exact
   status: "all",    // "all" | "active" | "inactive"
   featured: false,  // true = only featured
   hasRooms: false,  // true = only hotels with at least one room
@@ -664,7 +668,15 @@ function loadStoredFilters() {
     // Defensive merge — if a future version adds a new filter key, old
     // stored state shouldn't break the page; missing keys fall back to
     // the blank default.
-    return { ...BLANK_FILTERS, ...parsed };
+    const merged = { ...BLANK_FILTERS, ...parsed };
+    // `stars` used to be a number where 0 meant "any". It is now a string where
+    // "" means any and 0 belongs to non-classé, so a session saved before this
+    // change would arrive as a value that matches no pill and leaves the
+    // "Clear filters" button stuck on. Coerce it once, on read.
+    if (typeof merged.stars === "number") {
+      merged.stars = merged.stars > 0 ? String(merged.stars) : "";
+    }
+    return merged;
   } catch {
     return BLANK_FILTERS;
   }
@@ -749,7 +761,8 @@ function HotelsManager() {
         if (!hay.includes(q)) return false;
       }
       if (filters.city && (h.city || "").toLowerCase() !== filters.city) return false;
-      if (filters.stars && h.stars !== filters.stars) return false;
+      if (filters.stars === "nc" && Number(h.stars) !== 0) return false;
+      if (filters.stars && filters.stars !== "nc" && Number(h.stars) !== Number(filters.stars)) return false;
       if (filters.status === "active"   && !h.isActive) return false;
       if (filters.status === "inactive" &&  h.isActive) return false;
       if (filters.featured && !h.isFeatured) return false;
@@ -763,7 +776,7 @@ function HotelsManager() {
   const filtersActive =
     filters.q !== "" ||
     filters.city !== "" ||
-    filters.stars !== 0 ||
+    filters.stars !== "" ||
     filters.status !== "all" ||
     filters.featured ||
     filters.hasRooms;
@@ -827,14 +840,18 @@ function HotelsManager() {
             <div className="nzad-filter-row">
               <div className="nzad-filter-pill-group" role="group" aria-label="Filter by stars">
                 <button
-                  className={`nzad-pill ${filters.stars === 0 ? "on" : ""}`}
-                  onClick={() => setFilter({ stars: 0 })}
+                  className={`nzad-pill ${filters.stars === "" ? "on" : ""}`}
+                  onClick={() => setFilter({ stars: "" })}
                 >Any ★</button>
-                {[3, 4, 5].map((n) => (
+                <button
+                  className={`nzad-pill ${filters.stars === "nc" ? "on" : ""}`}
+                  onClick={() => setFilter({ stars: filters.stars === "nc" ? "" : "nc" })}
+                >N/C</button>
+                {["3", "4", "5"].map((n) => (
                   <button
                     key={n}
                     className={`nzad-pill ${filters.stars === n ? "on" : ""}`}
-                    onClick={() => setFilter({ stars: filters.stars === n ? 0 : n })}
+                    onClick={() => setFilter({ stars: filters.stars === n ? "" : n })}
                   >{n}★</button>
                 ))}
               </div>
@@ -896,7 +913,7 @@ function HotelsManager() {
                     {h.isFeatured && <span className="nzad-tag-feat">Featured</span>}
                   </div>
                   <div className="nzad-hotel-sub">
-                    {"★".repeat(h.stars)} · {h.city} · {h.rooms?.length || 0} room types · from {fmt(h.priceFrom)}
+                    {Number(h.stars) > 0 ? "★".repeat(h.stars) : "N/C"} · {h.city} · {h.rooms?.length || 0} room types · from {fmt(h.priceFrom)}
                   </div>
                 </div>
                 <button
@@ -1125,7 +1142,20 @@ function HotelEditor({ hotel, onClose, onSaved }) {
         <h3>Location &amp; rating</h3>
         <div className="nzad-grid3">
           <Field label="City key (lowercase, e.g. algiers)" v={form.city} onChange={(v) => set("city", v)} required />
-          <Field label="Stars (1–5)" v={form.stars} onChange={(v) => set("stars", v)} type="number" required />
+          <Choice
+            label="Stars"
+            v={String(form.stars)}
+            onChange={(v) => set("stars", v)}
+            options={[
+              { value: "0", label: "N/C — non classé" },
+              { value: "1", label: "1 ★" },
+              { value: "2", label: "2 ★" },
+              { value: "3", label: "3 ★" },
+              { value: "4", label: "4 ★" },
+              { value: "5", label: "5 ★" },
+            ]}
+            required
+          />
           <Field label="Address" v={form.address} onChange={(v) => set("address", v)} />
           <Field label="City (EN)" v={form.cityEn} onChange={(v) => set("cityEn", v)} />
           <Field label="City (FR)" v={form.cityFr} onChange={(v) => set("cityFr", v)} />
@@ -3411,6 +3441,33 @@ function Field({ label, v, onChange, type = "text", area, rtl, required }) {
         }
         .nzad-field input:focus, .nzad-field textarea:focus { border-color: var(--red); }
         .nzad-field textarea { resize: vertical; }
+      `}</style>
+    </div>
+  );
+}
+
+// Same shell as Field, but a fixed list. A free number input is how a hotel
+// ends up with 7 stars, or with 0 meaning "nobody filled this in" rather than
+// "non-classé" — which are different facts that used to look identical.
+function Choice({ label, v, onChange, options, required }) {
+  return (
+    <div className="nzad-field">
+      <label>
+        {label}
+        {required && <span className="nzad-req">*</span>}
+      </label>
+      <select value={v} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <style jsx>{`
+        .nzad-field label { display: block; font-size: 11.5px; font-weight: 700; color: var(--gray-400); margin-bottom: 5px; }
+        .nzad-req { color: var(--red); font-weight: 800; margin-left: 3px; }
+        .nzad-field select {
+          width: 100%; padding: 9px 12px; border: 1.5px solid var(--gray-200);
+          border-radius: var(--r-sm); font-size: 13px; outline: none;
+          font-family: inherit; background: #fff; color: var(--ink);
+        }
+        .nzad-field select:focus { border-color: var(--red); }
       `}</style>
     </div>
   );
