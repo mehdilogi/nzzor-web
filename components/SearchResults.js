@@ -28,7 +28,7 @@ const PRICE_STEP = 500;
 // other two instead of failing loudly.
 const UI = {
   en: {
-    filters: "Filters", showAll: "Show all",
+    filters: "Filters", showAll: "Show all", nc: "Unrated (N/C)",
     where: "Where", dates: "Check in — check out", addDates: "Add dates",
     guests: "Guests", guest: "guest", guestPl: "guests", room: "room", roomPl: "rooms",
     adults: "Guests", adultsSub: "Adults and children",
@@ -38,7 +38,7 @@ const UI = {
     noAvail: "Dates are carried through to your booking. They do not filter the list yet.",
   },
   fr: {
-    filters: "Filtres", showAll: "Tout afficher",
+    filters: "Filtres", showAll: "Tout afficher", nc: "Non classé (N/C)",
     where: "Où", dates: "Arrivée — départ", addDates: "Ajouter des dates",
     guests: "Voyageurs", guest: "voyageur", guestPl: "voyageurs", room: "chambre", roomPl: "chambres",
     adults: "Voyageurs", adultsSub: "Adultes et enfants",
@@ -48,7 +48,7 @@ const UI = {
     noAvail: "Les dates sont reprises lors de la réservation. Elles ne filtrent pas encore la liste.",
   },
   ar: {
-    filters: "عوامل التصفية", showAll: "عرض الكل",
+    filters: "عوامل التصفية", showAll: "عرض الكل", nc: "غير مصنّف",
     where: "الوجهة", dates: "الوصول — المغادرة", addDates: "أضف التواريخ",
     guests: "النزلاء", guest: "نزيل", guestPl: "نزلاء", room: "غرفة", roomPl: "غرف",
     adults: "النزلاء", adultsSub: "بالغون وأطفال",
@@ -100,7 +100,11 @@ export default function SearchResults({
   // applied to a client-side array, which capped the catalogue at whatever 50
   // rows the server sent first.
   const city = initialFilters.city || "";
-  const stars = Number(initialFilters.stars) || 0;
+  // "nc" (non-classé) travels through the URL as a string, so the raw value is
+  // what gets carried and compared; the number is only for the star rows.
+  const starsRaw = String(initialFilters.stars || "");
+  const isNC = starsRaw.toLowerCase() === "nc";
+  const stars = isNC ? 0 : Number(starsRaw) || 0;
   const sort = initialFilters.sort || "popular";
   const minPrice = initialFilters.minPrice || "";
   const maxPrice = initialFilters.maxPrice || "";
@@ -207,14 +211,14 @@ export default function SearchResults({
     if (adults !== 2) params.set("adults", String(adults));
     if (roomCount !== 1) params.set("rooms", String(roomCount));
     if (city) params.set("city", city);
-    if (stars) params.set("stars", String(stars));
+    if (starsRaw) params.set("stars", starsRaw);
     if (sort && sort !== "popular") params.set("sort", sort);
     if (minPrice) params.set("minPrice", minPrice);
     if (maxPrice) params.set("maxPrice", maxPrice);
     if (activeTags.length) params.set("tags", activeTags.join(","));
     if (initialFilters.ai) params.set("ai", "1");
     return params.toString();
-  }, [initialFilters.q, initialFilters.ai, city, stars, sort, minPrice, maxPrice, activeTags,
+  }, [initialFilters.q, initialFilters.ai, city, starsRaw, sort, minPrice, maxPrice, activeTags,
       checkIn, checkOut, adults, roomCount]);
 
   // Restore an accumulated list after a back-navigation: one request for N ×
@@ -263,7 +267,7 @@ export default function SearchResults({
     const next = {
       q: initialFilters.q || "",
       city,
-      stars: stars || "",
+      stars: starsRaw,
       sort: sort === "popular" ? "" : sort,
       minPrice,
       maxPrice,
@@ -443,7 +447,7 @@ export default function SearchResults({
     return [...list].sort((a, b) => (counts[b.key] || 0) - (counts[a.key] || 0));
   }, [tagDict, facets]);
   const visibleTags = showAllTags ? rankedTags : rankedTags.slice(0, 6);
-  const activeCount = (stars ? 1 : 0) + activeTags.length + (minPrice || maxPrice ? 1 : 0);
+  const activeCount = (starsRaw ? 1 : 0) + activeTags.length + (minPrice || maxPrice ? 1 : 0);
 
   const remaining = Math.max(0, total - rows.length);
   const skeletonCount = Math.min(perPage, remaining) || perPage;
@@ -818,7 +822,7 @@ export default function SearchResults({
               <h3>{t("results.filter_rating")}</h3>
               <button
                 type="button"
-                className={`nz-f-row radio ${!stars ? "on" : ""}`}
+                className={`nz-f-row radio ${!starsRaw ? "on" : ""}`}
                 onClick={() => applyFilters({ stars: "" })}
               >
                 <span className="nz-f-box">
@@ -829,6 +833,22 @@ export default function SearchResults({
                 <span className="nz-f-lab">{t("results.any")}</span>
                 {facets?.starsAny != null && <span className="nz-f-cnt">{facets.starsAny}</span>}
               </button>
+              {/* Non-classé sits below the scale, not inside it — a hotel with
+                  no official rating is a different thing from a one-star. */}
+              <button
+                type="button"
+                className={`nz-f-row radio ${isNC ? "on" : ""}`}
+                onClick={() => applyFilters({ stars: "nc" })}
+              >
+                <span className="nz-f-box">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
+                <span className="nz-f-lab">{ui.nc}</span>
+                {facets?.starsNc != null && <span className="nz-f-cnt">{facets.starsNc}</span>}
+              </button>
+
               {STAR_CHOICES.map((sVal) => (
                 <button
                   key={sVal}

@@ -332,7 +332,12 @@ export default function HotelCard({ hotel, priority = false }) {
 
         <div className="nz-hcard-info">
         <div className="nz-hcard-loc">
-          {"★".repeat(hotel.stars)} · {hotel.city}
+          {/* stars === 0 is non-classé, not "no stars". Repeating the glyph
+              zero times renders an empty string and the line comes out as a
+              dangling separator before the city. N/C reads the same in all
+              three languages, so it needs no dictionary key — and a missing
+              key would humanise into English-looking copy in production. */}
+          {hotel.stars > 0 ? "★".repeat(hotel.stars) : <span className="nz-hcard-nc">N/C</span>} · {hotel.city}
         </div>
         {/* Fixed two-line box. Without it a hotel with a long name pushes its
             price down and the row stops lining up — which is exactly what a
@@ -462,6 +467,12 @@ export default function HotelCard({ hotel, priority = false }) {
         .nz-hcard-loc {
           font-size: 11px; font-weight: 700; letter-spacing: 0.03em;
           color: var(--gray-400); margin-bottom: 5px;
+        }
+        .nz-hcard-nc {
+          display: inline-block; padding: 1px 5px; border-radius: 4px;
+          background: var(--gray-100); color: var(--gray-400);
+          font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em;
+          vertical-align: 1px;
         }
         .nz-hcard-name {
           font-size: 15.5px; font-weight: 600; letter-spacing: -0.015em;
