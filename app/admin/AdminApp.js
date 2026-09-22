@@ -689,6 +689,11 @@ function HotelsManager() {
   // Track per-row "opening" state so the user gets feedback while we fetch the
   // detail endpoint (which carries the raw multilingual fields the editor needs).
   const [openingId, setOpeningId] = useState(null);
+  // Row-level delete / restore. confirmId keeps the confirmation inside the
+  // row rather than in a browser dialog, which is easy to dismiss by reflex.
+  const [confirmId, setConfirmId] = useState(null);
+  const [rowBusy, setRowBusy] = useState(null);
+  const [rowErr, setRowErr] = useState("");
 
   // Filter state — initialized from sessionStorage so a refresh keeps place.
   const [filters, setFilters] = useState(loadStoredFilters);
@@ -696,6 +701,31 @@ function HotelsManager() {
     if (typeof window === "undefined") return;
     try { sessionStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters)); } catch {}
   }, [filters]);
+
+  // Deleting hides the hotel from the public site and leaves the row here.
+  // It is NOT a database delete, deliberately: bookings, receipts and vouchers
+  // point at this hotel, and removing the row would break a guest's paid
+  // reservation months later. The public listing filters on isActive, so it
+  // disappears from the site immediately.
+  async function removeHotel(h) {
+    setRowErr(""); setRowBusy(h.id);
+    try {
+      await adminDeleteHotel(h.id);
+      setConfirmId(null);
+      load();
+    } catch (e) { setRowErr(e.message); }
+    finally { setRowBusy(null); }
+  }
+
+  async function restoreHotel(h) {
+    setRowErr(""); setRowBusy(h.id);
+    try {
+      const detail = await adminHotel(h.id);
+      await adminUpdateHotel(h.id, { ...hotelPayload(detail), isActive: true });
+      load();
+    } catch (e) { setRowErr(e.message); }
+    finally { setRowBusy(null); }
+  }
 
   const load = useCallback(() => {
     setHotels(null);
@@ -898,6 +928,7 @@ function HotelsManager() {
                 </span>
               </div>
             )}
+            {rowErr && <div className="nzad-row-err">{rowErr}</div>}
             {filteredHotels.map((h) => (
               <div className="nzad-hotel-row" key={h.id}>
                 <div className="nzad-hotel-thumb">
@@ -916,13 +947,38 @@ function HotelsManager() {
                     {Number(h.stars) > 0 ? "★".repeat(h.stars) : "N/C"} · {h.city} · {h.rooms?.length || 0} room types · from {fmt(h.priceFrom)}
                   </div>
                 </div>
-                <button
-                  className="nzad-btn-ghost"
-                  disabled={openingId === h.id}
-                  onClick={() => openEditor(h)}
-                >
-                  {openingId === h.id ? "Opening…" : "Manage"}
-                </button>
+                {confirmId === h.id ? (
+                  <div className="nzad-row-confirm">
+                    <span>Hide <b>{h.name}</b> from the site? Its bookings keep working, and you can restore it here.</span>
+                    <button className="nzad-btn-danger" disabled={rowBusy === h.id} onClick={() => removeHotel(h)}>
+                      {rowBusy === h.id ? "Deleting…" : "Delete"}
+                    </button>
+                    <button className="nzad-btn-ghost" onClick={() => setConfirmId(null)}>Cancel</button>
+                  </div>
+                ) : (
+                  <div className="nzad-row-actions">
+                    <button
+                      className="nzad-btn-ghost"
+                      disabled={openingId === h.id}
+                      onClick={() => openEditor(h)}
+                    >
+                      {openingId === h.id ? "Opening…" : "Manage"}
+                    </button>
+                    {h.isActive ? (
+                      <button
+                        className="nzad-btn-danger-ghost"
+                        onClick={() => { setRowErr(""); setConfirmId(h.id); }}
+                        aria-label={`Delete ${h.name}`}
+                      >Delete</button>
+                    ) : (
+                      <button
+                        className="nzad-btn-ghost"
+                        disabled={rowBusy === h.id}
+                        onClick={() => restoreHotel(h)}
+                      >{rowBusy === h.id ? "Restoring…" : "Restore"}</button>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -931,6 +987,28 @@ function HotelsManager() {
 
       <style jsx>{`
         .nzad-hotel-list { display: flex; flex-direction: column; gap: 10px; }
+        .nzad-row-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+        .nzad-btn-danger-ghost {
+          border: 1.5px solid var(--gray-200); background: #fff; color: var(--gray-400);
+          border-radius: var(--r-sm); padding: 8px 14px; font-size: 13px; font-weight: 600;
+          font-family: inherit; cursor: pointer; transition: color .15s, border-color .15s, background .15s;
+        }
+        .nzad-btn-danger-ghost:hover { color: var(--red); border-color: var(--red); background: var(--red-soft); }
+        /* The confirmation replaces that row's buttons instead of opening a
+           dialog, and it names the hotel — so a mis-click on the wrong row is
+           visible before it is confirmed. */
+        .nzad-row-confirm {
+          display: flex; align-items: center; gap: 10px; flex: 1 1 auto; justify-content: flex-end;
+          font-size: 12.5px; color: var(--ink-2);
+        }
+        .nzad-row-confirm span { max-width: 46ch; line-height: 1.45; }
+        .nzad-row-err {
+          border: 1px solid var(--red); background: var(--red-soft); color: var(--red-deep);
+          border-radius: var(--r-sm); padding: 10px 12px; font-size: 13px; font-weight: 600;
+        }
+        @media (max-width: 720px) {
+          .nzad-row-confirm { flex-wrap: wrap; justify-content: flex-start; }
+        }
         .nzad-hotel-row {
           display: flex; align-items: center; gap: 16px; padding: 12px;
           background: #fff; border: 1px solid var(--gray-200); border-radius: var(--r-md);
@@ -1017,6 +1095,30 @@ const BLANK_HOTEL = {
   isActive: true, isFeatured: false,
   tags: [],
 };
+
+// The update endpoint validates the WHOLE hotel, not a patch, so restoring
+// one means sending every field back. Built from the detail endpoint rather
+// than the list row, which carries only display fields.
+function hotelPayload(h) {
+  return {
+    nameEn: h.nameEn ?? h.name ?? "", nameFr: h.nameFr ?? "", nameAr: h.nameAr ?? "",
+    descEn: h.descEn ?? h.description ?? "", descFr: h.descFr ?? "", descAr: h.descAr ?? "",
+    stars: Number(h.stars ?? 0), city: h.city ?? "",
+    cityEn: h.cityEn ?? "", cityFr: h.cityFr ?? "", cityAr: h.cityAr ?? "",
+    regionEn: h.regionEn ?? "", regionFr: h.regionFr ?? "", regionAr: h.regionAr ?? "",
+    address: h.address ?? "", contactEmail: h.contactEmail ?? "", contactPhone: h.contactPhone ?? "",
+    latitude: h.latitude ?? null, longitude: h.longitude ?? null,
+    checkInTime: h.checkInTime ?? "14:00", checkOutTime: h.checkOutTime ?? "12:00",
+    cancellationHours: Number(h.cancellationHours ?? 48),
+    childrenAllowed: h.childrenAllowed ?? true,
+    petsAllowed: h.petsAllowed ?? false,
+    parkingFree: h.parkingFree ?? true,
+    instantConfirmation: h.trustSignals?.instantConfirmation ?? h.instantConfirmation ?? true,
+    verifiedPartner: h.trustSignals?.verifiedPartner ?? h.verifiedPartner ?? true,
+    isFeatured: h.isFeatured ?? false,
+    tags: Array.isArray(h.tags) ? h.tags : [],
+  };
+}
 
 function HotelEditor({ hotel, onClose, onSaved }) {
   const isNew = !hotel;
