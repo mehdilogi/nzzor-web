@@ -481,16 +481,16 @@ export default function HomeSections({ featured, cities = [], wilayaCount = 0, h
           background-size: 4px 4px;
         }
         .nz-band-town {
-          position: absolute; top: 34px; inset-inline-end: 0; z-index: 1;
-          width: clamp(260px, 25vw, 400px); height: auto; pointer-events: none; opacity: .95;
+          position: absolute; top: 14px; inset-inline-end: 0; z-index: 1;
+          width: clamp(230px, 21vw, 330px); height: auto; pointer-events: none; opacity: .95;
         }
         .nz-band-olive {
           position: absolute; bottom: -4px; inset-inline-start: 0; z-index: 1;
-          width: clamp(140px, 13vw, 216px); height: auto; pointer-events: none;
+          width: clamp(120px, 11vw, 180px); height: auto; pointer-events: none;
         }
         .nz-band-inner {
           position: relative; z-index: 2; max-width: 1440px; margin: 0 auto;
-          padding-top: 66px; padding-bottom: 70px; padding-inline: 52px;
+          padding-top: 42px; padding-bottom: 44px; padding-inline: 52px;
           display: grid; grid-template-columns: minmax(300px, 1.95fr) repeat(4, minmax(0, 1fr));
           align-items: end;
         }
@@ -502,33 +502,33 @@ export default function HomeSections({ featured, cities = [], wilayaCount = 0, h
         }
         .nz-band-kicker::after { content: ""; width: 74px; height: 1px; background: #DCC9B8; }
         .nz-band-h2 {
-          font-weight: 400; color: #1E1512; margin-top: 22px;
-          font-size: clamp(34px, 16.2cqi, 80px); line-height: .97; letter-spacing: -.022em;
+          font-weight: 400; color: #1E1512; margin-top: 16px;
+          font-size: clamp(34px, 15.4cqi, 72px); line-height: .97; letter-spacing: -.022em;
           white-space: nowrap;
         }
-        .nz-band-redrule { width: 44px; height: 2px; background: var(--red); margin-top: 26px; }
+        .nz-band-redrule { width: 44px; height: 2px; background: var(--red); margin-top: 18px; }
         .nz-band-sub {
-          margin-top: 24px; font-size: 10.5px; font-weight: 600; letter-spacing: .3em;
+          margin-top: 16px; font-size: 10.5px; font-weight: 600; letter-spacing: .3em;
           line-height: 2; color: #8E8177; text-transform: uppercase;
         }
         .nz-band-sub b { color: #4A3F39; font-weight: 700; }
 
         .nz-band-stat {
-          position: relative; height: 300px; container-type: inline-size;
+          position: relative; height: 246px; container-type: inline-size;
           display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
           text-align: center; color: inherit; text-decoration: none;
         }
         .nz-band-stat + .nz-band-stat::before {
-          content: ""; position: absolute; inset-inline-start: 0; top: 20px; bottom: 6px; width: 1px;
+          content: ""; position: absolute; inset-inline-start: 0; top: 12px; bottom: 6px; width: 1px;
           background-image: linear-gradient(#DCC9B8 50%, transparent 50%); background-size: 1px 6px;
         }
         .nz-band-num {
           position: relative; z-index: 2; color: #1E1512;
-          font-size: clamp(48px, 44cqi, 112px); line-height: .92; letter-spacing: -.035em;
+          font-size: clamp(44px, 39cqi, 96px); line-height: .92; letter-spacing: -.035em;
         }
         .nz-band-n { position: relative; z-index: 2; }
         .nz-band-label {
-          position: relative; z-index: 2; margin-top: 18px;
+          position: relative; z-index: 2; margin-top: 14px;
           font-size: 15px; font-weight: 700; color: #1E1512; letter-spacing: -.005em;
           text-wrap: balance; transition: color .2s ease;
         }
@@ -542,7 +542,7 @@ export default function HomeSections({ featured, cities = [], wilayaCount = 0, h
         /* The drawings live INSIDE their numbers, sized in em, so they scale
            and move with the digits: the country wraps the 47, the stopwatch
            arc hooks over the s. */
-        .nz-band-arch { width: min(203px, 88cqi); height: auto; margin-bottom: -6px; }
+        .nz-band-arch { width: min(146px, 70cqi); height: auto; margin-bottom: -4px; }
         .nz-band-map {
           position: absolute; z-index: 1; left: -.14em; top: -.58em; width: 1.62em; height: auto;
           pointer-events: none; overflow: visible;
@@ -596,13 +596,13 @@ export default function HomeSections({ featured, cities = [], wilayaCount = 0, h
         .nz-band.in .nz-band-pin { opacity: 1; transform: none; }
 
         @media (max-width: 1100px) {
-          .nz-band-inner { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 40px; padding-inline: 36px; }
+          .nz-band-inner { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 28px; padding-inline: 36px; }
           .nz-band-statement { grid-column: 1 / -1; }
           .nz-band-town { opacity: .5; }
         }
         @media (max-width: 720px) {
-          .nz-band-inner { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-top: 48px; padding-bottom: 56px; padding-inline: 22px; }
-          .nz-band-stat { height: 236px; }
+          .nz-band-inner { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-top: 36px; padding-bottom: 40px; padding-inline: 22px; }
+          .nz-band-stat { height: 200px; }
           .nz-band-stat:nth-child(4)::before { display: none; }
           .nz-band-town { display: none; }
         }
