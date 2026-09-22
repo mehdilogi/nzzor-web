@@ -1243,13 +1243,146 @@ function HotelEditor({ hotel, onClose, onSaved }) {
 }
 
 // =============================================================================
+// ROOM-TYPE TRANSLATION
+// =============================================================================
+// English in, French and Arabic out, from a fixed vocabulary rather than a
+// translation service. Room names are a small closed set, and generic machine
+// translation gets them wrong in ways guests notice — "King" comes back as
+// "Roi". A dictionary is instant, free, never down, and right for the domain.
+//
+// Word order matters and is handled: French and Arabic both put the noun
+// first and the qualifiers after it, so "Deluxe Double Room" becomes
+// "Chambre Double Deluxe" and "غرفة مزدوجة فاخرة" rather than a word-for-word
+// swap. Adjectives agree in gender with the noun in both languages — a room
+// (غرفة, chambre) is feminine, a suite in Arabic (جناح) is masculine — so
+// each qualifier carries both forms.
+//
+// Anything not in the list is passed through untouched, so a proper name like
+// "Atlas" survives and the admin corrects the rest by hand. The generated
+// French and Arabic are suggestions: both fields stay editable.
+
+// head noun -> [French, French gender, Arabic, Arabic gender]
+const ROOM_HEADS = {
+  room: ["Chambre", "f", "غرفة", "f"],
+  suite: ["Suite", "f", "جناح", "m"],
+  studio: ["Studio", "m", "استوديو", "m"],
+  apartment: ["Appartement", "m", "شقة", "f"],
+  villa: ["Villa", "f", "فيلا", "f"],
+  bungalow: ["Bungalow", "m", "بنغل", "m"],
+  chalet: ["Chalet", "m", "شاليه", "m"],
+  dormitory: ["Dortoir", "m", "مهجع", "m"],
+  dorm: ["Dortoir", "m", "مهجع", "m"],
+};
+
+// qualifier -> [French fem, French masc, Arabic fem, Arabic masc]
+// Multi-word keys are matched before single words.
+const ROOM_MODS = {
+  "sea view": ["Vue mer", "Vue mer", "مطلة على البحر", "مطل على البحر"],
+  "ocean view": ["Vue mer", "Vue mer", "مطلة على البحر", "مطل على البحر"],
+  "garden view": ["Vue jardin", "Vue jardin", "مطلة على الحديقة", "مطل على الحديقة"],
+  "pool view": ["Vue piscine", "Vue piscine", "مطلة على المسبح", "مطل على المسبح"],
+  "mountain view": ["Vue montagne", "Vue montagne", "مطلة على الجبل", "مطل على الجبل"],
+  "city view": ["Vue ville", "Vue ville", "مطلة على المدينة", "مطل على المدينة"],
+  "desert view": ["Vue désert", "Vue désert", "مطلة على الصحراء", "مطل على الصحراء"],
+  "with balcony": ["avec balcon", "avec balcon", "بشرفة", "بشرفة"],
+  "with terrace": ["avec terrasse", "avec terrasse", "بتراس", "بتراس"],
+  balcony: ["avec balcon", "avec balcon", "بشرفة", "بشرفة"],
+  terrace: ["avec terrasse", "avec terrasse", "بتراس", "بتراس"],
+  single: ["Simple", "Simple", "فردية", "فردي"],
+  double: ["Double", "Double", "مزدوجة", "مزدوج"],
+  twin: ["Twin", "Twin", "بسريرين", "بسريرين"],
+  triple: ["Triple", "Triple", "ثلاثية", "ثلاثي"],
+  quadruple: ["Quadruple", "Quadruple", "رباعية", "رباعي"],
+  quad: ["Quadruple", "Quadruple", "رباعية", "رباعي"],
+  family: ["Familiale", "Familial", "عائلية", "عائلي"],
+  standard: ["Standard", "Standard", "قياسية", "قياسي"],
+  superior: ["Supérieure", "Supérieur", "ممتازة", "ممتاز"],
+  deluxe: ["Deluxe", "Deluxe", "فاخرة", "فاخر"],
+  luxury: ["de Luxe", "de Luxe", "فاخرة", "فاخر"],
+  premium: ["Premium", "Premium", "متميزة", "متميز"],
+  executive: ["Exécutive", "Exécutif", "تنفيذية", "تنفيذي"],
+  junior: ["Junior", "Junior", "صغيرة", "صغير"],
+  presidential: ["Présidentielle", "Présidentiel", "رئاسية", "رئاسي"],
+  royal: ["Royale", "Royal", "ملكية", "ملكي"],
+  economy: ["Économique", "Économique", "اقتصادية", "اقتصادي"],
+  comfort: ["Confort", "Confort", "مريحة", "مريح"],
+  classic: ["Classique", "Classique", "كلاسيكية", "كلاسيكي"],
+  connecting: ["Communicante", "Communicant", "متصلة", "متصل"],
+  accessible: ["Accessible PMR", "Accessible PMR", "مهيأة لذوي الاحتياجات الخاصة", "مهيأ لذوي الاحتياجات الخاصة"],
+  king: ["Lit King", "Lit King", "بسرير كبير", "بسرير كبير"],
+  queen: ["Lit Queen", "Lit Queen", "بسرير كوين", "بسرير كوين"],
+};
+const MOD_KEYS = Object.keys(ROOM_MODS).sort((a, b) => b.split(" ").length - a.split(" ").length);
+
+function translateRoomType(en) {
+  const raw = String(en || "").trim();
+  if (!raw) return { fr: "", ar: "" };
+
+  // Tokenise, then consume multi-word qualifiers before single words so that
+  // "sea view" is read as one phrase and not as "sea" + "view".
+  const words = raw.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter(Boolean);
+  const original = raw.replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter(Boolean);
+
+  let head = null;
+  const mods = [];
+  for (let i = 0; i < words.length; ) {
+    let matched = false;
+    for (const key of MOD_KEYS) {
+      const parts = key.split(" ");
+      if (parts.every((p, j) => words[i + j] === p)) {
+        mods.push({ key });
+        i += parts.length;
+        matched = true;
+        break;
+      }
+    }
+    if (matched) continue;
+    if (!head && ROOM_HEADS[words[i]]) { head = words[i]; i += 1; continue; }
+    // "rooms" / "suites" — accept the plural as the head too.
+    const singular = words[i].replace(/s$/, "");
+    if (!head && ROOM_HEADS[singular]) { head = singular; i += 1; continue; }
+    // Not in the vocabulary: keep it as typed, in its original position.
+    mods.push({ literal: original[i] || words[i] });
+    i += 1;
+  }
+
+  // "Double" on its own means a double room.
+  const [frHead, frG, arHead, arG] = ROOM_HEADS[head || "room"];
+  const frParts = [frHead];
+  const arParts = [arHead];
+  for (const m of mods) {
+    if (m.literal) { frParts.push(m.literal); arParts.push(m.literal); continue; }
+    const [frF, frM, arF, arM] = ROOM_MODS[m.key];
+    frParts.push(frG === "f" ? frF : frM);
+    arParts.push(arG === "f" ? arF : arM);
+  }
+  return { fr: frParts.join(" "), ar: arParts.join(" ") };
+}
+
+// =============================================================================
 // ROOMS PANEL
 // =============================================================================
+// Blank means blank. This used to pre-fill 20 000 DZD, a King bed and 5 rooms,
+// so a room saved without a second look went live at a price nobody chose.
+// Capacity keeps a sensible default because it is almost always 2.
 const BLANK_ROOM = {
   typeEn: "", typeFr: "", typeAr: "",
-  capacity: 2, sizeSqm: 30, bedType: "King",
-  basePrice: 20000, totalUnits: 5, isActive: true,
+  capacity: 2, sizeSqm: "", bedType: "",
+  basePrice: "", totalUnits: 1, isActive: true,
 };
+
+// The three types almost every hotel has. Staged, not created: they appear
+// on a hotel with no rooms yet, each waiting for a price, and nothing is
+// written until the admin presses Create. A room with no price must never
+// exist, because it goes live as "0 DZD / night".
+const STANDARD_ROOMS = [
+  { key: "single", typeEn: "Single Room", capacity: 1, bedType: "Single", sizeSqm: 18 },
+  { key: "double", typeEn: "Double Room", capacity: 2, bedType: "Double", sizeSqm: 22 },
+  { key: "triple", typeEn: "Triple Room", capacity: 3, bedType: "Double + Single", sizeSqm: 28 },
+].map((r) => {
+  const t = translateRoomType(r.typeEn);
+  return { ...r, typeFr: t.fr, typeAr: t.ar, basePrice: "", totalUnits: 1 };
+});
 
 function RoomsPanel({ hotelId, initialRooms, refresh }) {
   const [rooms, setRooms] = useState(initialRooms);
@@ -1258,6 +1391,10 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [note, setNote] = useState(""); // soft-delete feedback message
+  const [staged, setStaged] = useState(STANDARD_ROOMS);
+  // Once an admin types into French or Arabic by hand, stop overwriting it.
+  // Clearing the field hands it back to the translator.
+  const [trTouched, setTrTouched] = useState({ fr: false, ar: false });
 
   // Resync local state when the parent passes a different initialRooms
   // (happens after refresh()). Without this useEffect, the panel would
@@ -1266,10 +1403,64 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
     setRooms(initialRooms);
   }, [initialRooms]);
 
-  const set = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
+  const set = (k, v) => {
+    if (k === "typeFr") setTrTouched((t) => ({ ...t, fr: String(v).trim() !== "" }));
+    if (k === "typeAr") setTrTouched((t) => ({ ...t, ar: String(v).trim() !== "" }));
+    setDraft((d) => {
+      const next = { ...d, [k]: v };
+      if (k === "typeEn") {
+        const auto = translateRoomType(v);
+        if (!trTouched.fr) next.typeFr = auto.fr;
+        if (!trTouched.ar) next.typeAr = auto.ar;
+      }
+      return next;
+    });
+  };
+
+  function resetDraft() {
+    setDraft(BLANK_ROOM);
+    setTrTouched({ fr: false, ar: false });
+  }
+
+  const setStagedField = (key, k, v) =>
+    setStaged((rows) => rows.map((r) => (r.key === key ? { ...r, [k]: v } : r)));
+
+  async function createStaged() {
+    setErr(""); setNote("");
+    const missing = staged.filter((r) => !(Number(r.basePrice) > 0));
+    if (missing.length) {
+      setErr(`Set a price for ${missing.map((r) => r.typeEn).join(", ")} — or remove it.`);
+      return;
+    }
+    setBusy(true);
+    try {
+      // One after another rather than in parallel, so a failure part-way
+      // through leaves a clear record of which rooms were created.
+      for (const r of staged) {
+        await adminAddRoom(hotelId, {
+          typeEn: r.typeEn, typeFr: r.typeFr, typeAr: r.typeAr,
+          capacity: Number(r.capacity),
+          sizeSqm: Number(r.sizeSqm),
+          bedType: r.bedType,
+          basePrice: Number(r.basePrice),
+          totalUnits: Number(r.totalUnits) || 1,
+          isActive: true,
+        });
+      }
+      setStaged([]);
+      if (refresh) await refresh();
+    } catch (e) {
+      setErr(e.message);
+    } finally { setBusy(false); }
+  }
 
   async function addRoom() {
-    setErr(""); setNote(""); setBusy(true);
+    setErr(""); setNote("");
+    if (!(Number(draft.basePrice) > 0)) {
+      setErr("Set a price for this room. A room without one goes live as 0 DZD / night.");
+      return;
+    }
+    setBusy(true);
     try {
       const payload = {
         ...draft,
@@ -1279,7 +1470,7 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
         totalUnits: Number(draft.totalUnits),
       };
       await adminAddRoom(hotelId, payload);
-      setDraft(BLANK_ROOM);
+      resetDraft();
       setAdding(false);
       // Refetch from the server — the new room comes back with its id and
       // any server-side defaults applied. More reliable than appending the
@@ -1329,7 +1520,54 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
         </div>
       )}
 
-      {rooms.length === 0 && !adding && (
+      {rooms.length === 0 && !adding && staged.length > 0 && (
+        <div className="nzad-staged">
+          <p className="nzad-staged-lead">
+            Every hotel starts with the three standard room types. Give each one a price,
+            remove any this hotel doesn't have, then create them.
+          </p>
+          {staged.map((r) => (
+            <div className="nzad-staged-row" key={r.key}>
+              <div className="nzad-staged-name">
+                <strong>{r.typeEn}</strong>
+                <span>{r.typeFr} · <bdi dir="rtl">{r.typeAr}</bdi></span>
+                <em>{r.capacity} {r.capacity === 1 ? "guest" : "guests"} · {r.bedType}</em>
+              </div>
+              <label className="nzad-staged-field">
+                <span>Price / night (DZD)</span>
+                <input
+                  type="number" min="0" inputMode="numeric" placeholder="Required"
+                  value={r.basePrice}
+                  onChange={(e) => setStagedField(r.key, "basePrice", e.target.value)}
+                />
+              </label>
+              <label className="nzad-staged-field narrow">
+                <span>Rooms</span>
+                <input
+                  type="number" min="1" inputMode="numeric"
+                  value={r.totalUnits}
+                  onChange={(e) => setStagedField(r.key, "totalUnits", e.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                className="nzad-staged-x"
+                onClick={() => setStaged((rows) => rows.filter((x) => x.key !== r.key))}
+                aria-label={`Remove ${r.typeEn}`}
+                title={`Remove ${r.typeEn}`}
+              >×</button>
+            </div>
+          ))}
+          <div className="nzad-editor-actions">
+            <button className="nzad-btn-primary" onClick={createStaged} disabled={busy}>
+              {busy ? "Creating…" : `Create ${staged.length} room type${staged.length === 1 ? "" : "s"}`}
+            </button>
+            <button className="nzad-btn-ghost" onClick={() => setStaged([])}>Start from scratch</button>
+          </div>
+        </div>
+      )}
+
+      {rooms.length === 0 && !adding && staged.length === 0 && (
         <span className="nzad-empty-inline">No rooms yet. Add at least one room type.</span>
       )}
 
@@ -1358,7 +1596,7 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
             <button className="nzad-btn-primary" onClick={addRoom} disabled={busy}>
               {busy ? "Adding…" : "Add room"}
             </button>
-            <button className="nzad-btn-ghost" onClick={() => { setAdding(false); setDraft(BLANK_ROOM); }}>Cancel</button>
+            <button className="nzad-btn-ghost" onClick={() => { setAdding(false); resetDraft(); }}>Cancel</button>
           </div>
         </div>
       )}
@@ -1366,6 +1604,32 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
       <style jsx>{`
         .nzad-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
         .nzad-panel-head h3 { margin: 0; }
+
+        .nzad-staged { border: 1.5px dashed var(--gray-200); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+        .nzad-staged-lead { font-size: 12.5px; color: var(--gray-400); margin: 0 0 12px; line-height: 1.55; }
+        .nzad-staged-row {
+          display: grid; grid-template-columns: minmax(0, 1fr) 170px 88px 32px;
+          gap: 12px; align-items: end; padding: 10px 0; border-top: 1px solid var(--gray-100);
+        }
+        .nzad-staged-row:first-of-type { border-top: 0; }
+        .nzad-staged-name strong { display: block; font-size: 13.5px; color: var(--ink); }
+        .nzad-staged-name span { display: block; font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+        .nzad-staged-name em { display: block; font-style: normal; font-size: 11px; color: var(--gray-400); margin-top: 2px; }
+        .nzad-staged-field span { display: block; font-size: 10.5px; font-weight: 700; color: var(--gray-400); margin-bottom: 4px; }
+        .nzad-staged-field input {
+          width: 100%; padding: 8px 10px; border: 1.5px solid var(--gray-200); border-radius: var(--r-sm);
+          font-size: 13px; font-family: inherit; outline: none; background: #fff; color: var(--ink);
+        }
+        .nzad-staged-field input:focus { border-color: var(--red); }
+        .nzad-staged-x {
+          width: 32px; height: 34px; border-radius: var(--r-sm); border: 1.5px solid var(--gray-200);
+          background: #fff; color: var(--gray-400); font-size: 17px; line-height: 1; cursor: pointer;
+        }
+        .nzad-staged-x:hover { border-color: var(--red); color: var(--red); }
+        @media (max-width: 720px) {
+          .nzad-staged-row { grid-template-columns: minmax(0, 1fr) 32px; }
+          .nzad-staged-field { grid-column: 1; }
+        }
         .nzad-info-note {
           display: flex; align-items: center; gap: 12px;
           padding: 10px 14px; margin: 10px 0 14px;
@@ -1417,12 +1681,34 @@ function RoomCard({ room, onDelete, onRoomChange }) {
   const photoCount = (room.photos || []).length;
   const displayName = room.typeEn || room.type || "(unnamed room)";
 
-  const setD = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
+  const [trTouched, setTrTouched] = useState({ fr: true, ar: true });
+
+  const setD = (k, v) => {
+    if (k === "typeFr") setTrTouched((t) => ({ ...t, fr: String(v).trim() !== "" }));
+    if (k === "typeAr") setTrTouched((t) => ({ ...t, ar: String(v).trim() !== "" }));
+    setDraft((d) => {
+      const next = { ...d, [k]: v };
+      if (k === "typeEn") {
+        const auto = translateRoomType(v);
+        if (!trTouched.fr) next.typeFr = auto.fr;
+        if (!trTouched.ar) next.typeAr = auto.ar;
+      }
+      return next;
+    });
+  };
 
   function startEdit() {
     // Seed the form from the current room each time we open, so cancelling
     // and reopening always reflects the latest saved values.
     setDraft(room);
+    // A stored French or Arabic name that matches what the dictionary would
+    // produce was generated, so keep it in sync when English changes. One
+    // that differs was written by hand, and editing English must not wipe it.
+    const auto = translateRoomType(room.typeEn || "");
+    setTrTouched({
+      fr: !!room.typeFr && room.typeFr !== auto.fr,
+      ar: !!room.typeAr && room.typeAr !== auto.ar,
+    });
     setEditErr("");
     setEditing(true);
   }
