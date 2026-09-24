@@ -1416,6 +1416,12 @@ const ROOM_MODS = {
 };
 const MOD_KEYS = Object.keys(ROOM_MODS).sort((a, b) => b.split(" ").length - a.split(" ").length);
 
+// French capitalises the noun and lowercases what follows: "Chambre simple",
+// not "Chambre Simple".
+function frCase(parts) {
+  return parts.map((p, i) => (i === 0 ? p : p.charAt(0).toLowerCase() + p.slice(1)));
+}
+
 function translateRoomType(en) {
   const raw = String(en || "").trim();
   if (!raw) return { fr: "", ar: "" };
@@ -1458,8 +1464,29 @@ function translateRoomType(en) {
     frParts.push(frG === "f" ? frF : frM);
     arParts.push(arG === "f" ? arF : arM);
   }
-  return { fr: frParts.join(" "), ar: arParts.join(" ") };
+  return { fr: frCase(frParts).join(" "), ar: arParts.join(" ") };
 }
+
+// The bed vocabulary. A free-text field produced "King", "king size", "lit
+// king" and "سرير كبير" for the same bed, which no filter or translation can
+// ever reconcile. The stored value is the English one — that is what the
+// column already holds and what the public site reads today; translating it
+// for guests is a change to the room display, not to this form.
+const BED_TYPES = [
+  { value: "Single Bed", fr: "Lit simple", ar: "\u0633\u0631\u064a\u0631 \u0645\u0641\u0631\u062f" },
+  { value: "Double Bed", fr: "Lit double", ar: "\u0633\u0631\u064a\u0631 \u0645\u0632\u062f\u0648\u062c" },
+  { value: "Twin Beds", fr: "Deux lits simples", ar: "\u0633\u0631\u064a\u0631\u0627\u0646 \u0645\u0646\u0641\u0635\u0644\u0627\u0646" },
+  { value: "Queen Bed", fr: "Lit Queen Size", ar: "\u0633\u0631\u064a\u0631 \u0643\u0648\u064a\u0646" },
+  { value: "King Bed", fr: "Lit King Size", ar: "\u0633\u0631\u064a\u0631 \u0643\u064a\u0646\u063a" },
+  { value: "Sofa Bed", fr: "Canap\u00e9-lit", ar: "\u0623\u0631\u064a\u0643\u0629 \u0642\u0627\u0628\u0644\u0629 \u0644\u0644\u062a\u062d\u0648\u0644 \u0625\u0644\u0649 \u0633\u0631\u064a\u0631" },
+  { value: "Extra Bed", fr: "Lit suppl\u00e9mentaire", ar: "\u0633\u0631\u064a\u0631 \u0625\u0636\u0627\u0641\u064a" },
+  { value: "Baby Cot", fr: "Lit b\u00e9b\u00e9", ar: "\u0633\u0631\u064a\u0631 \u0644\u0644\u0623\u0637\u0641\u0627\u0644" },
+];
+// Blank first: a bed type that was never chosen must stay empty rather than
+// silently defaulting to whichever option happens to sit at the top.
+const BED_OPTIONS = [{ value: "", label: "\u2014" }].concat(
+  BED_TYPES.map((b) => ({ value: b.value, label: `${b.value}  \u00b7  ${b.fr}  \u00b7  ${b.ar}` }))
+);
 
 // =============================================================================
 // ROOMS PANEL
@@ -1478,9 +1505,9 @@ const BLANK_ROOM = {
 // written until the admin presses Create. A room with no price must never
 // exist, because it goes live as "0 DZD / night".
 const STANDARD_ROOMS = [
-  { key: "single", typeEn: "Single Room", capacity: 1, bedType: "Single", sizeSqm: 18 },
-  { key: "double", typeEn: "Double Room", capacity: 2, bedType: "Double", sizeSqm: 22 },
-  { key: "triple", typeEn: "Triple Room", capacity: 3, bedType: "Double + Single", sizeSqm: 28 },
+  { key: "single", typeEn: "Single Room", capacity: 1, bedType: "Single Bed", sizeSqm: 18 },
+  { key: "double", typeEn: "Double Room", capacity: 2, bedType: "Double Bed", sizeSqm: 22 },
+  { key: "triple", typeEn: "Triple Room", capacity: 3, bedType: "Double Bed", sizeSqm: 28 },
 ].map((r) => {
   const t = translateRoomType(r.typeEn);
   return { ...r, typeFr: t.fr, typeAr: t.ar, basePrice: "", totalUnits: 1 };
@@ -1691,7 +1718,7 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
             <Field label="Price / night (DZD)" v={draft.basePrice} onChange={(v) => set("basePrice", v)} type="number" />
             <Field label="Capacity (guests)" v={draft.capacity} onChange={(v) => set("capacity", v)} type="number" />
             <Field label="Size (m²)" v={draft.sizeSqm} onChange={(v) => set("sizeSqm", v)} type="number" />
-            <Field label="Bed type" v={draft.bedType} onChange={(v) => set("bedType", v)} />
+            <Choice label="Bed type" v={draft.bedType || ""} onChange={(v) => set("bedType", v)} options={BED_OPTIONS} />
             <Field label="Number of rooms" v={draft.totalUnits} onChange={(v) => set("totalUnits", v)} type="number" />
           </div>
           <div className="nzad-editor-actions">
@@ -1875,7 +1902,7 @@ function RoomCard({ room, onDelete, onRoomChange }) {
             <Field label="Price / night (DZD)" v={draft.basePrice} onChange={(v) => setD("basePrice", v)} type="number" />
             <Field label="Capacity (guests)" v={draft.capacity} onChange={(v) => setD("capacity", v)} type="number" />
             <Field label="Size (m²)" v={draft.sizeSqm} onChange={(v) => setD("sizeSqm", v)} type="number" />
-            <Field label="Bed type" v={draft.bedType} onChange={(v) => setD("bedType", v)} />
+            <Choice label="Bed type" v={draft.bedType || ""} onChange={(v) => setD("bedType", v)} options={BED_OPTIONS} />
             <Field label="Number of rooms" v={draft.totalUnits} onChange={(v) => setD("totalUnits", v)} type="number" />
           </div>
           <div className="nzad-redit-actions">
