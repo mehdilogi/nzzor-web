@@ -649,7 +649,11 @@ const FILTER_STORAGE_KEY = "NZAD_HOTEL_FILTERS";
 const BLANK_FILTERS = {
   q: "",            // free-text search
   city: "",         // exact match against h.city (the lowercase slug)
-  stars: 0,         // 0 = any; 3, 4, 5 = exact
+  // A STRING, not a number. 0 now means non-classé (a real rating state), so
+  // it can no longer double as "any" — "" is any, "nc" is non-classé, "3".."5"
+  // are exact. Stored filters from before this change hold a number; the
+  // coercion on read below turns a legacy 0 back into "".
+  stars: "",        // "" = any; "nc" = non-classé; "3" | "4" | "5" = exact
   status: "all",    // "all" | "active" | "inactive"
   featured: false,  // true = only featured
   hasRooms: false,  // true = only hotels with at least one room
@@ -664,7 +668,15 @@ function loadStoredFilters() {
     // Defensive merge — if a future version adds a new filter key, old
     // stored state shouldn't break the page; missing keys fall back to
     // the blank default.
-    return { ...BLANK_FILTERS, ...parsed };
+    const merged = { ...BLANK_FILTERS, ...parsed };
+    // `stars` used to be a number where 0 meant "any". It is now a string where
+    // "" means any and 0 belongs to non-classé, so a session saved before this
+    // change would arrive as a value that matches no pill and leaves the
+    // "Clear filters" button stuck on. Coerce it once, on read.
+    if (typeof merged.stars === "number") {
+      merged.stars = merged.stars > 0 ? String(merged.stars) : "";
+    }
+    return merged;
   } catch {
     return BLANK_FILTERS;
   }
@@ -677,6 +689,11 @@ function HotelsManager() {
   // Track per-row "opening" state so the user gets feedback while we fetch the
   // detail endpoint (which carries the raw multilingual fields the editor needs).
   const [openingId, setOpeningId] = useState(null);
+  // Row-level delete / restore. confirmId keeps the confirmation inside the
+  // row rather than in a browser dialog, which is easy to dismiss by reflex.
+  const [confirmId, setConfirmId] = useState(null);
+  const [rowBusy, setRowBusy] = useState(null);
+  const [rowErr, setRowErr] = useState("");
 
   // Filter state — initialized from sessionStorage so a refresh keeps place.
   const [filters, setFilters] = useState(loadStoredFilters);
@@ -684,6 +701,31 @@ function HotelsManager() {
     if (typeof window === "undefined") return;
     try { sessionStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters)); } catch {}
   }, [filters]);
+
+  // Deleting hides the hotel from the public site and leaves the row here.
+  // It is NOT a database delete, deliberately: bookings, receipts and vouchers
+  // point at this hotel, and removing the row would break a guest's paid
+  // reservation months later. The public listing filters on isActive, so it
+  // disappears from the site immediately.
+  async function removeHotel(h) {
+    setRowErr(""); setRowBusy(h.id);
+    try {
+      await adminDeleteHotel(h.id);
+      setConfirmId(null);
+      load();
+    } catch (e) { setRowErr(e.message); }
+    finally { setRowBusy(null); }
+  }
+
+  async function restoreHotel(h) {
+    setRowErr(""); setRowBusy(h.id);
+    try {
+      const detail = await adminHotel(h.id);
+      await adminUpdateHotel(h.id, { ...hotelPayload(detail), isActive: true });
+      load();
+    } catch (e) { setRowErr(e.message); }
+    finally { setRowBusy(null); }
+  }
 
   const load = useCallback(() => {
     setHotels(null);
@@ -749,7 +791,8 @@ function HotelsManager() {
         if (!hay.includes(q)) return false;
       }
       if (filters.city && (h.city || "").toLowerCase() !== filters.city) return false;
-      if (filters.stars && h.stars !== filters.stars) return false;
+      if (filters.stars === "nc" && Number(h.stars) !== 0) return false;
+      if (filters.stars && filters.stars !== "nc" && Number(h.stars) !== Number(filters.stars)) return false;
       if (filters.status === "active"   && !h.isActive) return false;
       if (filters.status === "inactive" &&  h.isActive) return false;
       if (filters.featured && !h.isFeatured) return false;
@@ -763,7 +806,7 @@ function HotelsManager() {
   const filtersActive =
     filters.q !== "" ||
     filters.city !== "" ||
-    filters.stars !== 0 ||
+    filters.stars !== "" ||
     filters.status !== "all" ||
     filters.featured ||
     filters.hasRooms;
@@ -827,14 +870,18 @@ function HotelsManager() {
             <div className="nzad-filter-row">
               <div className="nzad-filter-pill-group" role="group" aria-label="Filter by stars">
                 <button
-                  className={`nzad-pill ${filters.stars === 0 ? "on" : ""}`}
-                  onClick={() => setFilter({ stars: 0 })}
+                  className={`nzad-pill ${filters.stars === "" ? "on" : ""}`}
+                  onClick={() => setFilter({ stars: "" })}
                 >Any ★</button>
-                {[3, 4, 5].map((n) => (
+                <button
+                  className={`nzad-pill ${filters.stars === "nc" ? "on" : ""}`}
+                  onClick={() => setFilter({ stars: filters.stars === "nc" ? "" : "nc" })}
+                >N/C</button>
+                {["3", "4", "5"].map((n) => (
                   <button
                     key={n}
                     className={`nzad-pill ${filters.stars === n ? "on" : ""}`}
-                    onClick={() => setFilter({ stars: filters.stars === n ? 0 : n })}
+                    onClick={() => setFilter({ stars: filters.stars === n ? "" : n })}
                   >{n}★</button>
                 ))}
               </div>
@@ -881,6 +928,7 @@ function HotelsManager() {
                 </span>
               </div>
             )}
+            {rowErr && <div className="nzad-row-err">{rowErr}</div>}
             {filteredHotels.map((h) => (
               <div className="nzad-hotel-row" key={h.id}>
                 <div className="nzad-hotel-thumb">
@@ -896,16 +944,41 @@ function HotelsManager() {
                     {h.isFeatured && <span className="nzad-tag-feat">Featured</span>}
                   </div>
                   <div className="nzad-hotel-sub">
-                    {"★".repeat(h.stars)} · {h.city} · {h.rooms?.length || 0} room types · from {fmt(h.priceFrom)}
+                    {Number(h.stars) > 0 ? "★".repeat(h.stars) : "N/C"} · {h.city} · {h.rooms?.length || 0} room types · from {fmt(h.priceFrom)}
                   </div>
                 </div>
-                <button
-                  className="nzad-btn-ghost"
-                  disabled={openingId === h.id}
-                  onClick={() => openEditor(h)}
-                >
-                  {openingId === h.id ? "Opening…" : "Manage"}
-                </button>
+                {confirmId === h.id ? (
+                  <div className="nzad-row-confirm">
+                    <span>Hide <b>{h.name}</b> from the site? Its bookings keep working, and you can restore it here.</span>
+                    <button className="nzad-btn-danger" disabled={rowBusy === h.id} onClick={() => removeHotel(h)}>
+                      {rowBusy === h.id ? "Deleting…" : "Delete"}
+                    </button>
+                    <button className="nzad-btn-ghost" onClick={() => setConfirmId(null)}>Cancel</button>
+                  </div>
+                ) : (
+                  <div className="nzad-row-actions">
+                    <button
+                      className="nzad-btn-ghost"
+                      disabled={openingId === h.id}
+                      onClick={() => openEditor(h)}
+                    >
+                      {openingId === h.id ? "Opening…" : "Manage"}
+                    </button>
+                    {h.isActive ? (
+                      <button
+                        className="nzad-btn-danger-ghost"
+                        onClick={() => { setRowErr(""); setConfirmId(h.id); }}
+                        aria-label={`Delete ${h.name}`}
+                      >Delete</button>
+                    ) : (
+                      <button
+                        className="nzad-btn-ghost"
+                        disabled={rowBusy === h.id}
+                        onClick={() => restoreHotel(h)}
+                      >{rowBusy === h.id ? "Restoring…" : "Restore"}</button>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -914,6 +987,28 @@ function HotelsManager() {
 
       <style jsx>{`
         .nzad-hotel-list { display: flex; flex-direction: column; gap: 10px; }
+        .nzad-row-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+        .nzad-btn-danger-ghost {
+          border: 1.5px solid var(--gray-200); background: #fff; color: var(--gray-400);
+          border-radius: var(--r-sm); padding: 8px 14px; font-size: 13px; font-weight: 600;
+          font-family: inherit; cursor: pointer; transition: color .15s, border-color .15s, background .15s;
+        }
+        .nzad-btn-danger-ghost:hover { color: var(--red); border-color: var(--red); background: var(--red-soft); }
+        /* The confirmation replaces that row's buttons instead of opening a
+           dialog, and it names the hotel — so a mis-click on the wrong row is
+           visible before it is confirmed. */
+        .nzad-row-confirm {
+          display: flex; align-items: center; gap: 10px; flex: 1 1 auto; justify-content: flex-end;
+          font-size: 12.5px; color: var(--ink-2);
+        }
+        .nzad-row-confirm span { max-width: 46ch; line-height: 1.45; }
+        .nzad-row-err {
+          border: 1px solid var(--red); background: var(--red-soft); color: var(--red-deep);
+          border-radius: var(--r-sm); padding: 10px 12px; font-size: 13px; font-weight: 600;
+        }
+        @media (max-width: 720px) {
+          .nzad-row-confirm { flex-wrap: wrap; justify-content: flex-start; }
+        }
         .nzad-hotel-row {
           display: flex; align-items: center; gap: 16px; padding: 12px;
           background: #fff; border: 1px solid var(--gray-200); border-radius: var(--r-md);
@@ -1000,6 +1095,30 @@ const BLANK_HOTEL = {
   isActive: true, isFeatured: false,
   tags: [],
 };
+
+// The update endpoint validates the WHOLE hotel, not a patch, so restoring
+// one means sending every field back. Built from the detail endpoint rather
+// than the list row, which carries only display fields.
+function hotelPayload(h) {
+  return {
+    nameEn: h.nameEn ?? h.name ?? "", nameFr: h.nameFr ?? "", nameAr: h.nameAr ?? "",
+    descEn: h.descEn ?? h.description ?? "", descFr: h.descFr ?? "", descAr: h.descAr ?? "",
+    stars: Number(h.stars ?? 0), city: h.city ?? "",
+    cityEn: h.cityEn ?? "", cityFr: h.cityFr ?? "", cityAr: h.cityAr ?? "",
+    regionEn: h.regionEn ?? "", regionFr: h.regionFr ?? "", regionAr: h.regionAr ?? "",
+    address: h.address ?? "", contactEmail: h.contactEmail ?? "", contactPhone: h.contactPhone ?? "",
+    latitude: h.latitude ?? null, longitude: h.longitude ?? null,
+    checkInTime: h.checkInTime ?? "14:00", checkOutTime: h.checkOutTime ?? "12:00",
+    cancellationHours: Number(h.cancellationHours ?? 48),
+    childrenAllowed: h.childrenAllowed ?? true,
+    petsAllowed: h.petsAllowed ?? false,
+    parkingFree: h.parkingFree ?? true,
+    instantConfirmation: h.trustSignals?.instantConfirmation ?? h.instantConfirmation ?? true,
+    verifiedPartner: h.trustSignals?.verifiedPartner ?? h.verifiedPartner ?? true,
+    isFeatured: h.isFeatured ?? false,
+    tags: Array.isArray(h.tags) ? h.tags : [],
+  };
+}
 
 function HotelEditor({ hotel, onClose, onSaved }) {
   const isNew = !hotel;
@@ -1125,7 +1244,20 @@ function HotelEditor({ hotel, onClose, onSaved }) {
         <h3>Location &amp; rating</h3>
         <div className="nzad-grid3">
           <Field label="City key (lowercase, e.g. algiers)" v={form.city} onChange={(v) => set("city", v)} required />
-          <Field label="Stars (1–5)" v={form.stars} onChange={(v) => set("stars", v)} type="number" required />
+          <Choice
+            label="Stars"
+            v={String(form.stars)}
+            onChange={(v) => set("stars", v)}
+            options={[
+              { value: "0", label: "N/C — non classé" },
+              { value: "1", label: "1 ★" },
+              { value: "2", label: "2 ★" },
+              { value: "3", label: "3 ★" },
+              { value: "4", label: "4 ★" },
+              { value: "5", label: "5 ★" },
+            ]}
+            required
+          />
           <Field label="Address" v={form.address} onChange={(v) => set("address", v)} />
           <Field label="City (EN)" v={form.cityEn} onChange={(v) => set("cityEn", v)} />
           <Field label="City (FR)" v={form.cityFr} onChange={(v) => set("cityFr", v)} />
@@ -1205,9 +1337,6 @@ function HotelEditor({ hotel, onClose, onSaved }) {
         .nzad-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
         .nzad-toggles { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
         .nzad-editor-actions { display: flex; gap: 10px; margin-bottom: 24px; }
-        .nzad-bf-toggle { display: flex; align-items: flex-start; gap: 10px; margin: 14px 0; cursor: pointer; font-size: 12.5px; color: var(--gray-500); line-height: 1.5; }
-        .nzad-bf-toggle input { width: 16px; height: 16px; margin-top: 1px; flex-shrink: 0; accent-color: var(--red, #E63946); }
-        .nzad-bf-toggle strong { color: var(--ink); }
         .nzad-note { padding: 16px; background: var(--cream); border: 1px dashed var(--gray-300); border-radius: var(--r-md); font-size: 13px; color: var(--gray-400); }
         @media (max-width: 720px) { .nzad-grid3 { grid-template-columns: 1fr; } }
       `}</style>
@@ -1216,13 +1345,173 @@ function HotelEditor({ hotel, onClose, onSaved }) {
 }
 
 // =============================================================================
+// ROOM-TYPE TRANSLATION
+// =============================================================================
+// English in, French and Arabic out, from a fixed vocabulary rather than a
+// translation service. Room names are a small closed set, and generic machine
+// translation gets them wrong in ways guests notice — "King" comes back as
+// "Roi". A dictionary is instant, free, never down, and right for the domain.
+//
+// Word order matters and is handled: French and Arabic both put the noun
+// first and the qualifiers after it, so "Deluxe Double Room" becomes
+// "Chambre Double Deluxe" and "غرفة مزدوجة فاخرة" rather than a word-for-word
+// swap. Adjectives agree in gender with the noun in both languages — a room
+// (غرفة, chambre) is feminine, a suite in Arabic (جناح) is masculine — so
+// each qualifier carries both forms.
+//
+// Anything not in the list is passed through untouched, so a proper name like
+// "Atlas" survives and the admin corrects the rest by hand. The generated
+// French and Arabic are suggestions: both fields stay editable.
+
+// head noun -> [French, French gender, Arabic, Arabic gender]
+const ROOM_HEADS = {
+  room: ["Chambre", "f", "غرفة", "f"],
+  suite: ["Suite", "f", "جناح", "m"],
+  studio: ["Studio", "m", "استوديو", "m"],
+  apartment: ["Appartement", "m", "شقة", "f"],
+  villa: ["Villa", "f", "فيلا", "f"],
+  bungalow: ["Bungalow", "m", "بنغل", "m"],
+  chalet: ["Chalet", "m", "شاليه", "m"],
+  dormitory: ["Dortoir", "m", "مهجع", "m"],
+  dorm: ["Dortoir", "m", "مهجع", "m"],
+};
+
+// qualifier -> [French fem, French masc, Arabic fem, Arabic masc]
+// Multi-word keys are matched before single words.
+const ROOM_MODS = {
+  "sea view": ["Vue mer", "Vue mer", "مطلة على البحر", "مطل على البحر"],
+  "ocean view": ["Vue mer", "Vue mer", "مطلة على البحر", "مطل على البحر"],
+  "garden view": ["Vue jardin", "Vue jardin", "مطلة على الحديقة", "مطل على الحديقة"],
+  "pool view": ["Vue piscine", "Vue piscine", "مطلة على المسبح", "مطل على المسبح"],
+  "mountain view": ["Vue montagne", "Vue montagne", "مطلة على الجبل", "مطل على الجبل"],
+  "city view": ["Vue ville", "Vue ville", "مطلة على المدينة", "مطل على المدينة"],
+  "desert view": ["Vue désert", "Vue désert", "مطلة على الصحراء", "مطل على الصحراء"],
+  "with balcony": ["avec balcon", "avec balcon", "بشرفة", "بشرفة"],
+  "with terrace": ["avec terrasse", "avec terrasse", "بتراس", "بتراس"],
+  balcony: ["avec balcon", "avec balcon", "بشرفة", "بشرفة"],
+  terrace: ["avec terrasse", "avec terrasse", "بتراس", "بتراس"],
+  single: ["Simple", "Simple", "فردية", "فردي"],
+  double: ["Double", "Double", "مزدوجة", "مزدوج"],
+  twin: ["Twin", "Twin", "بسريرين", "بسريرين"],
+  triple: ["Triple", "Triple", "ثلاثية", "ثلاثي"],
+  quadruple: ["Quadruple", "Quadruple", "رباعية", "رباعي"],
+  quad: ["Quadruple", "Quadruple", "رباعية", "رباعي"],
+  family: ["Familiale", "Familial", "عائلية", "عائلي"],
+  standard: ["Standard", "Standard", "قياسية", "قياسي"],
+  superior: ["Supérieure", "Supérieur", "ممتازة", "ممتاز"],
+  deluxe: ["Deluxe", "Deluxe", "فاخرة", "فاخر"],
+  luxury: ["de Luxe", "de Luxe", "فاخرة", "فاخر"],
+  premium: ["Premium", "Premium", "متميزة", "متميز"],
+  executive: ["Exécutive", "Exécutif", "تنفيذية", "تنفيذي"],
+  junior: ["Junior", "Junior", "صغيرة", "صغير"],
+  presidential: ["Présidentielle", "Présidentiel", "رئاسية", "رئاسي"],
+  royal: ["Royale", "Royal", "ملكية", "ملكي"],
+  economy: ["Économique", "Économique", "اقتصادية", "اقتصادي"],
+  comfort: ["Confort", "Confort", "مريحة", "مريح"],
+  classic: ["Classique", "Classique", "كلاسيكية", "كلاسيكي"],
+  connecting: ["Communicante", "Communicant", "متصلة", "متصل"],
+  accessible: ["Accessible PMR", "Accessible PMR", "مهيأة لذوي الاحتياجات الخاصة", "مهيأ لذوي الاحتياجات الخاصة"],
+  king: ["Lit King", "Lit King", "بسرير كبير", "بسرير كبير"],
+  queen: ["Lit Queen", "Lit Queen", "بسرير كوين", "بسرير كوين"],
+};
+const MOD_KEYS = Object.keys(ROOM_MODS).sort((a, b) => b.split(" ").length - a.split(" ").length);
+
+// French capitalises the noun and lowercases what follows: "Chambre simple",
+// not "Chambre Simple".
+function frCase(parts) {
+  return parts.map((p, i) => (i === 0 ? p : p.charAt(0).toLowerCase() + p.slice(1)));
+}
+
+function translateRoomType(en) {
+  const raw = String(en || "").trim();
+  if (!raw) return { fr: "", ar: "" };
+
+  // Tokenise, then consume multi-word qualifiers before single words so that
+  // "sea view" is read as one phrase and not as "sea" + "view".
+  const words = raw.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter(Boolean);
+  const original = raw.replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter(Boolean);
+
+  let head = null;
+  const mods = [];
+  for (let i = 0; i < words.length; ) {
+    let matched = false;
+    for (const key of MOD_KEYS) {
+      const parts = key.split(" ");
+      if (parts.every((p, j) => words[i + j] === p)) {
+        mods.push({ key });
+        i += parts.length;
+        matched = true;
+        break;
+      }
+    }
+    if (matched) continue;
+    if (!head && ROOM_HEADS[words[i]]) { head = words[i]; i += 1; continue; }
+    // "rooms" / "suites" — accept the plural as the head too.
+    const singular = words[i].replace(/s$/, "");
+    if (!head && ROOM_HEADS[singular]) { head = singular; i += 1; continue; }
+    // Not in the vocabulary: keep it as typed, in its original position.
+    mods.push({ literal: original[i] || words[i] });
+    i += 1;
+  }
+
+  // "Double" on its own means a double room.
+  const [frHead, frG, arHead, arG] = ROOM_HEADS[head || "room"];
+  const frParts = [frHead];
+  const arParts = [arHead];
+  for (const m of mods) {
+    if (m.literal) { frParts.push(m.literal); arParts.push(m.literal); continue; }
+    const [frF, frM, arF, arM] = ROOM_MODS[m.key];
+    frParts.push(frG === "f" ? frF : frM);
+    arParts.push(arG === "f" ? arF : arM);
+  }
+  return { fr: frCase(frParts).join(" "), ar: arParts.join(" ") };
+}
+
+// The bed vocabulary. A free-text field produced "King", "king size", "lit
+// king" and "سرير كبير" for the same bed, which no filter or translation can
+// ever reconcile. The stored value is the English one — that is what the
+// column already holds and what the public site reads today; translating it
+// for guests is a change to the room display, not to this form.
+const BED_TYPES = [
+  { value: "Single Bed", fr: "Lit simple", ar: "\u0633\u0631\u064a\u0631 \u0645\u0641\u0631\u062f" },
+  { value: "Double Bed", fr: "Lit double", ar: "\u0633\u0631\u064a\u0631 \u0645\u0632\u062f\u0648\u062c" },
+  { value: "Twin Beds", fr: "Deux lits simples", ar: "\u0633\u0631\u064a\u0631\u0627\u0646 \u0645\u0646\u0641\u0635\u0644\u0627\u0646" },
+  { value: "Queen Bed", fr: "Lit Queen Size", ar: "\u0633\u0631\u064a\u0631 \u0643\u0648\u064a\u0646" },
+  { value: "King Bed", fr: "Lit King Size", ar: "\u0633\u0631\u064a\u0631 \u0643\u064a\u0646\u063a" },
+  { value: "Sofa Bed", fr: "Canap\u00e9-lit", ar: "\u0623\u0631\u064a\u0643\u0629 \u0642\u0627\u0628\u0644\u0629 \u0644\u0644\u062a\u062d\u0648\u0644 \u0625\u0644\u0649 \u0633\u0631\u064a\u0631" },
+  { value: "Extra Bed", fr: "Lit suppl\u00e9mentaire", ar: "\u0633\u0631\u064a\u0631 \u0625\u0636\u0627\u0641\u064a" },
+  { value: "Baby Cot", fr: "Lit b\u00e9b\u00e9", ar: "\u0633\u0631\u064a\u0631 \u0644\u0644\u0623\u0637\u0641\u0627\u0644" },
+];
+// Blank first: a bed type that was never chosen must stay empty rather than
+// silently defaulting to whichever option happens to sit at the top.
+const BED_OPTIONS = [{ value: "", label: "\u2014" }].concat(
+  BED_TYPES.map((b) => ({ value: b.value, label: `${b.value}  \u00b7  ${b.fr}  \u00b7  ${b.ar}` }))
+);
+
+// =============================================================================
 // ROOMS PANEL
 // =============================================================================
+// Blank means blank. This used to pre-fill 20 000 DZD, a King bed and 5 rooms,
+// so a room saved without a second look went live at a price nobody chose.
+// Capacity keeps a sensible default because it is almost always 2.
 const BLANK_ROOM = {
   typeEn: "", typeFr: "", typeAr: "",
-  capacity: 2, sizeSqm: 30, bedType: "King",
-  basePrice: 20000, totalUnits: 5, breakfastIncluded: true, isActive: true,
+  capacity: 2, sizeSqm: "", bedType: "",
+  basePrice: "", totalUnits: 1, isActive: true,
 };
+
+// The three types almost every hotel has. Staged, not created: they appear
+// on a hotel with no rooms yet, each waiting for a price, and nothing is
+// written until the admin presses Create. A room with no price must never
+// exist, because it goes live as "0 DZD / night".
+const STANDARD_ROOMS = [
+  { key: "single", typeEn: "Single Room", capacity: 1, bedType: "Single Bed", sizeSqm: 18 },
+  { key: "double", typeEn: "Double Room", capacity: 2, bedType: "Double Bed", sizeSqm: 22 },
+  { key: "triple", typeEn: "Triple Room", capacity: 3, bedType: "Double Bed", sizeSqm: 28 },
+].map((r) => {
+  const t = translateRoomType(r.typeEn);
+  return { ...r, typeFr: t.fr, typeAr: t.ar, basePrice: "", totalUnits: 1 };
+});
 
 function RoomsPanel({ hotelId, initialRooms, refresh }) {
   const [rooms, setRooms] = useState(initialRooms);
@@ -1231,6 +1520,10 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [note, setNote] = useState(""); // soft-delete feedback message
+  const [staged, setStaged] = useState(STANDARD_ROOMS);
+  // Once an admin types into French or Arabic by hand, stop overwriting it.
+  // Clearing the field hands it back to the translator.
+  const [trTouched, setTrTouched] = useState({ fr: false, ar: false });
 
   // Resync local state when the parent passes a different initialRooms
   // (happens after refresh()). Without this useEffect, the panel would
@@ -1239,10 +1532,64 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
     setRooms(initialRooms);
   }, [initialRooms]);
 
-  const set = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
+  const set = (k, v) => {
+    if (k === "typeFr") setTrTouched((t) => ({ ...t, fr: String(v).trim() !== "" }));
+    if (k === "typeAr") setTrTouched((t) => ({ ...t, ar: String(v).trim() !== "" }));
+    setDraft((d) => {
+      const next = { ...d, [k]: v };
+      if (k === "typeEn") {
+        const auto = translateRoomType(v);
+        if (!trTouched.fr) next.typeFr = auto.fr;
+        if (!trTouched.ar) next.typeAr = auto.ar;
+      }
+      return next;
+    });
+  };
+
+  function resetDraft() {
+    setDraft(BLANK_ROOM);
+    setTrTouched({ fr: false, ar: false });
+  }
+
+  const setStagedField = (key, k, v) =>
+    setStaged((rows) => rows.map((r) => (r.key === key ? { ...r, [k]: v } : r)));
+
+  async function createStaged() {
+    setErr(""); setNote("");
+    const missing = staged.filter((r) => !(Number(r.basePrice) > 0));
+    if (missing.length) {
+      setErr(`Set a price for ${missing.map((r) => r.typeEn).join(", ")} — or remove it.`);
+      return;
+    }
+    setBusy(true);
+    try {
+      // One after another rather than in parallel, so a failure part-way
+      // through leaves a clear record of which rooms were created.
+      for (const r of staged) {
+        await adminAddRoom(hotelId, {
+          typeEn: r.typeEn, typeFr: r.typeFr, typeAr: r.typeAr,
+          capacity: Number(r.capacity),
+          sizeSqm: Number(r.sizeSqm),
+          bedType: r.bedType,
+          basePrice: Number(r.basePrice),
+          totalUnits: Number(r.totalUnits) || 1,
+          isActive: true,
+        });
+      }
+      setStaged([]);
+      if (refresh) await refresh();
+    } catch (e) {
+      setErr(e.message);
+    } finally { setBusy(false); }
+  }
 
   async function addRoom() {
-    setErr(""); setNote(""); setBusy(true);
+    setErr(""); setNote("");
+    if (!(Number(draft.basePrice) > 0)) {
+      setErr("Set a price for this room. A room without one goes live as 0 DZD / night.");
+      return;
+    }
+    setBusy(true);
     try {
       const payload = {
         ...draft,
@@ -1252,7 +1599,7 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
         totalUnits: Number(draft.totalUnits),
       };
       await adminAddRoom(hotelId, payload);
-      setDraft(BLANK_ROOM);
+      resetDraft();
       setAdding(false);
       // Refetch from the server — the new room comes back with its id and
       // any server-side defaults applied. More reliable than appending the
@@ -1302,7 +1649,54 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
         </div>
       )}
 
-      {rooms.length === 0 && !adding && (
+      {rooms.length === 0 && !adding && staged.length > 0 && (
+        <div className="nzad-staged">
+          <p className="nzad-staged-lead">
+            Every hotel starts with the three standard room types. Give each one a price,
+            remove any this hotel doesn't have, then create them.
+          </p>
+          {staged.map((r) => (
+            <div className="nzad-staged-row" key={r.key}>
+              <div className="nzad-staged-name">
+                <strong>{r.typeEn}</strong>
+                <span>{r.typeFr} · <bdi dir="rtl">{r.typeAr}</bdi></span>
+                <em>{r.capacity} {r.capacity === 1 ? "guest" : "guests"} · {r.bedType}</em>
+              </div>
+              <label className="nzad-staged-field">
+                <span>Price / night (DZD)</span>
+                <input
+                  type="number" min="0" inputMode="numeric" placeholder="Required"
+                  value={r.basePrice}
+                  onChange={(e) => setStagedField(r.key, "basePrice", e.target.value)}
+                />
+              </label>
+              <label className="nzad-staged-field narrow">
+                <span>Rooms</span>
+                <input
+                  type="number" min="1" inputMode="numeric"
+                  value={r.totalUnits}
+                  onChange={(e) => setStagedField(r.key, "totalUnits", e.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                className="nzad-staged-x"
+                onClick={() => setStaged((rows) => rows.filter((x) => x.key !== r.key))}
+                aria-label={`Remove ${r.typeEn}`}
+                title={`Remove ${r.typeEn}`}
+              >×</button>
+            </div>
+          ))}
+          <div className="nzad-editor-actions">
+            <button className="nzad-btn-primary" onClick={createStaged} disabled={busy}>
+              {busy ? "Creating…" : `Create ${staged.length} room type${staged.length === 1 ? "" : "s"}`}
+            </button>
+            <button className="nzad-btn-ghost" onClick={() => setStaged([])}>Start from scratch</button>
+          </div>
+        </div>
+      )}
+
+      {rooms.length === 0 && !adding && staged.length === 0 && (
         <span className="nzad-empty-inline">No rooms yet. Add at least one room type.</span>
       )}
 
@@ -1324,22 +1718,14 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
             <Field label="Price / night (DZD)" v={draft.basePrice} onChange={(v) => set("basePrice", v)} type="number" />
             <Field label="Capacity (guests)" v={draft.capacity} onChange={(v) => set("capacity", v)} type="number" />
             <Field label="Size (m²)" v={draft.sizeSqm} onChange={(v) => set("sizeSqm", v)} type="number" />
-            <Field label="Bed type" v={draft.bedType} onChange={(v) => set("bedType", v)} />
+            <Choice label="Bed type" v={draft.bedType || ""} onChange={(v) => set("bedType", v)} options={BED_OPTIONS} />
             <Field label="Number of rooms" v={draft.totalUnits} onChange={(v) => set("totalUnits", v)} type="number" />
           </div>
-          <label className="nzad-bf-toggle">
-            <input
-              type="checkbox"
-              checked={draft.breakfastIncluded !== false}
-              onChange={(e) => set("breakfastIncluded", e.target.checked)}
-            />
-            <span><strong>Breakfast included (free)</strong> — guests see a free breakfast option. Turn off if this room has no breakfast.</span>
-          </label>
           <div className="nzad-editor-actions">
             <button className="nzad-btn-primary" onClick={addRoom} disabled={busy}>
               {busy ? "Adding…" : "Add room"}
             </button>
-            <button className="nzad-btn-ghost" onClick={() => { setAdding(false); setDraft(BLANK_ROOM); }}>Cancel</button>
+            <button className="nzad-btn-ghost" onClick={() => { setAdding(false); resetDraft(); }}>Cancel</button>
           </div>
         </div>
       )}
@@ -1347,6 +1733,32 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
       <style jsx>{`
         .nzad-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
         .nzad-panel-head h3 { margin: 0; }
+
+        .nzad-staged { border: 1.5px dashed var(--gray-200); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+        .nzad-staged-lead { font-size: 12.5px; color: var(--gray-400); margin: 0 0 12px; line-height: 1.55; }
+        .nzad-staged-row {
+          display: grid; grid-template-columns: minmax(0, 1fr) 170px 88px 32px;
+          gap: 12px; align-items: end; padding: 10px 0; border-top: 1px solid var(--gray-100);
+        }
+        .nzad-staged-row:first-of-type { border-top: 0; }
+        .nzad-staged-name strong { display: block; font-size: 13.5px; color: var(--ink); }
+        .nzad-staged-name span { display: block; font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+        .nzad-staged-name em { display: block; font-style: normal; font-size: 11px; color: var(--gray-400); margin-top: 2px; }
+        .nzad-staged-field span { display: block; font-size: 10.5px; font-weight: 700; color: var(--gray-400); margin-bottom: 4px; }
+        .nzad-staged-field input {
+          width: 100%; padding: 8px 10px; border: 1.5px solid var(--gray-200); border-radius: var(--r-sm);
+          font-size: 13px; font-family: inherit; outline: none; background: #fff; color: var(--ink);
+        }
+        .nzad-staged-field input:focus { border-color: var(--red); }
+        .nzad-staged-x {
+          width: 32px; height: 34px; border-radius: var(--r-sm); border: 1.5px solid var(--gray-200);
+          background: #fff; color: var(--gray-400); font-size: 17px; line-height: 1; cursor: pointer;
+        }
+        .nzad-staged-x:hover { border-color: var(--red); color: var(--red); }
+        @media (max-width: 720px) {
+          .nzad-staged-row { grid-template-columns: minmax(0, 1fr) 32px; }
+          .nzad-staged-field { grid-column: 1; }
+        }
         .nzad-info-note {
           display: flex; align-items: center; gap: 12px;
           padding: 10px 14px; margin: 10px 0 14px;
@@ -1398,12 +1810,34 @@ function RoomCard({ room, onDelete, onRoomChange }) {
   const photoCount = (room.photos || []).length;
   const displayName = room.typeEn || room.type || "(unnamed room)";
 
-  const setD = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
+  const [trTouched, setTrTouched] = useState({ fr: true, ar: true });
+
+  const setD = (k, v) => {
+    if (k === "typeFr") setTrTouched((t) => ({ ...t, fr: String(v).trim() !== "" }));
+    if (k === "typeAr") setTrTouched((t) => ({ ...t, ar: String(v).trim() !== "" }));
+    setDraft((d) => {
+      const next = { ...d, [k]: v };
+      if (k === "typeEn") {
+        const auto = translateRoomType(v);
+        if (!trTouched.fr) next.typeFr = auto.fr;
+        if (!trTouched.ar) next.typeAr = auto.ar;
+      }
+      return next;
+    });
+  };
 
   function startEdit() {
     // Seed the form from the current room each time we open, so cancelling
     // and reopening always reflects the latest saved values.
     setDraft(room);
+    // A stored French or Arabic name that matches what the dictionary would
+    // produce was generated, so keep it in sync when English changes. One
+    // that differs was written by hand, and editing English must not wipe it.
+    const auto = translateRoomType(room.typeEn || "");
+    setTrTouched({
+      fr: !!room.typeFr && room.typeFr !== auto.fr,
+      ar: !!room.typeAr && room.typeAr !== auto.ar,
+    });
     setEditErr("");
     setEditing(true);
   }
@@ -1418,7 +1852,6 @@ function RoomCard({ room, onDelete, onRoomChange }) {
         sizeSqm: Number(draft.sizeSqm),
         basePrice: Number(draft.basePrice),
         totalUnits: Number(draft.totalUnits),
-        breakfastIncluded: draft.breakfastIncluded !== false,
       };
       const result = await adminUpdateRoom(room.id, payload);
       // The PUT returns the updated room (without its photos include), so
@@ -1469,17 +1902,9 @@ function RoomCard({ room, onDelete, onRoomChange }) {
             <Field label="Price / night (DZD)" v={draft.basePrice} onChange={(v) => setD("basePrice", v)} type="number" />
             <Field label="Capacity (guests)" v={draft.capacity} onChange={(v) => setD("capacity", v)} type="number" />
             <Field label="Size (m²)" v={draft.sizeSqm} onChange={(v) => setD("sizeSqm", v)} type="number" />
-            <Field label="Bed type" v={draft.bedType} onChange={(v) => setD("bedType", v)} />
+            <Choice label="Bed type" v={draft.bedType || ""} onChange={(v) => setD("bedType", v)} options={BED_OPTIONS} />
             <Field label="Number of rooms" v={draft.totalUnits} onChange={(v) => setD("totalUnits", v)} type="number" />
           </div>
-          <label className="nzad-bf-toggle">
-            <input
-              type="checkbox"
-              checked={draft.breakfastIncluded !== false}
-              onChange={(e) => setD("breakfastIncluded", e.target.checked)}
-            />
-            <span><strong>Breakfast included (free)</strong> — guests see a free breakfast option. Turn off if this room has no breakfast.</span>
-          </label>
           <div className="nzad-redit-actions">
             <button className="nzad-btn-primary" onClick={saveRoom} disabled={savingRoom}>
               {savingRoom ? "Saving…" : "Save room"}
@@ -1529,9 +1954,6 @@ function RoomCard({ room, onDelete, onRoomChange }) {
           gap: 14px;
         }
         .nzad-redit-actions { display: flex; gap: 10px; margin-top: 14px; }
-        .nzad-bf-toggle { display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; cursor: pointer; font-size: 12.5px; color: var(--gray-500); line-height: 1.5; }
-        .nzad-bf-toggle input { width: 16px; height: 16px; margin-top: 1px; flex-shrink: 0; accent-color: var(--red, #E63946); }
-        .nzad-bf-toggle strong { color: var(--ink); }
         .nzad-room-edit-err {
           padding: 9px 12px; margin-bottom: 12px;
           background: var(--red-soft); color: var(--red-deep);
@@ -1572,19 +1994,8 @@ const BOARD_DEFS = [
 ];
 
 function BoardRatesPanel({ room }) {
-  // Base price = the room's nightly rate (Room only). Supplements are what each
-  // meal plan ADDS on top of the base. We store ABSOLUTE prices (base +
-  // supplement) so the quote engine and guest cards need no change — the
-  // add-on math lives here in admin only.
-  const [base, setBase] = useState(() => (room.basePrice != null ? String(room.basePrice) : ""));
-  // Supplements per board (ADD-ON amount, not absolute). ROOM_ONLY has no
-  // supplement — it IS the base.
-  const [supps, setSupps] = useState(() =>
-    Object.fromEntries(BOARD_DEFS.filter((b) => b.key !== "ROOM_ONLY").map((b) => [b.key, ""]))
-  );
-  // Which boards are offered at all (a blank/unchecked board = not offered).
-  const [offered, setOffered] = useState(() =>
-    Object.fromEntries(BOARD_DEFS.map((b) => [b.key, b.key === "ROOM_ONLY"]))
+  const [prices, setPrices] = useState(() =>
+    Object.fromEntries(BOARD_DEFS.map((b) => [b.key, ""]))
   );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1597,59 +2008,34 @@ function BoardRatesPanel({ room }) {
     adminGetBoardRates(room.id)
       .then((res) => {
         if (!live) return;
+        // adminGetBoardRates returns the array directly (client unwraps .data).
         const rows = Array.isArray(res) ? res : (res?.data || []);
-        // The API now returns `supplement` directly. Base is the room's price.
-        const byBoard = {};
-        for (const r of rows) byBoard[r.board] = r;
-        setBase(room.basePrice != null ? String(room.basePrice) : "0");
-
-        const nextSupps = {};
-        const nextOffered = Object.fromEntries(BOARD_DEFS.map((b) => [b.key, false]));
-        nextOffered.ROOM_ONLY = true; // room-only is always offered
-        for (const b of BOARD_DEFS) {
-          if (b.key === "ROOM_ONLY") continue;
-          const row = byBoard[b.key];
-          if (row && row.isActive) {
-            nextSupps[b.key] = String(Math.max(0, Number(row.supplement) || 0));
-            nextOffered[b.key] = true;
-          } else {
-            nextSupps[b.key] = "";
-          }
+        const next = Object.fromEntries(BOARD_DEFS.map((b) => [b.key, ""]));
+        for (const r of rows) {
+          if (r.board in next) next[r.board] = String(r.price);
         }
-        setSupps(nextSupps);
-        setOffered(nextOffered);
+        // Seed ROOM_ONLY from basePrice as a hint if nothing saved yet.
+        if (!next.ROOM_ONLY && room.basePrice != null) {
+          next.ROOM_ONLY = String(room.basePrice);
+        }
+        setPrices(next);
       })
       .catch((e) => live && setErr(e.message))
       .finally(() => live && setLoading(false));
     return () => { live = false; };
   }, [room.id, room.basePrice]);
 
-  const baseNum = base.trim() === "" ? 0 : Number(base);
-  const suppNum = (key) => {
-    const raw = String(supps[key] ?? "").trim();
-    const n = raw === "" ? 0 : Number(raw);
-    return Number.isNaN(n) ? 0 : n;
-  };
-  // Absolute total shown per board = base + supplement.
-  const totalFor = (key) => (key === "ROOM_ONLY" ? baseNum : baseNum + suppNum(key));
-
-  const setSupp = (key, v) => setSupps((p) => ({ ...p, [key]: v }));
-  const toggleOffered = (key, on) => setOffered((p) => ({ ...p, [key]: on }));
+  const setPrice = (key, v) => setPrices((p) => ({ ...p, [key]: v }));
 
   async function save() {
     setErr(""); setMsg(""); setSaving(true);
     try {
-      // Send the SUPPLEMENT for each board (DZD added to the room's base).
-      // null = not offered. ROOM_ONLY supplement is always 0. The engine adds
-      // the base, so what the guest sees = base + supplement.
       const rates = BOARD_DEFS.map((b) => {
-        if (b.key === "ROOM_ONLY") {
-          return { board: b.key, supplement: 0, isActive: true };
-        }
-        const isOffered = !!offered[b.key];
+        const raw = String(prices[b.key]).trim();
+        const price = raw === "" ? null : Number(raw);
         return {
           board: b.key,
-          supplement: isOffered ? suppNum(b.key) : null,
+          price: price == null || Number.isNaN(price) ? null : price,
           isActive: true,
         };
       });
@@ -1668,51 +2054,31 @@ function BoardRatesPanel({ room }) {
   return (
     <div className="nzad-boards">
       <p className="nzad-boards-help">
-        The base price (Room only) comes from the room&apos;s &quot;Price / night&quot;
-        above. Add a supplement for each meal plan — the guest sees the full
-        price (base + supplement). Untick a meal plan this room doesn&apos;t offer.
+        Price each meal plan (DZD per room per night). Leave a row blank if this
+        room doesn&apos;t offer that board. These power the priced options guests
+        will see.
       </p>
       {err && <div className="nzad-boards-err">{err}</div>}
-
-      {/* Base price row — read-only, mirrors the room's basePrice */}
-      <div className="nzad-board-base">
-        <div className="nzad-board-label"><strong>Base price (Room only)</strong><em>Chambre seule · from the room&apos;s price / night</em></div>
-        <div className="nzad-board-input">
-          <input type="number" value={base} readOnly disabled />
-          <span>DZD</span>
-        </div>
-      </div>
-
       <div className="nzad-boards-grid">
-        {BOARD_DEFS.filter((b) => b.key !== "ROOM_ONLY").map((b) => {
-          const on = !!offered[b.key];
-          return (
-            <div className={`nzad-board-row ${on ? "" : "off"}`} key={b.key}>
-              <label className="nzad-board-toggle">
-                <input type="checkbox" checked={on} onChange={(e) => toggleOffered(b.key, e.target.checked)} />
-                <div className="nzad-board-label">
-                  <strong>{b.label}</strong>
-                  <em>{b.hint}</em>
-                </div>
-              </label>
-              <div className="nzad-board-suppwrap">
-                <div className="nzad-board-input">
-                  <span className="nzad-board-plus">+</span>
-                  <input
-                    type="number" min="0" step="1" placeholder="0"
-                    value={supps[b.key]}
-                    disabled={!on}
-                    onChange={(e) => setSupp(b.key, e.target.value)}
-                  />
-                  <span>DZD</span>
-                </div>
-                <div className="nzad-board-total">
-                  {on ? `= ${fmt(totalFor(b.key))}` : "not offered"}
-                </div>
-              </div>
+        {BOARD_DEFS.map((b) => (
+          <div className="nzad-board-row" key={b.key}>
+            <div className="nzad-board-label">
+              <strong>{b.label}</strong>
+              <em>{b.hint}</em>
             </div>
-          );
-        })}
+            <div className="nzad-board-input">
+              <input
+                type="number"
+                min="0"
+                step="1"
+                placeholder="—"
+                value={prices[b.key]}
+                onChange={(e) => setPrice(b.key, e.target.value)}
+              />
+              <span>DZD</span>
+            </div>
+          </div>
+        ))}
       </div>
       <div className="nzad-boards-actions">
         <button className="nzad-btn-primary" onClick={save} disabled={saving}>
@@ -1728,38 +2094,26 @@ function BoardRatesPanel({ room }) {
           padding: 9px 12px; background: var(--red-soft); color: var(--red-deep);
           border-radius: var(--r-sm); font-size: 12.5px; font-weight: 600;
         }
-        .nzad-board-base {
-          display: flex; align-items: center; justify-content: space-between; gap: 12px;
-          padding: 10px 12px; background: var(--cream, #FAF8F4); border-radius: var(--r-sm);
-        }
         .nzad-boards-grid { display: flex; flex-direction: column; gap: 8px; }
         .nzad-board-row {
           display: flex; align-items: center; justify-content: space-between;
           gap: 12px; padding: 8px 0;
         }
         .nzad-board-row:not(:last-child) { border-bottom: 1px solid var(--gray-100); }
-        .nzad-board-row.off { opacity: 0.55; }
-        .nzad-board-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-        .nzad-board-toggle input[type="checkbox"] { width: 16px; height: 16px; flex-shrink: 0; accent-color: var(--red, #E63946); }
         .nzad-board-label strong { font-size: 14px; color: var(--ink); display: block; }
         .nzad-board-label em { font-size: 11.5px; color: var(--gray-400); font-style: normal; }
-        .nzad-board-suppwrap { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-        .nzad-board-input { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-        .nzad-board-plus { font-size: 13px; font-weight: 700; color: var(--gray-400); }
+        .nzad-board-input { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
         .nzad-board-input input {
-          width: 96px; padding: 8px 11px; border: 1.5px solid var(--gray-200);
+          width: 120px; padding: 8px 11px; border: 1.5px solid var(--gray-200);
           border-radius: var(--r-sm); font-size: 13px; font-family: inherit; outline: none;
           text-align: right;
         }
         .nzad-board-input input:focus { border-color: var(--red); }
-        .nzad-board-input input:disabled { background: var(--gray-50, #f5f5f5); color: var(--gray-300); }
         .nzad-board-input span { font-size: 12px; font-weight: 700; color: var(--gray-400); }
-        .nzad-board-total { font-size: 13px; font-weight: 700; color: var(--ink); min-width: 92px; text-align: right; }
         .nzad-boards-actions { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
         .nzad-boards-msg { font-size: 12.5px; font-weight: 600; color: var(--teal, #1B8A5A); }
         @media (max-width: 720px) {
-          .nzad-board-input input { width: 80px; }
-          .nzad-board-total { min-width: 72px; }
+          .nzad-board-input input { width: 96px; }
         }
       `}</style>
     </div>
@@ -3502,6 +3856,33 @@ function Field({ label, v, onChange, type = "text", area, rtl, required }) {
         }
         .nzad-field input:focus, .nzad-field textarea:focus { border-color: var(--red); }
         .nzad-field textarea { resize: vertical; }
+      `}</style>
+    </div>
+  );
+}
+
+// Same shell as Field, but a fixed list. A free number input is how a hotel
+// ends up with 7 stars, or with 0 meaning "nobody filled this in" rather than
+// "non-classé" — which are different facts that used to look identical.
+function Choice({ label, v, onChange, options, required }) {
+  return (
+    <div className="nzad-field">
+      <label>
+        {label}
+        {required && <span className="nzad-req">*</span>}
+      </label>
+      <select value={v} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <style jsx>{`
+        .nzad-field label { display: block; font-size: 11.5px; font-weight: 700; color: var(--gray-400); margin-bottom: 5px; }
+        .nzad-req { color: var(--red); font-weight: 800; margin-left: 3px; }
+        .nzad-field select {
+          width: 100%; padding: 9px 12px; border: 1.5px solid var(--gray-200);
+          border-radius: var(--r-sm); font-size: 13px; outline: none;
+          font-family: inherit; background: #fff; color: var(--ink);
+        }
+        .nzad-field select:focus { border-color: var(--red); }
       `}</style>
     </div>
   );
