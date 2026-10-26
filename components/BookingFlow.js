@@ -27,8 +27,31 @@ import { setUserToken } from "../lib/accountApi";
 
 // Human label for a board code, using the i18n dictionary when present and a
 // clean English fallback otherwise. null/ROOM_ONLY -> "Room only".
+// t() does NOT return the key on a miss in production — it humanises it:
+// "bk.promo_toggle" comes back as "Promo toggle", "errors.payment.20" as "20".
+// So the pattern `t(key) !== key ? t(key) : fallback` never detects a miss,
+// and the humanised fragment gets shown as if it were copy. That is exactly
+// how a failed booking reached a customer as the single word "20": the real
+// error message was replaced by the last segment of a key that doesn't exist.
+//
+// A miss is either the raw key or its humanised last segment, compared without
+// case so it holds whichever capitalisation t() applies. The one collision is
+// an ENGLISH string that genuinely equals its own key's last word ("bk.room"
+// -> "room"): it falls back to the English fallback, which is the same text.
+function isMiss(key, value) {
+  if (value == null || value === "") return true;
+  const v = String(value).trim().toLowerCase();
+  if (v === String(key).toLowerCase()) return true;
+  const last = String(key).split(".").pop().replace(/_/g, " ").trim().toLowerCase();
+  return v === last;
+}
+function tr(t, key, fallback) {
+  const v = t(key);
+  return isMiss(key, v) ? fallback : v;
+}
+
 function boardLabel(board, t) {
-  if (!board || board === "ROOM_ONLY") return t("board.room_only") !== "board.room_only" ? t("board.room_only") : "Room only";
+  if (!board || board === "ROOM_ONLY") return tr(t, "board.room_only", "Room only");
   const map = {
     BREAKFAST: ["board.breakfast", "Breakfast"],
     HALF_BOARD: ["board.half", "Half board"],
@@ -37,8 +60,7 @@ function boardLabel(board, t) {
   };
   const [key, fallback] = map[board] || [null, board];
   if (!key) return fallback;
-  const v = t(key);
-  return v && v !== key ? v : fallback;
+  return tr(t, key, fallback);
 }
 
 export default function BookingFlow({ hotel, selections, nights, checkIn, checkOut }) {
@@ -140,6 +162,52 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
             padding: 13px 26px; border-radius: 980px; font-weight: 700;
             font-size: 14px; text-decoration: none;
           }
+        `}</style>
+      </div>
+    );
+  }
+
+  // ---- guard: hotel sold by WhatsApp only ----------------------------------
+  // Switched off in the admin ("Online booking & payment"). The hotel stays
+  // listed, but there is no checkout: the guest gets a WhatsApp message
+  // already filled with the hotel, the dates and the rooms, so the team can
+  // answer without asking for any of it again. The API refuses payment for
+  // these hotels as well — this panel is the courtesy, not the control.
+  if (hotel.onlineBooking === false) {
+    const WA = {
+      en: { title: "Book this hotel with our team", sub: "This hotel is booked directly with Allouni Travel Agency. Send us your request on WhatsApp — we'll confirm availability and the price.", cta: "Request on WhatsApp", back: "Back to the hotel", msg: "Hello, I would like to book" },
+      fr: { title: "Réservez cet hôtel avec notre équipe", sub: "Cet hôtel se réserve directement auprès d’Allouni Travel Agency. Envoyez-nous votre demande sur WhatsApp — nous confirmons la disponibilité et le prix.", cta: "Demander sur WhatsApp", back: "Retour à l’hôtel", msg: "Bonjour, je souhaite réserver" },
+      ar: { title: "احجز هذا الفندق مع فريقنا", sub: "يتم حجز هذا الفندق مباشرة عبر وكالة علوني للسفر. أرسل لنا طلبك على واتساب — سنؤكد لك التوفر والسعر.", cta: "اطلب عبر واتساب", back: "العودة إلى الفندق", msg: "مرحبا، أود حجز" },
+    }[["en", "fr", "ar"].includes(lang) ? lang : "fr"];
+    const roomsLine = sels.map((s) => s.room?.type || s.room?.typeEn || "").filter(Boolean).join(", ");
+    const text = [
+      `${WA.msg}: ${hotel.name}`,
+      checkIn && checkOut ? `${checkIn} → ${checkOut}` : "",
+      roomsLine,
+    ].filter(Boolean).join("\n");
+    const waNumber = (process.env.NEXT_PUBLIC_WHATSAPP || "213770080830").replace(/\D/g, "");
+    const waHref = `https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`;
+    return (
+      <div className="bk-missing">
+        <Icon name="whatsapp" size={40} style={{ color: "#1B8A5A" }} />
+        <h1 className="display">{WA.title}</h1>
+        <p>{WA.sub}</p>
+        <a href={waHref} target="_blank" rel="noopener noreferrer" className="bk-wa-btn">{WA.cta}</a>
+        <Link href={`/hotels/${hotel.slug}`} className="bk-wa-back">{WA.back}</Link>
+        <style jsx>{`
+          .bk-missing {
+            max-width: 480px; margin: 80px auto; padding: 0 24px; text-align: center;
+            display: flex; flex-direction: column; align-items: center; gap: 12px;
+          }
+          .bk-missing h1 { font-size: 26px; font-weight: 600; color: var(--ink); }
+          .bk-missing p { color: var(--gray-400); font-size: 15px; line-height: 1.6; }
+          .bk-wa-btn {
+            margin-top: 12px; background: #1B8A5A; color: #fff;
+            padding: 14px 28px; border-radius: 980px; font-weight: 700;
+            font-size: 14.5px; text-decoration: none;
+          }
+          .bk-wa-btn:hover { background: #15704A; }
+          .bk-wa-back { font-size: 13px; color: var(--gray-400); text-decoration: underline; }
         `}</style>
       </div>
     );
@@ -292,20 +360,24 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
   // the key string is truthy).
   function resolveErrorText(err) {
     if (!err) return "";
+    // The full error goes to the console every time. The customer-facing line
+    // hides the cause on purpose; without this, the only trace of a failed
+    // booking was a number on somebody's phone.
+    if (typeof console !== "undefined") console.error("[booking] failed:", err);
     const code = err.code;
     if (code) {
-      const paymentKey = `errors.payment.${code}`;
-      if (t(paymentKey) !== paymentKey) return t(paymentKey);
-      const dateKey = `errors.dates.${code}`;
-      if (t(dateKey) !== dateKey) return t(dateKey);
+      const byPayment = tr(t, `errors.payment.${code}`, null);
+      if (byPayment) return byPayment;
+      const byDates = tr(t, `errors.dates.${code}`, null);
+      if (byDates) return byDates;
       // SATIM_REGISTER_5, SATIM_UNREACHABLE, SATIM_NOT_CONFIGURED and friends
       // are diagnostic codes for us, never for the customer.
       if (String(code).startsWith("SATIM_")) {
-        const generic = "errors.payment.GATEWAY_GENERIC";
-        if (t(generic) !== generic) return t(generic);
+        const generic = tr(t, "errors.payment.GATEWAY_GENERIC", null);
+        if (generic) return generic;
       }
     }
-    return err.message || t("bk.err_generic");
+    return err.message || tr(t, "bk.err_generic", "We couldn't complete this booking. Please try again.");
   }
 
   async function payNow() {
@@ -342,9 +414,8 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
       // stays in its processing state forever, because setProcessing(false)
       // only runs further down after the await.
       setProcessing(false);
-      const msg = t("bk.pay_method_error");
       setBookingError({
-        message: msg && msg !== "bk.pay_method_error" ? msg : "Please choose a payment method.",
+        message: tr(t, "bk.pay_method_error", "Please choose a payment method."),
         code: "NO_PAYMENT_METHOD",
       });
       return;
@@ -359,25 +430,23 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
     // that would have failed validation anyway.
     if (!termsAccepted) {
       setProcessing(false);
-      const m = t("bk.terms_required");
       setBookingError({
-        message: m && m !== "bk.terms_required" ? m : "Please accept the terms before paying.",
+        message: tr(t, "bk.terms_required", "Please accept the terms before paying."),
         code: "TERMS_NOT_ACCEPTED",
       });
       return;
     }
     if (process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY && !captchaToken) {
       setProcessing(false);
-      const m = t("bk.captcha_required");
       setBookingError({
-        message: m && m !== "bk.captcha_required" ? m : "Please complete the captcha.",
+        message: tr(t, "bk.captcha_required", "Please complete the captcha."),
         code: "CAPTCHA_REQUIRED",
       });
       return;
     }
 
-    // t() returns the raw key on a miss, so guard with !== key rather than a
-    // || fallback (which never fires, because the key itself is truthy).
+    // Translation lookups go through tr() — see isMiss() at the top of the
+    // file for why `t(key) !== key` is not a miss test in production.
     const bookingLang = ["ar", "fr", "en"].includes(lang) ? lang : "fr";
 
     // payload shaped exactly as the backend's bookings route expects
@@ -449,7 +518,7 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
         const msg = t("bk.err_payment_init");
         setBookingError({
           message:
-            (msg && msg !== "bk.err_payment_init" ? msg : null) ||
+            (isMiss("bk.err_payment_init", msg) ? null : msg) ||
             pay.error ||
             "We could not open the payment page. Your booking is held — please try again or contact us.",
           code: pay.code || "PAYMENT_INIT_FAILED",
@@ -983,7 +1052,7 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
               <img src={room.photos?.[0] || hotel.primaryPhoto} alt={hotel.name} />
               <div>
                 <strong>{hotel.name}</strong>
-                <span>{sels.length} {sels.length === 1 ? (t("bk.room") || "room") : (t("bk.rooms") !== "bk.rooms" ? t("bk.rooms") : "rooms")}</span>
+                <span>{sels.length} {sels.length === 1 ? tr(t, "bk.room", "room") : tr(t, "bk.rooms", "rooms")}</span>
               </div>
             </div>
 
@@ -1014,7 +1083,7 @@ export default function BookingFlow({ hotel, selections, nights, checkIn, checkO
             <div className="bk-sum-prices">
               <div className="bk-sum-row">
                 <span>
-                  {sels.length} {sels.length === 1 ? (t("bk.room") || "room") : (t("bk.rooms") !== "bk.rooms" ? t("bk.rooms") : "rooms")} · {nights} {nightLabel}
+                  {sels.length} {sels.length === 1 ? tr(t, "bk.room", "room") : tr(t, "bk.rooms", "rooms")} · {nights} {nightLabel}
                 </span>
                 <span>{formatPrice(subtotal)}</span>
               </div>
