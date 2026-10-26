@@ -942,6 +942,7 @@ function HotelsManager() {
                     {h.name}
                     {!h.isActive && <span className="nzad-tag-off">Inactive</span>}
                     {h.isFeatured && <span className="nzad-tag-feat">Featured</span>}
+                    {h.onlineBooking === false && <span className="nzad-tag-wa">WhatsApp only</span>}
                   </div>
                   <div className="nzad-hotel-sub">
                     {Number(h.stars) > 0 ? "★".repeat(h.stars) : "N/C"} · {h.city} · {h.rooms?.length || 0} room types · from {fmt(h.priceFrom)}
@@ -1021,6 +1022,7 @@ function HotelsManager() {
         .nzad-hotel-sub { font-size: 12.5px; color: var(--gray-400); font-weight: 600; margin-top: 2px; }
         .nzad-tag-off { font-size: 10px; background: var(--gray-100); color: var(--gray-400); padding: 2px 7px; border-radius: 980px; font-weight: 700; }
         .nzad-tag-feat { font-size: 10px; background: var(--red-soft); color: var(--red-deep); padding: 2px 7px; border-radius: 980px; font-weight: 700; }
+        .nzad-tag-wa { font-size: 10px; background: #E7F4EC; color: #1B8A5A; padding: 2px 7px; border-radius: 980px; font-weight: 700; }
         .nzad-empty-inline { color: var(--gray-400); font-size: 13px; }
         .nzad-link-btn { background: none; border: none; color: var(--red-deep); font-weight: 700; cursor: pointer; font-family: inherit; padding: 0; text-decoration: underline; }
 
@@ -1092,7 +1094,7 @@ const BLANK_HOTEL = {
   checkInTime: "14:00", checkOutTime: "12:00", cancellationHours: 48,
   childrenAllowed: true, petsAllowed: false, parkingFree: true,
   instantConfirmation: true, verifiedPartner: true,
-  isActive: true, isFeatured: false,
+  isActive: true, isFeatured: false, onlineBooking: true,
   tags: [],
 };
 
@@ -1116,6 +1118,7 @@ function hotelPayload(h) {
     instantConfirmation: h.trustSignals?.instantConfirmation ?? h.instantConfirmation ?? true,
     verifiedPartner: h.trustSignals?.verifiedPartner ?? h.verifiedPartner ?? true,
     isFeatured: h.isFeatured ?? false,
+    onlineBooking: h.onlineBooking ?? true,
     tags: Array.isArray(h.tags) ? h.tags : [],
   };
 }
@@ -1170,6 +1173,7 @@ function HotelEditor({ hotel, onClose, onSaved }) {
       verifiedPartner: hotel.trustSignals?.verifiedPartner ?? hotel.verifiedPartner ?? true,
       isActive: hotel.isActive ?? true,
       isFeatured: hotel.isFeatured ?? false,
+      onlineBooking: hotel.onlineBooking ?? true,
       tags: Array.isArray(hotel.tags) ? hotel.tags : [],
     };
   });
@@ -1295,6 +1299,9 @@ function HotelEditor({ hotel, onClose, onSaved }) {
           <Toggle label="Verified partner" v={form.verifiedPartner} onChange={(v) => set("verifiedPartner", v)} />
           <Toggle label="Active (visible on site)" v={form.isActive} onChange={(v) => set("isActive", v)} />
           <Toggle label="Featured on homepage" v={form.isFeatured} onChange={(v) => set("isFeatured", v)} />
+          {/* Off = the hotel stays listed, but guests reach it through
+              WhatsApp instead of booking and paying online. */}
+          <Toggle label="Online booking & payment" v={form.onlineBooking} onChange={(v) => set("onlineBooking", v)} />
         </div>
 
         <TagsPicker
@@ -1467,6 +1474,42 @@ function translateRoomType(en) {
   return { fr: frCase(frParts).join(" "), ar: arParts.join(" ") };
 }
 
+// The room vocabulary. Unlike beds, room names are open-ended — a hotel can
+// legitimately sell a "Deluxe Double Sea View" — so this is a chooser, not a
+// replacement: picking one fills all three language fields from a checked
+// table, and they stay editable afterwards for anything not listed.
+const ROOM_TYPES = [
+  { en: "Single Room",        fr: "Chambre simple",        ar: "غرفة فردية" },
+  { en: "Double Room",        fr: "Chambre double",        ar: "غرفة مزدوجة" },
+  { en: "Twin Room",          fr: "Chambre twin",          ar: "غرفة بسريرين" },
+  { en: "Triple Room",        fr: "Chambre triple",        ar: "غرفة ثلاثية" },
+  { en: "Quadruple Room",     fr: "Chambre quadruple",     ar: "غرفة رباعية" },
+  { en: "Family Room",        fr: "Chambre familiale",     ar: "غرفة عائلية" },
+  { en: "Standard Room",      fr: "Chambre standard",      ar: "غرفة قياسية" },
+  { en: "Superior Room",      fr: "Chambre supérieure",    ar: "غرفة ممتازة" },
+  { en: "Deluxe Room",        fr: "Chambre deluxe",        ar: "غرفة فاخرة" },
+  { en: "Sea View Room",      fr: "Chambre vue mer",       ar: "غرفة مطلة على البحر" },
+  { en: "Suite",              fr: "Suite",                 ar: "جناح" },
+  { en: "Junior Suite",       fr: "Suite junior",          ar: "جناح صغير" },
+  { en: "Executive Suite",    fr: "Suite exécutive",       ar: "جناح تنفيذي" },
+  { en: "Presidential Suite", fr: "Suite présidentielle",  ar: "جناح رئاسي" },
+  { en: "Studio",             fr: "Studio",                ar: "استوديو" },
+  { en: "Apartment",          fr: "Appartement",           ar: "شقة" },
+  { en: "Bungalow",           fr: "Bungalow",              ar: "بنغالو" },
+  { en: "Chalet",             fr: "Chalet",                ar: "شاليه" },
+];
+// Blank first, labelled as the free option: a room that is none of these must
+// stay typeable rather than be forced into the nearest match.
+const ROOM_TYPE_OPTIONS = [{ value: "", label: "— Autre / type libre —" }].concat(
+  ROOM_TYPES.map((r) => ({ value: r.en, label: `${r.en}  ·  ${r.fr}  ·  ${r.ar}` }))
+);
+// Which option a room currently matches, so an existing room opens on its own
+// entry instead of on the blank one.
+function roomTypeValue(typeEn) {
+  const hit = ROOM_TYPES.find((r) => r.en.toLowerCase() === String(typeEn || "").trim().toLowerCase());
+  return hit ? hit.en : "";
+}
+
 // The bed vocabulary. A free-text field produced "King", "king size", "lit
 // king" and "سرير كبير" for the same bed, which no filter or translation can
 // ever reconcile. The stored value is the English one — that is what the
@@ -1509,7 +1552,9 @@ const STANDARD_ROOMS = [
   { key: "double", typeEn: "Double Room", capacity: 2, bedType: "Double Bed", sizeSqm: 22 },
   { key: "triple", typeEn: "Triple Room", capacity: 3, bedType: "Double Bed", sizeSqm: 28 },
 ].map((r) => {
-  const t = translateRoomType(r.typeEn);
+  // From the checked table, not the translator, so the standards a hotel
+  // starts with are exactly the standards the dropdown offers.
+  const t = ROOM_TYPES.find((x) => x.en === r.typeEn);
   return { ...r, typeFr: t.fr, typeAr: t.ar, basePrice: "", totalUnits: 1 };
 });
 
@@ -1545,6 +1590,16 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
       return next;
     });
   };
+
+  // Picking a standard type writes all three languages at once and marks them
+  // as set by hand, so the English-to-French translator does not then overwrite
+  // the checked Arabic with its own guess.
+  function pickRoomType(v) {
+    const hit = ROOM_TYPES.find((r) => r.en === v);
+    if (!hit) return;
+    setTrTouched({ fr: true, ar: true });
+    setDraft((d) => ({ ...d, typeEn: hit.en, typeFr: hit.fr, typeAr: hit.ar }));
+  }
 
   function resetDraft() {
     setDraft(BLANK_ROOM);
@@ -1712,6 +1767,12 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
       {adding && (
         <div className="nzad-room-form">
           <div className="nzad-grid3">
+            <Choice
+              label="Room type"
+              v={roomTypeValue(draft.typeEn)}
+              onChange={(v) => pickRoomType(v)}
+              options={ROOM_TYPE_OPTIONS}
+            />
             <Field label="Type (EN)" v={draft.typeEn} onChange={(v) => set("typeEn", v)} />
             <Field label="Type (FR)" v={draft.typeFr} onChange={(v) => set("typeFr", v)} />
             <Field label="Type (AR)" v={draft.typeAr} onChange={(v) => set("typeAr", v)} rtl />
@@ -1896,6 +1957,17 @@ function RoomCard({ room, onDelete, onRoomChange }) {
         <div className="nzad-room-edit">
           {editErr && <div className="nzad-room-edit-err">{editErr}</div>}
           <div className="nzad-redit-grid">
+            <Choice
+              label="Room type"
+              v={roomTypeValue(draft.typeEn)}
+              onChange={(v) => {
+                const hit = ROOM_TYPES.find((r) => r.en === v);
+                if (!hit) return;
+                setTrTouched({ fr: true, ar: true });
+                setDraft((d) => ({ ...d, typeEn: hit.en, typeFr: hit.fr, typeAr: hit.ar }));
+              }}
+              options={ROOM_TYPE_OPTIONS}
+            />
             <Field label="Type (EN)" v={draft.typeEn} onChange={(v) => setD("typeEn", v)} />
             <Field label="Type (FR)" v={draft.typeFr} onChange={(v) => setD("typeFr", v)} />
             <Field label="Type (AR)" v={draft.typeAr} onChange={(v) => setD("typeAr", v)} rtl />
