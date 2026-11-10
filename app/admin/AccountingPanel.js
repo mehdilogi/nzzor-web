@@ -47,7 +47,7 @@ function monthRange(offset) {
 }
 
 function toCsv(rows) {
-  const head = ["Reference", "Hotel", "Client", "Arrivee", "Depart", "Nuits", "Paiement", "Encaisse par", "Brut (DA)", "Commission (%)", "Commission (DA)", "Net hotel (DA)", "Regle", "Date reglement", "Ref reglement"];
+  const head = ["Reference", "Hotel", "Client", "Arrivee", "Depart", "Nuits", "Paiement", "Encaisse par", "Brut (DA)", "Base commission", "Commission (DA)", "Net hotel (DA)", "Regle", "Date reglement", "Ref reglement"];
   const q = (v) => {
     const s = String(v == null ? "" : v);
     return /[",;\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -55,7 +55,7 @@ function toCsv(rows) {
   const lines = rows.map((l) => [
     l.reference, l.hotelName, l.guest, fmtDate(l.checkIn), fmtDate(l.checkOut), l.nights,
     METHOD[l.paymentMethod] || l.paymentMethod, l.collectedBy === "NZZOR" ? "Nzzor" : "Hotel",
-    l.gross, l.rate, l.commission, l.net, l.settled ? "Oui" : "Non", fmtDate(l.hotelPaidAt), l.hotelPayoutRef || "",
+    l.gross, l.basis, l.commission, l.net, l.settled ? "Oui" : "Non", fmtDate(l.hotelPaidAt), l.hotelPayoutRef || "",
   ].map(q).join(";"));
   // BOM so Excel opens accents correctly; semicolons for French Excel.
   return "﻿" + [head.join(";"), ...lines].join("\n");
@@ -151,13 +151,27 @@ export default function AccountingPanel() {
     } catch (e) { setErr(e.message); }
     setBusy(false);
   }
+  // Draft per hotel: { type, value }. Type is PERCENT or FIXED_PER_NIGHT.
+  function draftOf(h) {
+    const d = rateDraft[h.id];
+    if (d) return d;
+    return h.commissionType === "FIXED_PER_NIGHT"
+      ? { type: "FIXED_PER_NIGHT", value: h.commissionFixed }
+      : { type: "PERCENT", value: h.commissionRate };
+  }
+  function setDraft(h, patch) {
+    setRateDraft((all) => ({ ...all, [h.id]: { ...draftOf(h), ...patch } }));
+  }
   async function saveRate(id) {
-    const v = rateDraft[id];
-    if (v === undefined || v === "") return;
+    const d = rateDraft[id];
+    if (!d || d.value === "" || d.value === undefined) return;
     setErr("");
     try {
-      const h = await call("/hotels/" + id + "/commission", { method: "PATCH", body: JSON.stringify({ commissionRate: Number(v) }) });
-      setRates((rs) => rs.map((r) => (r.id === id ? { ...r, commissionRate: h.commissionRate } : r)));
+      const body = d.type === "FIXED_PER_NIGHT"
+        ? { commissionType: "FIXED_PER_NIGHT", commissionFixed: Number(d.value) }
+        : { commissionType: "PERCENT", commissionRate: Number(d.value) };
+      const h = await call("/hotels/" + id + "/commission", { method: "PATCH", body: JSON.stringify(body) });
+      setRates((rs) => rs.map((r) => (r.id === id ? { ...r, ...h } : r)));
       setRateDraft((d) => { const n = { ...d }; delete n[id]; return n; });
       setMsg("Commission mise à jour.");
       load();
@@ -202,7 +216,7 @@ export default function AccountingPanel() {
           <option value="yes">Settled only</option>
         </select>
         <button className="acc-btn ghost" onClick={() => setShowRates(!showRates)}>
-          {showRates ? "Hide commission rates" : "Commission rates"}
+          {showRates ? "Hide commission terms" : "Commission terms"}
         </button>
         <button className="acc-btn ghost" onClick={exportCsv} disabled={!lines.length}>Export CSV</button>
       </div>
@@ -212,19 +226,30 @@ export default function AccountingPanel() {
 
       {showRates && (
         <section className="acc-card">
-          <h2>Commission rates</h2>
-          <p className="acc-sub">Percent of the gross Nzzor keeps, per hotel. Applies to every booking not yet settled; settled bookings keep the rate they were settled at.</p>
+          <h2>Commission per hotel</h2>
+          <p className="acc-sub">Either a percent of the gross, or a fixed amount per room per night. Applies to every booking not yet settled; settled bookings keep the terms they were settled at.</p>
           <div className="acc-rates">
             {rates.map((h) => (
               <div key={h.id} className="acc-rate">
                 <span className="acc-rate-name">{h.nameFr || h.nameEn}{h.isActive ? "" : " (inactive)"}</span>
+                <select
+                  value={draftOf(h).type}
+                  onChange={(e) => setDraft(h, {
+                    type: e.target.value,
+                    value: e.target.value === "FIXED_PER_NIGHT" ? h.commissionFixed : h.commissionRate,
+                  })}
+                >
+                  <option value="PERCENT">%</option>
+                  <option value="FIXED_PER_NIGHT">DA / night</option>
+                </select>
                 <input
-                  type="number" min="0" max="50" step="0.5"
-                  value={rateDraft[h.id] !== undefined ? rateDraft[h.id] : h.commissionRate}
-                  onChange={(e) => setRateDraft({ ...rateDraft, [h.id]: e.target.value })}
+                  type="number" min="0"
+                  max={draftOf(h).type === "PERCENT" ? 50 : 100000}
+                  step={draftOf(h).type === "PERCENT" ? 0.5 : 50}
+                  value={draftOf(h).value}
+                  onChange={(e) => setDraft(h, { value: e.target.value })}
                   onKeyDown={(e) => { if (e.key === "Enter") saveRate(h.id); }}
                 />
-                <span className="acc-pct">%</span>
                 <button className="acc-btn small" onClick={() => saveRate(h.id)} disabled={rateDraft[h.id] === undefined}>Save</button>
               </div>
             ))}
@@ -242,7 +267,7 @@ export default function AccountingPanel() {
           <div className="acc-kpi red">
             <span>Nzzor commission</span>
             <strong>{fmt(s.commission)}</strong>
-            <em>{s.gross ? ((s.commission / s.gross) * 100).toFixed(1) : "0"} % of gross</em>
+            <em>{s.gross ? ((s.commission / s.gross) * 100).toFixed(1) : "0"} % of gross on average</em>
           </div>
           <div className="acc-kpi">
             <span>Nzzor owes hotels</span>
@@ -262,13 +287,13 @@ export default function AccountingPanel() {
           <h2>Balance per hotel</h2>
           <table className="acc-table">
             <thead>
-              <tr><th>Hotel</th><th className="r">Rate</th><th className="r">Bookings</th><th className="r">Gross</th><th className="r">Commission</th><th className="r">Balance</th><th></th></tr>
+              <tr><th>Hotel</th><th className="r">Commission</th><th className="r">Bookings</th><th className="r">Gross</th><th className="r">Commission</th><th className="r">Balance</th><th></th></tr>
             </thead>
             <tbody>
               {data.hotels.map((h) => (
                 <tr key={h.hotelId}>
                   <td>{h.hotelName}</td>
-                  <td className="r">{h.rate} %</td>
+                  <td className="r">{h.terms}</td>
                   <td className="r">{h.count}</td>
                   <td className="r">{fmt(h.gross)}</td>
                   <td className="r">{fmt(h.commission)}</td>
@@ -346,7 +371,7 @@ export default function AccountingPanel() {
                       <span className={"acc-by " + (l.collectedBy === "NZZOR" ? "n" : "h")}>{l.collectedBy === "NZZOR" ? "Nzzor holds" : "Hotel holds"}</span>
                     </td>
                     <td className="r">{fmt(l.gross)}</td>
-                    <td className="r">{fmt(l.commission)}<span className="acc-rt">{l.rate} %{l.rateFrozen ? " · frozen" : ""}</span></td>
+                    <td className="r">{fmt(l.commission)}<span className="acc-rt">{l.basis}{l.rateFrozen ? " · frozen" : ""}</span></td>
                     <td className="r">{fmt(l.net)}</td>
                     <td>
                       {l.settled
@@ -391,8 +416,8 @@ export default function AccountingPanel() {
         .acc-rates { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 8px 24px; }
         .acc-rate { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--gray-100); }
         .acc-rate-name { flex: 1; font-size: 13px; }
-        .acc-rate input { width: 70px; height: 30px; border: 1px solid var(--gray-200); border-radius: var(--r-sm); padding: 0 8px; font-family: inherit; text-align: right; }
-        .acc-pct { font-size: 13px; color: var(--gray-400); }
+        .acc-rate select { height: 30px; border: 1px solid var(--gray-200); border-radius: var(--r-sm); padding: 0 6px; font-family: inherit; font-size: 12px; background: #fff; }
+        .acc-rate input { width: 84px; height: 30px; border: 1px solid var(--gray-200); border-radius: var(--r-sm); padding: 0 8px; font-family: inherit; text-align: right; }
         .acc-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         .acc-bar h2 { margin: 0; }
         .acc-bar-actions { display: flex; gap: 8px; }
