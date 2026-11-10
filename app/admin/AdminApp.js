@@ -3327,6 +3327,32 @@ function BookingDetailPanel({ id, onClose, onChanged }) {
     } catch (e) { setErr(e.message); }
     setBusy(false);
   }
+  // Resend the customer's voucher email and the hotel notification. Called
+  // directly rather than through lib/adminApi so this ships as one file; same
+  // base URL and token as every other admin call.
+  const [resendMsg, setResendMsg] = useState("");
+  async function resendConfirmation() {
+    setBusy(true);
+    setResendMsg("");
+    setErr("");
+    try {
+      const base = process.env.NEXT_PUBLIC_API_URL || "https://api.nzzor.com";
+      const res = await fetch(base + "/api/admin/bookings/" + id + "/resend-confirmation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + getToken() },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Could not resend (HTTP " + res.status + ")");
+      const d = json.data || {};
+      setResendMsg(
+        (d.guestSent ? "Voucher sent to the guest" : "Voucher NOT sent to the guest") +
+        " · " +
+        (d.hotelSent ? "hotel notified" : "hotel NOT notified")
+      );
+    } catch (e) { setErr(e.message); }
+    setBusy(false);
+  }
+
   async function reject() {
     if (!window.confirm("Reject this booking? The guest will need to be refunded.")) return;
     setBusy(true);
@@ -3412,6 +3438,15 @@ function BookingDetailPanel({ id, onClose, onChanged }) {
                 <button className="bd-confirm" onClick={confirm} disabled={busy}>Confirm booking</button>
               </div>
             )}
+
+            {b.status === "CONFIRMED" && (
+              <div className="bd-actions">
+                {resendMsg && <span className="bd-resend-msg">{resendMsg}</span>}
+                <button className="bd-confirm" onClick={resendConfirmation} disabled={busy}>
+                  {busy ? "Sending…" : "Resend voucher & hotel notification"}
+                </button>
+              </div>
+            )}
           </>
         )}
 
@@ -3450,6 +3485,7 @@ function BookingDetailPanel({ id, onClose, onChanged }) {
             font-size: 14px; font-weight: 700; font-family: inherit;
           }
           .bd-confirm { background: var(--teal); color: #fff; }
+          .bd-resend-msg { align-self: center; margin-right: auto; font-size: 13px; font-weight: 600; color: var(--ink-2); }
           .bd-reject { background: var(--red-soft); color: var(--red-deep); }
           .bd-confirm:disabled, .bd-reject:disabled { opacity: 0.6; cursor: default; }
           @media (max-width: 640px) {
