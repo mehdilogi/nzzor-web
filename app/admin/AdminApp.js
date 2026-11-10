@@ -1651,7 +1651,10 @@ function RoomsPanel({ hotelId, initialRooms, refresh }) {
         capacity: Number(draft.capacity),
         sizeSqm: Number(draft.sizeSqm),
         basePrice: Number(draft.basePrice),
-        totalUnits: Number(draft.totalUnits),
+        // A blank "Number of rooms" used to save as 0 (Number("") === 0),
+        // which made the room permanently unavailable: every booking became an
+        // unpayable on-request. Blank now means 1; an explicit 0 still closes it.
+        totalUnits: String(draft.totalUnits ?? "").trim() === "" ? 1 : Number(draft.totalUnits),
       };
       await adminAddRoom(hotelId, payload);
       resetDraft();
@@ -1912,7 +1915,10 @@ function RoomCard({ room, onDelete, onRoomChange }) {
         capacity: Number(draft.capacity),
         sizeSqm: Number(draft.sizeSqm),
         basePrice: Number(draft.basePrice),
-        totalUnits: Number(draft.totalUnits),
+        // A blank "Number of rooms" used to save as 0 (Number("") === 0),
+        // which made the room permanently unavailable: every booking became an
+        // unpayable on-request. Blank now means 1; an explicit 0 still closes it.
+        totalUnits: String(draft.totalUnits ?? "").trim() === "" ? 1 : Number(draft.totalUnits),
       };
       const result = await adminUpdateRoom(room.id, payload);
       // The PUT returns the updated room (without its photos include), so
@@ -1930,7 +1936,14 @@ function RoomCard({ room, onDelete, onRoomChange }) {
       <div className="nzad-room-head">
         <div className="nzad-room-meta">
           <strong>{displayName}</strong>
-          <span>· {room.capacity} guests · {room.bedType} · {fmt(room.basePrice ?? room.price)}/night</span>
+          <span>· {room.capacity} guests · {room.bedType} · {fmt(room.basePrice ?? room.price)}/night{room.totalUnits != null ? " · " : ""}</span>
+          {/* Room count on the row: a room saved with 0 can never be booked
+              online, and that used to be invisible until a customer hit it. */}
+          {room.totalUnits != null && <span style={{ color: Number(room.totalUnits) > 0 ? "inherit" : "#E63946", fontWeight: Number(room.totalUnits) > 0 ? 400 : 700 }}>
+            {Number(room.totalUnits) > 0
+              ? room.totalUnits + (Number(room.totalUnits) === 1 ? " room" : " rooms")
+              : "0 rooms — not bookable"}
+          </span>}
         </div>
         <div className="nzad-room-actions">
           <button
