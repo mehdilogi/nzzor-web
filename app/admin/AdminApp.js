@@ -14,6 +14,7 @@ import {
   adminUsers, adminUserDetail,
 } from "../../lib/adminApi";
 import AnalyticsPanel from "./AnalyticsPanel";
+import AccountingPanel from "./AccountingPanel";
 import HotelMapPicker from "./HotelMapPicker";
 
 const fmt = (n) => Number(n || 0).toLocaleString("en") + " DZD";
@@ -174,6 +175,7 @@ function Dashboard({ user, onLogout }) {
             ["analytics", "Analytics"],
             ["hotels", "Hotels"],
             ["bookings", "Bookings"],
+            ["accounting", "Accounting"],
             ["customers", "Customers"],
           ].map(([k, label]) => (
             <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
@@ -195,6 +197,7 @@ function Dashboard({ user, onLogout }) {
         {tab === "analytics" && <AnalyticsPanel />}
         {tab === "hotels" && <HotelsManager />}
         {tab === "bookings" && <BookingsManager />}
+        {tab === "accounting" && <AccountingPanel />}
         {tab === "customers" && <CustomersManager />}
       </main>
 
