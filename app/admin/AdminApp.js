@@ -661,6 +661,7 @@ const BLANK_FILTERS = {
   contract: "",     // "" = both; "yes" = contract; "no" = WhatsApp only
   featured: false,  // true = only featured
   hasRooms: false,  // true = only hotels with at least one room
+  noPhoto: false,   // true = only hotels with no photo yet (to fix first)
 };
 
 function loadStoredFilters() {
@@ -816,6 +817,7 @@ function HotelsManager() {
       if (filters.contract === "no" && h.onlineBooking !== false) return false;
       if (filters.featured && !h.isFeatured) return false;
       if (filters.hasRooms && !(h.rooms && h.rooms.length > 0)) return false;
+      if (filters.noPhoto && h.primaryPhoto) return false;
       return true;
     });
   }, [hotels, filters]);
@@ -829,7 +831,8 @@ function HotelsManager() {
     filters.status !== "all" ||
     Boolean(filters.contract) ||
     filters.featured ||
-    filters.hasRooms;
+    filters.hasRooms ||
+    Boolean(filters.noPhoto);
 
   function setFilter(patch) { setFilters((f) => ({ ...f, ...patch })); }
   function clearFilters() { setFilters(BLANK_FILTERS); }
@@ -921,6 +924,12 @@ function HotelsManager() {
                 className={`nzad-pill ${filters.featured ? "on" : ""}`}
                 onClick={() => setFilter({ featured: !filters.featured })}
               >Featured only</button>
+
+              <button
+                className={`nzad-pill ${filters.noPhoto ? "on" : ""}`}
+                onClick={() => setFilter({ noPhoto: !filters.noPhoto })}
+                title="Hotels with no photo yet"
+              >No photo</button>
 
               <button
                 className={`nzad-pill ${filters.hasRooms ? "on" : ""}`}
