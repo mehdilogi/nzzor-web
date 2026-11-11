@@ -14,7 +14,7 @@ export default function Page() {
   return (
     <>
       <Nav />
-      <InfoPage content={CONTACT} />
+      <InfoPage content={CONTACT} pattern />
       <Footer />
       <WhatsAppButton />
     </>
