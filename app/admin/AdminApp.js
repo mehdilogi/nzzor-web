@@ -658,6 +658,7 @@ const BLANK_FILTERS = {
   // coercion on read below turns a legacy 0 back into "".
   stars: "",        // "" = any; "nc" = non-classé; "3" | "4" | "5" = exact
   status: "all",    // "all" | "active" | "inactive"
+  contract: "",     // "" = both; "yes" = contract; "no" = WhatsApp only
   featured: false,  // true = only featured
   hasRooms: false,  // true = only hotels with at least one room
 };
@@ -716,6 +717,19 @@ function HotelsManager() {
       await adminDeleteHotel(h.id);
       setConfirmId(null);
       load();
+    } catch (e) { setRowErr(e.message); }
+    finally { setRowBusy(null); }
+  }
+
+  // One click from the list: switch a hotel between contract (online booking
+  // + SATIM) and no contract (WhatsApp). Saves through the same endpoint as
+  // the editor, with the full payload so nothing else on the hotel changes.
+  async function toggleContract(h) {
+    setRowErr(""); setRowBusy("c" + h.id);
+    try {
+      const detail = await adminHotel(h.id);
+      await adminUpdateHotel(h.id, { ...hotelPayload(detail), onlineBooking: h.onlineBooking === false });
+      setHotels((list) => list.map((x) => (x.id === h.id ? { ...x, onlineBooking: h.onlineBooking === false } : x)));
     } catch (e) { setRowErr(e.message); }
     finally { setRowBusy(null); }
   }
@@ -798,6 +812,8 @@ function HotelsManager() {
       if (filters.stars && filters.stars !== "nc" && Number(h.stars) !== Number(filters.stars)) return false;
       if (filters.status === "active"   && !h.isActive) return false;
       if (filters.status === "inactive" &&  h.isActive) return false;
+      if (filters.contract === "yes" && h.onlineBooking === false) return false;
+      if (filters.contract === "no" && h.onlineBooking !== false) return false;
       if (filters.featured && !h.isFeatured) return false;
       if (filters.hasRooms && !(h.rooms && h.rooms.length > 0)) return false;
       return true;
@@ -811,6 +827,7 @@ function HotelsManager() {
     filters.city !== "" ||
     filters.stars !== "" ||
     filters.status !== "all" ||
+    Boolean(filters.contract) ||
     filters.featured ||
     filters.hasRooms;
 
@@ -867,6 +884,17 @@ function HotelsManager() {
                 <option value="all">All statuses</option>
                 <option value="active">Active only</option>
                 <option value="inactive">Inactive only</option>
+              </select>
+
+              <select
+                className="nzad-filter-select"
+                value={filters.contract || ""}
+                onChange={(e) => setFilter({ contract: e.target.value })}
+                aria-label="Filter by contract"
+              >
+                <option value="">Contract and no contract</option>
+                <option value="yes">Contract (online booking)</option>
+                <option value="no">No contract (WhatsApp)</option>
               </select>
             </div>
 
@@ -945,7 +973,9 @@ function HotelsManager() {
                     {h.name}
                     {!h.isActive && <span className="nzad-tag-off">Inactive</span>}
                     {h.isFeatured && <span className="nzad-tag-feat">Featured</span>}
-                    {h.onlineBooking === false && <span className="nzad-tag-wa">WhatsApp only</span>}
+                    {h.onlineBooking === false
+                      ? <span className="nzad-tag-wa">No contract · WhatsApp</span>
+                      : <span className="nzad-tag-ct">Contract</span>}
                   </div>
                   <div className="nzad-hotel-sub">
                     {Number(h.stars) > 0 ? "★".repeat(h.stars) : "N/C"} · {h.city} · {h.rooms?.length || 0} room types · from {fmt(h.priceFrom)}
@@ -961,6 +991,14 @@ function HotelsManager() {
                   </div>
                 ) : (
                   <div className="nzad-row-actions">
+                    <button
+                      className="nzad-btn-ghost"
+                      disabled={rowBusy === "c" + h.id}
+                      onClick={() => toggleContract(h)}
+                      title={h.onlineBooking === false ? "Turn on: online booking and SATIM payment" : "Turn off: send guests to WhatsApp"}
+                    >
+                      {rowBusy === "c" + h.id ? "Saving…" : h.onlineBooking === false ? "Set contract" : "Remove contract"}
+                    </button>
                     <button
                       className="nzad-btn-ghost"
                       disabled={openingId === h.id}
@@ -1025,6 +1063,7 @@ function HotelsManager() {
         .nzad-hotel-sub { font-size: 12.5px; color: var(--gray-400); font-weight: 600; margin-top: 2px; }
         .nzad-tag-off { font-size: 10px; background: var(--gray-100); color: var(--gray-400); padding: 2px 7px; border-radius: 980px; font-weight: 700; }
         .nzad-tag-feat { font-size: 10px; background: var(--red-soft); color: var(--red-deep); padding: 2px 7px; border-radius: 980px; font-weight: 700; }
+        .nzad-tag-ct { font-size: 10px; background: #FDECEE; color: #C42A36; padding: 2px 7px; border-radius: 980px; font-weight: 700; }
         .nzad-tag-wa { font-size: 10px; background: #E7F4EC; color: #1B8A5A; padding: 2px 7px; border-radius: 980px; font-weight: 700; }
         .nzad-empty-inline { color: var(--gray-400); font-size: 13px; }
         .nzad-link-btn { background: none; border: none; color: var(--red-deep); font-weight: 700; cursor: pointer; font-family: inherit; padding: 0; text-decoration: underline; }
@@ -1097,7 +1136,8 @@ const BLANK_HOTEL = {
   checkInTime: "14:00", checkOutTime: "12:00", cancellationHours: 48,
   childrenAllowed: true, petsAllowed: false, parkingFree: true,
   instantConfirmation: true, verifiedPartner: true,
-  isActive: true, isFeatured: false, onlineBooking: true,
+  // New hotels start without a contract: listed, booked over WhatsApp.
+  isActive: true, isFeatured: false, onlineBooking: false,
   tags: [],
 };
 
@@ -1302,9 +1342,10 @@ function HotelEditor({ hotel, onClose, onSaved }) {
           <Toggle label="Verified partner" v={form.verifiedPartner} onChange={(v) => set("verifiedPartner", v)} />
           <Toggle label="Active (visible on site)" v={form.isActive} onChange={(v) => set("isActive", v)} />
           <Toggle label="Featured on homepage" v={form.isFeatured} onChange={(v) => set("isFeatured", v)} />
-          {/* Off = the hotel stays listed, but guests reach it through
-              WhatsApp instead of booking and paying online. */}
-          <Toggle label="Online booking & payment" v={form.onlineBooking} onChange={(v) => set("onlineBooking", v)} />
+          {/* On  = contract with Nzzor: online booking + CIB/Edahabia via SATIM.
+              Off = no contract: the hotel stays listed, guests book and pay
+              through WhatsApp. */}
+          <Toggle label="Contract with Nzzor (online booking & SATIM payment)" v={form.onlineBooking} onChange={(v) => set("onlineBooking", v)} />
         </div>
 
         <TagsPicker
