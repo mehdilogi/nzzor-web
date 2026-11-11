@@ -22,6 +22,70 @@ function groupOptionsByRoom(options) {
   return Array.from(byRoom.values());
 }
 
+// Inline copy for the strings this page owned in English. A missing dictionary
+// key humanises into English in production ("Tab location"), so these never go
+// through t(). Three languages, French as the fallback.
+const TX = {
+  fr: {
+    overview: "Aperçu", location: "Emplacement", rooms: "Chambres", amenities: "Équipements", policies: "Conditions",
+    all_meals: "Toutes formules", night: "nuit", nights: "nuits", guest: "voyageur", guests: "voyageurs",
+    breakfast: "Petit-déjeuner inclus", total_stay: "total du séjour", select: "Choisir", selected: "Choisie ✓",
+    cart: (n, q) => `Votre réservation · ${n} sur ${q} chambre${q > 1 ? "s" : ""}`,
+    cart_empty: "Touchez « Choisir » sur un tarif pour ajouter une chambre.",
+    book_now: "Réserver", on_request: "Sur demande", loading: "Chargement des tarifs…",
+    too_small: (c, g) => `${c} pers. max · trop petite pour ${g}`,
+    cap_one: (c, g) => `Cette chambre accueille ${c} pers., vous êtes ${g}. Choisissez une chambre plus grande.`,
+    cap_many: (c, g) => `Vos chambres accueillent ${c} pers., vous êtes ${g}. Ajoutez une chambre ou prenez-en une plus grande.`,
+    check_in: "Arrivée", check_out: "Départ", rooms_n: "chambres", your_selection: "Votre sélection", from: "À partir de",
+    pick_dates: "Choisissez vos dates pour voir les tarifs et les formules.",
+    wa_head: "Réservation via WhatsApp",
+    wa_body: "Cet hôtel n'est pas encore réservable en ligne. Notre équipe le réserve pour vous et vous confirme le prix sur WhatsApp.",
+    wa_cta: "Réserver via WhatsApp", wa_room: "Demander cette chambre",
+    wa_steps: ["Envoyez-nous vos dates", "Nous vérifions et confirmons le prix", "Vous payez, nous vous envoyons le bon"],
+    wa_rooms_note: "Prix et disponibilité confirmés par notre équipe sur WhatsApp.",
+    wa_msg: (h, c, ci, co, g, r) => `Bonjour Nzzor, je souhaite réserver ${h} (${c})${r ? ` — ${r}` : ""}, du ${ci} au ${co}, pour ${g} personne(s).`,
+  },
+  en: {
+    overview: "Overview", location: "Location", rooms: "Rooms", amenities: "Amenities", policies: "Policies",
+    all_meals: "All meal plans", night: "night", nights: "nights", guest: "guest", guests: "guests",
+    breakfast: "Breakfast included", total_stay: "total stay", select: "Select", selected: "Selected ✓",
+    cart: (n, q) => `Your booking · ${n} of ${q} room${q > 1 ? "s" : ""}`,
+    cart_empty: "Tap Select on a rate to add a room.",
+    book_now: "Book", on_request: "On request", loading: "Loading rates…",
+    too_small: (c, g) => `Sleeps ${c} · too small for ${g}`,
+    cap_one: (c, g) => `This room sleeps ${c}, but you are ${g}. Please choose a larger room.`,
+    cap_many: (c, g) => `Your rooms sleep ${c}, but you are ${g}. Add a room or pick a larger one.`,
+    check_in: "Check in", check_out: "Check out", rooms_n: "rooms", your_selection: "Your selection", from: "From",
+    pick_dates: "Choose your dates to see rates and meal plans.",
+    wa_head: "Booked via WhatsApp",
+    wa_body: "This hotel can't be booked online yet. Our team books it for you and confirms the price on WhatsApp.",
+    wa_cta: "Book via WhatsApp", wa_room: "Ask for this room",
+    wa_steps: ["Send us your dates", "We check and confirm the price", "You pay, we send your voucher"],
+    wa_rooms_note: "Price and availability confirmed by our team on WhatsApp.",
+    wa_msg: (h, c, ci, co, g, r) => `Hello Nzzor, I'd like to book ${h} (${c})${r ? ` — ${r}` : ""}, from ${ci} to ${co}, for ${g} guest(s).`,
+  },
+  ar: {
+    overview: "نظرة عامة", location: "الموقع", rooms: "الغرف", amenities: "المرافق", policies: "الشروط",
+    all_meals: "كل الصيغ", night: "ليلة", nights: "ليالٍ", guest: "شخص", guests: "أشخاص",
+    breakfast: "الإفطار مشمول", total_stay: "مجموع الإقامة", select: "اختيار", selected: "تم الاختيار ✓",
+    cart: (n, q) => `حجزك · ${n} من ${q} غرفة`,
+    cart_empty: "اضغط «اختيار» على سعر لإضافة غرفة.",
+    book_now: "احجز", on_request: "حسب الطلب", loading: "جارٍ تحميل الأسعار…",
+    too_small: (c, g) => `تتسع لـ ${c} · صغيرة على ${g}`,
+    cap_one: (c, g) => `هذه الغرفة تتسع لـ ${c} وأنتم ${g}. اختر غرفة أكبر.`,
+    cap_many: (c, g) => `غرفك تتسع لـ ${c} وأنتم ${g}. أضف غرفة أو اختر غرفة أكبر.`,
+    check_in: "الوصول", check_out: "المغادرة", rooms_n: "غرف", your_selection: "اختيارك", from: "ابتداءً من",
+    pick_dates: "اختر تواريخك لرؤية الأسعار والصيغ.",
+    wa_head: "الحجز عبر واتساب",
+    wa_body: "هذا الفندق غير متاح للحجز عبر الإنترنت بعد. فريقنا يحجزه لك ويؤكد السعر عبر واتساب.",
+    wa_cta: "احجز عبر واتساب", wa_room: "اطلب هذه الغرفة",
+    wa_steps: ["أرسل لنا تواريخك", "نتحقق ونؤكد السعر", "تدفع ونرسل لك القسيمة"],
+    wa_rooms_note: "السعر والتوفر يؤكدهما فريقنا عبر واتساب.",
+    wa_msg: (h, c, ci, co, g, r) => `مرحبا Nzzor، أريد حجز ${h} (${c})${r ? ` — ${r}` : ""} من ${ci} إلى ${co} لـ ${g} شخص.`,
+  },
+};
+const WA_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP || "213770080830";
+
 function localized(obj, lang) {
   if (!obj) return "";
   return obj[lang] || obj.en || obj.fr || "";
@@ -41,6 +105,10 @@ export default function HotelDetail({ hotel }) {
     return Math.min(10, Math.max(1, n));
   })();
   const { t, lang } = useLang();
+  const L = (k) => (TX[lang] && TX[lang][k]) || TX.fr[k];
+  // No contract with Nzzor: the hotel is shown, but booked over WhatsApp.
+  // No live rates, no prices, no checkout, no promises only a contract keeps.
+  const waOnly = hotel.onlineBooking === false;
   const [selectedRoom, setSelectedRoom] = useState(rooms[0] || null);
   // Pre-fill dates from the URL (carried over from the search bar). When the
   // user lands here directly from /hotels (no dates in URL), default to
@@ -85,7 +153,7 @@ export default function HotelDetail({ hotel }) {
   const [mealFilter, setMealFilter] = useState(null);
 
   useEffect(() => {
-    if (!checkIn || !checkOut || validateBookingDates(checkIn, checkOut)) {
+    if (waOnly || !checkIn || !checkOut || validateBookingDates(checkIn, checkOut)) {
       setQuote(null);
       return;
     }
@@ -193,11 +261,9 @@ export default function HotelDetail({ hotel }) {
     "detail.tab_amenities": "Amenities",
     "detail.tab_policies": "Policies",
   };
-  const labelFor = (tt, tab) => {
-    const out = tt(tab.labelKey);
-    // If the translator echoes the key back (missing translation), fall back.
-    return !out || out === tab.labelKey ? (TAB_FALLBACKS[tab.labelKey] || tab.id) : out;
-  };
+  // The translator humanises a missing key ("Tab location") instead of echoing
+  // it, so the old fallback never fired. Tab labels come from TX now.
+  const labelFor = (_tt, tab) => L(tab.id === "about" ? "overview" : tab.id) || TAB_FALLBACKS[tab.labelKey] || tab.id;
   const [activeTab, setActiveTab] = useState("about");
   const lockSpyUntil = useRef(0);
 
@@ -318,6 +384,12 @@ export default function HotelDetail({ hotel }) {
 
   const photos = hotel.photos || [];
 
+  function waHref(roomName) {
+    const fmtD = (d) => (d ? d.split("-").reverse().join("/") : "…");
+    const msg = L("wa_msg")(hotel.name, hotel.city, fmtD(checkIn), fmtD(checkOut), totalGuests, roomName || "");
+    return `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`;
+  }
+
   return (
     <div className="nz-detail">
       {/* breadcrumb */}
@@ -328,9 +400,11 @@ export default function HotelDetail({ hotel }) {
         <span className="cur">{hotel.name}</span>
       </div>
 
-      {/* gallery */}
+      {/* gallery — skipped entirely when the hotel has no photo yet, instead
+          of a 480px grey block */}
+      {photos.length > 0 && (
       <div className="wrap">
-        <div className="nz-gallery">
+        <div className={`nz-gallery n${Math.min(photos.length, 5)}`}>
           {photos.slice(0, 5).map((p, i) => (
             <button
               className={`nz-gal-item ${i === 4 && photos.length > 5 ? "more" : ""}`}
@@ -350,6 +424,7 @@ export default function HotelDetail({ hotel }) {
           ))}
         </div>
       </div>
+      )}
 
       {lightboxIndex !== null && (
         <Lightbox
@@ -365,7 +440,10 @@ export default function HotelDetail({ hotel }) {
           {/* header */}
           <div className="nz-hotel-head">
             <div className="nz-hotel-badges">
-              <span className="nz-badge stars">{"★".repeat(hotel.stars)}</span>
+              <span className="nz-badge stars">{hotel.stars > 0 ? "★".repeat(hotel.stars) : "N/C"}</span>
+              {waOnly && (
+                <span className="nz-badge wa"><Icon name="whatsapp" size={13} strokeWidth={0} /> {L("wa_head")}</span>
+              )}
               {hotel.trustSignals?.verifiedPartner && (
                 <span className="nz-badge verified">
                   <Icon name="check" size={13} strokeWidth={2.2} /> {t("detail.verified")}
@@ -389,7 +467,10 @@ export default function HotelDetail({ hotel }) {
 
           {/* Sticky scroll-spy tabs — click to jump, underline tracks scroll */}
           <nav className="nz-dtabs">
-            {TABS.filter((tab) => tab.id !== "location" || hotel.location).map((tab) => (
+            {TABS.filter((tab) =>
+              (tab.id !== "location" || hotel.location) &&
+              (tab.id !== "amenities" || (hotel.amenities || []).length > 0)
+            ).map((tab) => (
               <button
                 key={tab.id}
                 className={`nz-dtab ${activeTab === tab.id ? "active" : ""}`}
@@ -420,7 +501,7 @@ export default function HotelDetail({ hotel }) {
             <h2 className="display">{t("detail.choose_room")}</h2>
 
             {quoteLoading && (
-              <div className="nz-quote-loading">{t("detail.loading_rates") !== "detail.loading_rates" ? t("detail.loading_rates") : "Loading rates…"}</div>
+              <div className="nz-quote-loading">{L("loading")}</div>
             )}
 
             {!quoteLoading && quote && roomGroups.length > 0 ? (
@@ -428,7 +509,7 @@ export default function HotelDetail({ hotel }) {
                 {/* header: subline + meal filter chips */}
                 <div className="nz-opts-head">
                   <div className="nz-opts-sub">
-                    {nights} {nights === 1 ? (t("detail.night") !== "detail.night" ? t("detail.night") : "night") : (t("detail.nights") !== "detail.nights" ? t("detail.nights") : "nights")} · {totalGuests} {totalGuests === 1 ? (t("detail.guest_one") !== "detail.guest_one" ? t("detail.guest_one") : "guest") : (t("detail.guests") !== "detail.guests" ? t("detail.guests") : "guests")}
+                    {nights} {nights === 1 ? L("night") : L("nights")} · {totalGuests} {totalGuests === 1 ? L("guest") : L("guests")}
                   </div>
                   {availableBoards.length > 1 && (
                     <div className="nz-opts-chips">
@@ -436,7 +517,7 @@ export default function HotelDetail({ hotel }) {
                         className={`nz-chip ${mealFilter === null ? "on" : ""}`}
                         onClick={() => setMealFilter(null)}
                       >
-                        {t("detail.all_meals") !== "detail.all_meals" ? t("detail.all_meals") : "All meals"}
+                        {L("all_meals")}
                       </button>
                       {availableBoards.map((b) => (
                         <button
@@ -482,11 +563,11 @@ export default function HotelDetail({ hotel }) {
                         <div className="nz-rcard-name display">{roomTitle}</div>
                         {staticRoom?.bedType && <div className="nz-rcard-bed">{staticRoom.bedType}</div>}
                         <div className="nz-rcard-specs">
-                          <span><Icon name="guest" size={14} /> {staticRoom?.capacity} {t("detail.guests")}</span>
+                          <span><Icon name="guest" size={14} /> {staticRoom?.capacity} {staticRoom?.capacity === 1 ? L("guest") : L("guests")}</span>
                           {staticRoom?.sizeSqm && <span><Icon name="size" size={14} /> {staticRoom.sizeSqm} m²</span>}
                         </div>
                         {tooSmall && (
-                          <div className="nz-rcard-toosmall">Sleeps {roomCap} · too small for {totalGuests} guests</div>
+                          <div className="nz-rcard-toosmall">{L("too_small")(roomCap, totalGuests)}</div>
                         )}
                       </div>
 
@@ -497,28 +578,29 @@ export default function HotelDetail({ hotel }) {
                           return (
                             <div className={`nz-rate ${isSelected ? "selected" : ""}`} key={opt.board}>
                               <div className="nz-rate-tag">
-                                {onReq && <span className="nz-rate-req">{t("detail.on_request") !== "detail.on_request" ? t("detail.on_request") : "On request"}</span>}
+                                {onReq && <span className="nz-rate-req">{L("on_request")}</span>}
                               </div>
                               <div className="nz-rate-board">{localized(opt.boardLabel, lang)}</div>
                               <div className="nz-rate-lines">
                                 {staticRoom?.bedType && <div><Icon name="bed" size={14} /> {staticRoom.bedType}</div>}
                                 <div><Icon name="check" size={13} strokeWidth={2.5} /> {t("detail.free_cancel")}</div>
-                                {opt.breakfastIncluded && (
-                                  <div><Icon name="check" size={13} strokeWidth={2.5} /> {t("detail.breakfast_incl") !== "detail.breakfast_incl" ? t("detail.breakfast_incl") : "Breakfast included"}</div>
+                                {/* Never on a room-only rate: "Chambre seule" next to
+                                    "Breakfast included" is a contradiction a guest
+                                    can hold us to. */}
+                                {opt.breakfastIncluded && opt.board !== "ROOM_ONLY" && opt.board !== "BREAKFAST" && (
+                                  <div><Icon name="check" size={13} strokeWidth={2.5} /> {L("breakfast")}</div>
                                 )}
                               </div>
                               <div className="nz-rate-foot">
                                 <div className="nz-rate-price">
                                   <span className="amt display">{formatPrice(opt.total)}</span>
                                   <span className="per">
-                                    {opt.roomsCount > 1 ? `${opt.roomsCount} ${t("detail.rooms_n") !== "detail.rooms_n" ? t("detail.rooms_n") : "rooms"} · ` : ""}
-                                    {nights} {nights === 1 ? (t("detail.night") !== "detail.night" ? t("detail.night") : "night") : (t("detail.nights") !== "detail.nights" ? t("detail.nights") : "nights")} · {t("detail.total_stay") !== "detail.total_stay" ? t("detail.total_stay") : "total"}
+                                    {opt.roomsCount > 1 ? `${opt.roomsCount} ${L("rooms_n")} · ` : ""}
+                                    {nights} {nights === 1 ? L("night") : L("nights")} · {L("total_stay")}
                                   </span>
                                 </div>
                                 <button className={`nz-rate-btn ${isSelected ? "on" : ""}`} onClick={() => addToCart(grp.roomId, opt.board)}>
-                                  {isSelected
-                                    ? (t("detail.selected") !== "detail.selected" ? t("detail.selected") : "Selected ✓")
-                                    : (t("detail.select") !== "detail.select" ? t("detail.select") : "Select")}
+                                  {isSelected ? L("selected") : L("select")}
                                 </button>
                               </div>
                             </div>
@@ -533,23 +615,21 @@ export default function HotelDetail({ hotel }) {
                 <div className="nz-cart">
                   <div className="nz-cart-main">
                     <div className="nz-cart-title">
-                      Your booking · {cartRoomsUsed(cart)} of {roomsQty} {roomsQty === 1 ? "room" : "rooms"} selected
+                      {L("cart")(cartRoomsUsed(cart), roomsQty)}
                     </div>
                     {capacityShort && (
                       <div className="nz-cart-cap">
-                        {roomsQty === 1
-                          ? `This room sleeps ${pickedCapacity}, but you're booking for ${totalGuests} guests. Please choose a larger room.`
-                          : `Your rooms sleep ${pickedCapacity}, but you have ${totalGuests} guests. Add another room or pick a larger one.`}
+                        {roomsQty === 1 ? L("cap_one")(pickedCapacity, totalGuests) : L("cap_many")(pickedCapacity, totalGuests)}
                       </div>
                     )}
                     {cartOptions.length === 0 ? (
-                      <div className="nz-cart-empty">{t("detail.cart_empty") !== "detail.cart_empty" ? t("detail.cart_empty") : "Tap Select on a rate to add a room."}</div>
+                      <div className="nz-cart-empty">{L("cart_empty")}</div>
                     ) : (
                       cartOptions.map((o, i) => (
                         <div className="nz-cart-row" key={i}>
                           <div className="nz-cart-info">
                             <strong>{localized(o.roomType, lang)}</strong>
-                            <span>{localized(o.boardLabel, lang)}{o.availability !== "AVAILABLE" ? ` · ${t("detail.on_request") !== "detail.on_request" ? t("detail.on_request") : "on request"}` : ""}</span>
+                            <span>{localized(o.boardLabel, lang)}{o.availability !== "AVAILABLE" ? ` · ${L("on_request")}` : ""}</span>
                           </div>
                           <div className="nz-cart-rprice">
                             {formatPrice(o.total)}
@@ -562,12 +642,12 @@ export default function HotelDetail({ hotel }) {
                   <div className="nz-cart-foot">
                     {cartOptions.length > 0 && (
                       <div className="nz-cart-total">
-                        <span className="lbl">{t("detail.total_stay") !== "detail.total_stay" ? t("detail.total_stay") : "total"}</span>
+                        <span className="lbl">{L("total_stay")}</span>
                         <span className="amt display">{formatPrice(subtotal)}</span>
                       </div>
                     )}
                     <button className="nz-cart-cta" onClick={reserve} disabled={!canReserve}>
-                      {t("detail.book_now") !== "detail.book_now" ? t("detail.book_now") : "Book now"}
+                      {L("book_now")}
                     </button>
                   </div>
                 </div>
@@ -581,8 +661,10 @@ export default function HotelDetail({ hotel }) {
                       return (
                         <div className={`nz-room ${selected ? "selected" : ""}`} key={r.id}>
                           <div className="nz-room-photo">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={r.photos?.[0]} alt={r.type} loading="lazy" />
+                            {r.photos?.[0]
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              ? <img src={r.photos[0]} alt={r.type} loading="lazy" />
+                              : <Icon name="bed" size={26} style={{ color: "var(--gray-300)" }} />}
                           </div>
                           <div className="nz-room-info">
                             <h3 className="display">{r.type}</h3>
@@ -591,10 +673,19 @@ export default function HotelDetail({ hotel }) {
                               {r.sizeSqm && <span><Icon name="size" size={15} /> {r.sizeSqm} m²</span>}
                               <span><Icon name="bed" size={15} /> {r.bedType}</span>
                             </div>
-                            <div className="nz-room-perks">
-                              <span><Icon name="check" size={13} strokeWidth={2.5} /> {t("detail.free_cancel")}</span>
-                            </div>
+                            {!waOnly && (
+                              <div className="nz-room-perks">
+                                <span><Icon name="check" size={13} strokeWidth={2.5} /> {t("detail.free_cancel")}</span>
+                              </div>
+                            )}
                           </div>
+                          {waOnly ? (
+                            <div className="nz-room-action">
+                              <a className="nz-room-wa" href={waHref(r.type)} target="_blank" rel="noopener noreferrer">
+                                <Icon name="whatsapp" size={15} strokeWidth={0} /> {L("wa_room")}
+                              </a>
+                            </div>
+                          ) : (
                           <div className="nz-room-action">
                             <div className="nz-room-price">
                               <span className="amt display">{formatPriceShort(r.price)}</span>
@@ -604,22 +695,30 @@ export default function HotelDetail({ hotel }) {
                               className={`nz-room-btn ${selected ? "sel" : ""}`}
                               onClick={() => setSelectedRoom(r)}
                             >
-                              {selected ? t("detail.selected") + " ✓" : t("detail.select")}
+                              {selected ? L("selected") : L("select")}
                             </button>
                           </div>
+                          )}
                         </div>
                       );
                     })}
                   </div>
-                  {(!checkIn || !checkOut) && (
-                    <p className="nz-rooms-hint">{t("detail.pick_dates_for_rates") !== "detail.pick_dates_for_rates" ? t("detail.pick_dates_for_rates") : "Choose your dates to see live prices and meal-plan options."}</p>
+                  {waOnly && rooms.length > 0 && <p className="nz-rooms-hint">{L("wa_rooms_note")}</p>}
+                  {waOnly && rooms.length === 0 && (
+                    <a className="nz-wa-inline" href={waHref("")} target="_blank" rel="noopener noreferrer">
+                      <Icon name="whatsapp" size={18} strokeWidth={0} /> {L("wa_cta")}
+                    </a>
+                  )}
+                  {!waOnly && (!checkIn || !checkOut) && (
+                    <p className="nz-rooms-hint">{L("pick_dates")}</p>
                   )}
                 </>
               )
             )}
           </section>
 
-          {/* amenities */}
+          {/* amenities — hidden when the hotel lists none */}
+          {(hotel.amenities || []).length > 0 && (
           <section id="amenities" className="nz-dsection">
             <h2 className="display">{t("detail.offers")}</h2>
             <div className="nz-amenities">
@@ -631,6 +730,7 @@ export default function HotelDetail({ hotel }) {
               ))}
             </div>
           </section>
+          )}
 
           {/* policies */}
           <section id="policies" className="nz-dsection">
@@ -638,8 +738,10 @@ export default function HotelDetail({ hotel }) {
             <div className="nz-policies">
               <Policy icon="clock" label={t("detail.checkin")} value={`${t("detail.from")} ${hotel.checkInTime}`} />
               <Policy icon="clock" label={t("detail.checkout")} value={`${t("detail.until")} ${hotel.checkOutTime}`} />
-              <Policy icon="check" label={t("detail.cancellation")}
-                value={`${t("detail.cancel_free")} ${hotel.policies?.cancellationHours || 48}h ${t("detail.before_arrival")}`} good />
+              {!waOnly && (
+                <Policy icon="check" label={t("detail.cancellation")}
+                  value={`${t("detail.cancel_free")} ${hotel.policies?.cancellationHours || 48}h ${t("detail.before_arrival")}`} good />
+              )}
               <Policy icon="child" label={t("detail.children")}
                 value={hotel.policies?.childrenAllowed ? t("detail.children_ok") : t("detail.children_no")} />
               <Policy icon="pet" label={t("detail.pets")}
@@ -653,6 +755,37 @@ export default function HotelDetail({ hotel }) {
 
         {/* sticky booking widget */}
         <aside>
+          {waOnly ? (
+          <div className="nz-widget wa">
+            <div className="nz-widget-head wa">
+              <Icon name="whatsapp" size={15} strokeWidth={0} /> {L("wa_head")}
+            </div>
+            <div className="nz-widget-body">
+              <p className="nz-wa-body">{L("wa_body")}</p>
+              <div className="nz-widget-dates">
+                <div className="wf">
+                  <label>{L("check_in")}</label>
+                  <input type="date" value={checkIn} min={today}
+                    onChange={(e) => { const v = e.target.value; setCheckIn(v); if (checkOut && v && v >= checkOut) setCheckOut(""); }} />
+                </div>
+                <div className="wf">
+                  <label>{L("check_out")}</label>
+                  <input type="date" value={checkOut} min={checkIn || today} onChange={(e) => setCheckOut(e.target.value)} />
+                </div>
+              </div>
+              <ol className="nz-wa-steps">
+                {L("wa_steps").map((s, i) => <li key={i}><span>{i + 1}</span>{s}</li>)}
+              </ol>
+              <a className="nz-wa-cta" href={waHref("")} target="_blank" rel="noopener noreferrer">
+                <Icon name="whatsapp" size={19} strokeWidth={0} /> {L("wa_cta")}
+              </a>
+            </div>
+            <div className="nz-widget-foot">
+              <Icon name="shield" size={24} style={{ color: "var(--gray-300)" }} />
+              {t("detail.secured")}
+            </div>
+          </div>
+          ) : (
           <div className="nz-widget">
             <div className="nz-widget-head">
               <span className="live" /> {t("detail.widget_head")}
@@ -669,7 +802,7 @@ export default function HotelDetail({ hotel }) {
 
               <div className="nz-widget-dates">
                 <div className="wf">
-                  <label>Check in</label>
+                  <label>{L("check_in")}</label>
                   <input
                     type="date"
                     value={checkIn}
@@ -685,7 +818,7 @@ export default function HotelDetail({ hotel }) {
                   />
                 </div>
                 <div className="wf">
-                  <label>Check out</label>
+                  <label>{L("check_out")}</label>
                   <input
                     type="date"
                     value={checkOut}
@@ -710,8 +843,8 @@ export default function HotelDetail({ hotel }) {
                 <div className="nz-widget-room">
                   <div className="wr-label">
                     {cartHasItems
-                      ? (t("detail.your_selection") !== "detail.your_selection" ? t("detail.your_selection") : "Your selection")
-                      : (t("detail.from_price") !== "detail.from_price" ? t("detail.from_price") : "From")}
+                      ? L("your_selection")
+                      : L("from")}
                   </div>
                   {cartHasItems ? (
                     cartOptions.map((o, i) => (
@@ -727,7 +860,7 @@ export default function HotelDetail({ hotel }) {
                       <>
                         <div className="wr-name display">{localized(cheapestOption.roomType, lang)}</div>
                         <div className="wr-calc">
-                          <span>{localized(cheapestOption.boardLabel, lang)} · {nights} {nights === 1 ? (t("detail.night") || "night") : (t("detail.nights") || "nights")}</span>
+                          <span>{localized(cheapestOption.boardLabel, lang)} · {nights} {nights === 1 ? L("night") : L("nights")}</span>
                           <span>{formatPrice(cheapestOption.total)}</span>
                         </div>
                       </>
@@ -740,7 +873,7 @@ export default function HotelDetail({ hotel }) {
                   <div className="wr-name display">{selectedRoom.type}</div>
                   <div className="wr-calc">
                     <span>
-                      {roomsQty > 1 ? `${roomsQty} × ` : ""}{formatPrice(selectedRoom.price)} × {nights} {nights === 1 ? (t("detail.night") || "night") : (t("detail.nights") || "nights")}
+                      {roomsQty > 1 ? `${roomsQty} × ` : ""}{formatPrice(selectedRoom.price)} × {nights} {nights === 1 ? L("night") : L("nights")}
                     </span>
                     <span>{formatPrice(subtotal)}</span>
                   </div>
@@ -769,7 +902,7 @@ export default function HotelDetail({ hotel }) {
 
               <a
                 className="nz-widget-wa"
-                href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP || "213XXXXXXXXX"}`}
+                href={waHref("")}
                 target="_blank" rel="noopener noreferrer"
               >
                 <span className="ww-ic"><Icon name="whatsapp" size={20} style={{ color: "#fff" }} strokeWidth={0} /></span>
@@ -784,17 +917,30 @@ export default function HotelDetail({ hotel }) {
               {t("detail.secured")}
             </div>
           </div>
+          )}
         </aside>
       </div>
 
       {/* sticky mobile reserve bar */}
+      {waOnly ? (
+        <div className="nz-mobile-reserve">
+          <a className="nz-mr-btn wa" href={waHref("")} target="_blank" rel="noopener noreferrer">
+            <Icon name="whatsapp" size={17} strokeWidth={0} /> {L("wa_cta")}
+          </a>
+        </div>
+      ) : (
       <div className="nz-mobile-reserve">
         <div className="nz-mr-price">
-          <span className="amt display">{selectedRoom ? formatPriceShort(selectedRoom.price) : "—"}</span>
+          <span className="amt display">{
+            quote
+              ? (cheapestOption ? formatPriceShort(cheapestOption.pricePerNightPerRoom) : "—")
+              : (selectedRoom ? formatPriceShort(selectedRoom.price) : "—")
+          }</span>
           <span className="unit">{t("detail.per_night")}</span>
         </div>
         <button className="nz-mr-btn" onClick={reserve}>{t("detail.reserve")}</button>
       </div>
+      )}
 
       <DetailStyles />
     </div>
@@ -870,6 +1016,37 @@ function DetailStyles() {
       .nz-badge.instant { background: var(--red-soft); color: var(--red-deep); }
       .nz-badge.instant .live { width: 6px; height: 6px; border-radius: 50%; background: var(--red); animation: blink 1.6s infinite; }
       .nz-badge.stars { background: var(--ink); color: #fff; }
+      .nz-badge.wa { background: #E7F4EC; color: #1B8A5A; }
+      /* Galleries with fewer than five photos: no empty grey cells. */
+      .nz-gallery.n1 { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+      .nz-gallery.n2 { grid-template-columns: 2fr 1fr; grid-template-rows: 1fr; }
+      .nz-gallery.n2 .nz-gal-item:nth-child(1), .nz-gallery.n1 .nz-gal-item:nth-child(1) { grid-row: auto; }
+      .nz-gallery.n3 { grid-template-columns: 2fr 1fr; }
+      .nz-gallery.n4 { grid-template-columns: 2fr 1fr 1fr; }
+      .nz-gallery.n4 .nz-gal-item:nth-child(4) { grid-column: span 2; }
+
+      .nz-room-photo { display: flex; align-items: center; justify-content: center; background: var(--cream, #FAF8F4); }
+      .nz-room-wa, .nz-wa-inline {
+        display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+        background: #25D366; color: #fff; padding: 11px 20px; border-radius: 980px;
+        font-size: 13px; font-weight: 700; transition: background .2s;
+      }
+      .nz-room-wa:hover, .nz-wa-inline:hover { background: #1DA851; }
+      .nz-widget-head.wa { background: #E7F4EC; color: #1B8A5A; }
+      .nz-wa-body { font-size: 14px; line-height: 1.6; color: var(--ink-2); margin: 0 0 18px; }
+      .nz-wa-steps { list-style: none; padding: 0; margin: 4px 0 18px; display: flex; flex-direction: column; gap: 10px; }
+      .nz-wa-steps li { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+      .nz-wa-steps li span {
+        width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--cream, #FAF8F4); border: 1px solid var(--gray-200); font-size: 11px; font-weight: 800; color: #1B8A5A;
+      }
+      .nz-wa-cta {
+        display: flex; align-items: center; justify-content: center; gap: 9px; width: 100%; padding: 15px;
+        background: #25D366; color: #fff; border-radius: var(--r-md);
+        font-family: 'Clash Display', sans-serif; font-size: 16px; font-weight: 600; transition: background .2s;
+      }
+      .nz-wa-cta:hover { background: #1DA851; }
       .nz-hotel-head h1 { font-size: clamp(32px, 4vw, 46px); font-weight: 600; letter-spacing: -0.03em; line-height: 1.05; margin-bottom: 12px; }
       .nz-hotel-sub { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
       .nz-hotel-sub .loc { display: flex; align-items: center; gap: 7px; font-size: 14px; color: var(--gray-400); font-weight: 600; }
@@ -1210,6 +1387,10 @@ function DetailStyles() {
           flex: 1; max-width: 200px; padding: 14px; background: var(--red); color: #fff;
           border: none; border-radius: var(--r-sm);
           font-family: 'Clash Display', sans-serif; font-size: 15px; font-weight: 600;
+        }
+        .nz-mr-btn.wa {
+          max-width: none; background: #25D366; text-align: center;
+          display: flex; align-items: center; justify-content: center; gap: 8px;
         }
       }
     `}</style>
