@@ -7,6 +7,7 @@ import CitiesTicker from "./CitiesTicker";
 import RegionStage from "./RegionStage";
 import { useLang } from "../lib/LangContext";
 import { DM_Serif_Display } from "next/font/google";
+import ArabesqueGlow from "./ArabesqueGlow";
 
 // The stats band's serif. Loaded here rather than site-wide because this band
 // is the only place it appears; next/font self-hosts it, so there is no
@@ -270,6 +271,7 @@ export default function HomeSections({ featured, cities = [], wilayaCount = 0, h
         <div className="nz-why-hero">
           <div className="nz-why-hero-bg" />
           <div className="nz-why-hero-grain" />
+                  <ArabesqueGlow />
           <div className="wrap nz-why-hero-inner">
             <div className="nz-why-hero-kicker">{t("why.kicker")}</div>
             <h2 className="display nz-why-hero-title">
