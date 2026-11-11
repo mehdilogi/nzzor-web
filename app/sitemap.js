@@ -36,6 +36,9 @@ export default async function sitemap() {
     { url: SITE + "/", changeFrequency: "daily", priority: 1 },
     { url: SITE + "/hotels", changeFrequency: "daily", priority: 0.9 },
     { url: SITE + "/terms", changeFrequency: "yearly", priority: 0.2 },
+    { url: SITE + "/faq", changeFrequency: "monthly", priority: 0.4 },
+    { url: SITE + "/contact", changeFrequency: "yearly", priority: 0.4 },
+    { url: SITE + "/privacy", changeFrequency: "yearly", priority: 0.2 },
   ].map((p) => ({ ...p, lastModified: now }));
 
   const hotelPages = hotels
