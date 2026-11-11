@@ -180,9 +180,21 @@ export default function ArabesqueGlow({ tone = "dark", clearAt = "40% 52%" }) {
           0%, 100% { opacity: 0.18; }
           50%      { opacity: 0.55; }
         }
+        /* Phones and touch screens: no moving light at all. On a narrow screen
+           the copy covers the whole width, so a drifting glow only ever shows
+           as clipped blobs between text and cards, and animating a mask is
+           costly on a phone. The lattice stays, still and fainter, and only
+           in the lower part of the section, under the copy rather than
+           behind it. */
+        @media (max-width: 720px), (hover: none) {
+          .nz-arab-glow { display: none; }
+        }
         @media (max-width: 720px) {
-          /* on phones the copy spans the width: keep the lattice to the edges */
-          .nz-arab-base, .nz-arab-glow { opacity: 0.12; }
+          .nz-arab-base {
+            opacity: calc(var(--nz-arab-op, 0.15) * 0.6);
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0%, transparent 40%, #000 100%);
+                    mask-image: linear-gradient(to bottom, transparent 0%, transparent 40%, #000 100%);
+          }
         }
         @media (prefers-reduced-motion: reduce) {
           .nz-arab-glow { animation: none; opacity: 0.14; }
