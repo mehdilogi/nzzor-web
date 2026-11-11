@@ -37,9 +37,19 @@ export default function AdminPage() {
       .finally(() => setChecking(false));
   }, []);
 
-  if (checking) return <Splash />;
-  if (!user) return <Login onLogin={setUser} />;
-  return <Dashboard user={user} onLogout={() => { clearToken(); setUser(null); }} />;
+  // The admin is English and left-to-right whatever language the public site
+  // was last viewed in. The site's language choice is stored in the browser
+  // and sets dir="rtl" on <html> for Arabic, which mirrored the whole admin
+  // (sidebar on the right, numbers flipped). dir on this wrapper overrides it.
+  return (
+    <div dir="ltr" lang="en">
+      {checking
+        ? <Splash />
+        : !user
+          ? <Login onLogin={setUser} />
+          : <Dashboard user={user} onLogout={() => { clearToken(); setUser(null); }} />}
+    </div>
+  );
 }
 
 // =============================================================================
