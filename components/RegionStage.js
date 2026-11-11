@@ -114,6 +114,33 @@ export default function RegionStage() {
   const timerRef = useRef(null);
   const stageRef = useRef(null);
 
+  // The five region photographs are 2.2–3.3 MB JPEGs, about 14.5 MB together,
+  // and all five used to download with the homepage. Two changes:
+  //  1. Nothing loads until the section is within ~600px of the viewport.
+  //  2. Each file goes through Next's image optimizer (/_next/image), which
+  //     returns WebP or AVIF at a width that matches the screen. A phone gets
+  //     ~828px wide, a laptop 1920px, typically 60–250 KB each.
+  // Backgrounds stay CSS backgrounds so the cross-fade below is unchanged.
+  const [bgWidth, setBgWidth] = useState(0);
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return undefined;
+    const pickWidth = () => {
+      const px = (window.innerWidth || 1280) * Math.min(window.devicePixelRatio || 1, 2);
+      return px <= 828 ? 828 : px <= 1200 ? 1200 : 1920;
+    };
+    if (!("IntersectionObserver" in window)) { setBgWidth(pickWidth()); return undefined; }
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) {
+        setBgWidth(pickWidth());
+        io.disconnect();
+      }
+    }, { rootMargin: "600px 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  const bgUrl = (src) => `/_next/image?url=${encodeURIComponent(src)}&w=${bgWidth}&q=60`;
+
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     setReduced(mq.matches);
@@ -161,7 +188,7 @@ export default function RegionStage() {
         <div
           key={reg.key}
           className={`nz-rs-bg ${i === active ? "on" : ""}`}
-          style={{ backgroundImage: `url(${reg.img})` }}
+          style={bgWidth ? { backgroundImage: `url(${bgUrl(reg.img)})` } : undefined}
           aria-hidden="true"
         />
       ))}

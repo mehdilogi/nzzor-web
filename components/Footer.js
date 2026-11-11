@@ -41,23 +41,24 @@ export default function Footer() {
           <Link className="nz-flink" style={{ display: "block" }} href="/#allouni">{t("footer.about")}</Link>
           <Link className="nz-flink" style={{ display: "block" }} href="/#allouni">{t("footer.agency")}</Link>
           <Link className="nz-flink" style={{ display: "block" }} href="/hotels">{t("footer.ourhotels")}</Link>
-          <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.careers")}</Link>
+          {/* "Careers" removed: there is no careers page, and a link that lands
+              on the homepage reads as a broken site. */}
         </div>
         <div className="nz-fcol">
           <h5>{t("footer.support")}</h5>
-          <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.help")}</Link>
-          <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.contact")}</Link>
-          <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.whatsapp")}</Link>
-          <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.faq")}</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/faq">{t("footer.help")}</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/contact">{t("footer.contact")}</Link>
+          <a className="nz-flink" style={{ display: "block" }} href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP || "213770080830"}`} target="_blank" rel="noopener noreferrer">{t("footer.whatsapp")}</a>
+          <Link className="nz-flink" style={{ display: "block" }} href="/faq">{t("footer.faq")}</Link>
         </div>
         <div className="nz-fcol">
           <h5>{t("footer.legal")}</h5>
           <Link className="nz-flink" style={{ display: "block" }} href="/terms">{t("footer.terms")}</Link>
-          <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.privacy")}</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/privacy">{t("footer.privacy")}</Link>
           {/* Cancellation is Article 9 of the sale conditions — there is no
               separate page, so point at the document that actually states it. */}
           <Link className="nz-flink" style={{ display: "block" }} href="/terms">{t("footer.cancellation")}</Link>
-          <Link className="nz-flink" style={{ display: "block" }} href="/">{t("footer.agrement")}</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/contact#agrement">{t("footer.agrement")}</Link>
         </div>
       </div>
 
