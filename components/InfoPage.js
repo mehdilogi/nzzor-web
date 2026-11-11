@@ -12,14 +12,17 @@
 // =============================================================================
 
 import { useLang } from "../lib/LangContext";
+import ArabesqueGlow from "./ArabesqueGlow";
 
-export default function InfoPage({ content }) {
+export default function InfoPage({ content, pattern = false }) {
   const { lang } = useLang();
   const c = content[lang] || content.fr;
   const rtl = lang === "ar";
 
   return (
     <main className="ip" dir={rtl ? "rtl" : "ltr"} lang={lang}>
+      {/* The zellige lattice in its light tone, as on the homepage band. */}
+      {pattern && <ArabesqueGlow tone="light" clearAt="50% 18%" />}
       <div className="wrap ip-wrap">
         <header className="ip-head">
           <h1 className="display">{c.title}</h1>
@@ -30,7 +33,7 @@ export default function InfoPage({ content }) {
         {c.cards && c.cards.length > 0 && (
           <div className="ip-cards">
             {c.cards.map((card, i) => (
-              <div className="ip-card" key={i}>
+              <div className={`ip-card${card.wide ? " wide" : ""}`} key={i}>
                 <span className="ip-card-label">{card.label}</span>
                 {card.href
                   ? <a className="ip-card-value" href={card.href} target={card.href.startsWith("http") ? "_blank" : undefined} rel="noopener noreferrer" dir="ltr">{card.value}</a>
@@ -57,16 +60,18 @@ export default function InfoPage({ content }) {
       </div>
 
       <style jsx>{`
-        .ip { background: var(--cream, #FAF8F4); min-height: 70vh; }
-        .ip-wrap { max-width: 860px; padding-top: 56px; padding-bottom: 88px; }
+        .ip { position: relative; overflow: hidden; isolation: isolate; background: var(--cream, #FAF8F4); min-height: 70vh; }
+        .ip-wrap { position: relative; z-index: 2; max-width: 860px; padding-top: 56px; padding-bottom: 88px; }
         .ip-head { margin-bottom: 36px; }
         .ip-head h1 { font-size: clamp(32px, 4.4vw, 48px); font-weight: 600; letter-spacing: -0.03em; line-height: 1.05; color: var(--ink); margin: 0; }
         .ip-updated { margin: 12px 0 0; font-size: 12.5px; font-weight: 600; color: var(--gray-400); }
         .ip-intro { margin: 18px 0 0; font-size: 16.5px; line-height: 1.7; color: var(--ink-2); max-width: 680px; }
-        .ip-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin-bottom: 40px; }
+        .ip-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 40px; }
+        .ip-card.wide { grid-column: 1 / -1; }
+        @media (max-width: 760px) { .ip-cards { grid-template-columns: 1fr; } }
         .ip-card { background: #fff; border: 1px solid var(--gray-200); border-radius: var(--r-lg, 14px); padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; }
         .ip-card-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gray-400); }
-        .ip-card-value { font-size: 16px; font-weight: 700; color: var(--ink); text-decoration: none; word-break: break-word; }
+        .ip-card-value { font-size: 16px; font-weight: 700; color: var(--ink); text-decoration: none; word-break: break-word; white-space: pre-line; }
         a.ip-card-value:hover { color: var(--red); }
         .ip-card-note { font-size: 12.5px; color: var(--gray-400); line-height: 1.5; }
         .ip-body { background: #fff; border: 1px solid var(--gray-200); border-radius: var(--r-lg, 14px); padding: 8px 36px 16px; }
