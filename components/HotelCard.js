@@ -39,7 +39,7 @@ const AXIS_LOCK_PX = 8;
 const TAP_SLOP_PX = 10;
 
 export default function HotelCard({ hotel, priority = false }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const searchParams = useSearchParams();
 
   // Carry the search context from the current URL through to the hotel page,
@@ -347,6 +347,14 @@ export default function HotelCard({ hotel, priority = false }) {
           <span className="amt display">{formatPriceShort(hotel.priceFrom)}</span>
           <span className="unit">{t("card.per_night")}</span>
         </div>
+        {/* No contract with Nzzor: listed, but booked over WhatsApp. Said on
+            the card so nobody expects a checkout. Inline copy rather than a
+            dictionary key, which would humanise into English if missing. */}
+        {hotel.onlineBooking === false && (
+          <div className="nz-hcard-wa">
+            {{ fr: "Réservation via WhatsApp", en: "Booked via WhatsApp", ar: "الحجز عبر واتساب" }[lang] || "Réservation via WhatsApp"}
+          </div>
+        )}
         </div>
       </div>
 
@@ -357,6 +365,13 @@ export default function HotelCard({ hotel, priority = false }) {
         /* The <a> itself carries no styling — see the note in the JSX above.
            Everything visual lives on .nz-hcard-inner. */
         .nz-hcard-inner { display: block; background: transparent; }
+        .nz-hcard-wa {
+          display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;
+          font-size: 12px; font-weight: 600; color: #1B8A5A;
+        }
+        .nz-hcard-wa::before {
+          content: ""; width: 6px; height: 6px; border-radius: 50%; background: #25D366;
+        }
 
         .nz-hcard-media {
           position: relative;
