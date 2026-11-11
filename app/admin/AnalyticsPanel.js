@@ -356,7 +356,6 @@ export default function AnalyticsPanel() {
           <RegionsCard
             country={regionCountry}
             onCountry={setRegionCountry}
-            countries={(geo?.data || []).map((r) => r.country).filter((c) => c && c !== "unknown")}
             data={regions}
             loading={regionsLoading}
           />
@@ -976,12 +975,15 @@ function GeoList({ rows, total, loading }) {
 // REGIONS — wilaya (Algeria) / region (abroad) + top cities
 // =============================================================================
 
-function RegionsCard({ country, onCountry, countries, data, loading }) {
-  const options = Array.from(new Set(["DZ", ...countries])).slice(0, 15);
+function RegionsCard({ country, onCountry, data, loading }) {
+  // Only countries that already have located visits get a button; Algeria
+  // always stays first. Names, not flag emoji — Windows renders flags as
+  // two plain letters.
+  const counts = new Map((data?.countries || []).map((c) => [c.country, c.sessions]));
+  const options = Array.from(new Set(["DZ", ...counts.keys(), country])).slice(0, 15);
   const rows = data?.data;
   const cities = data?.cities || [];
   const max = rows && rows.length ? Math.max(...rows.map((r) => r.sessions)) : 0;
-  const noHeaders = !loading && data && data.total > 0 && data.located === 0;
 
   return (
     <div style={{
@@ -1009,7 +1011,6 @@ function RegionsCard({ country, onCountry, countries, data, loading }) {
                 key={c}
                 type="button"
                 onClick={() => onCountry(c)}
-                title={countryName(c)}
                 style={{
                   border: 0,
                   background: active ? T.ink : "transparent",
@@ -1022,7 +1023,8 @@ function RegionsCard({ country, onCountry, countries, data, loading }) {
                   fontFamily: "inherit",
                 }}
               >
-                {flagFor(c)} {c}
+                {countryName(c)}
+                {counts.get(c) ? <span style={{ marginLeft: 5, opacity: 0.6, fontVariantNumeric: "tabular-nums" }}>{counts.get(c)}</span> : null}
               </button>
             );
           })}
@@ -1031,13 +1033,11 @@ function RegionsCard({ country, onCountry, countries, data, loading }) {
 
       {loading && !rows ? (
         <SkelList />
-      ) : noHeaders ? (
-        <Empty
-          message="No region data yet"
-          hint="Turn on Cloudflare → Rules → Transform Rules → Managed Transforms → “Add visitor location headers”. New visits will show here within minutes."
-        />
       ) : !rows || rows.length === 0 ? (
-        <Empty message={`No visits from ${countryName(country)} in this range`} />
+        <Empty
+          message={`No located visits from ${countryName(country)} yet`}
+          hint="Region and city are recorded from 11 Nov 2026 onward. Earlier visits only have the country, and the IP was never stored, so they cannot be located afterwards."
+        />
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 3fr) minmax(0, 2fr)", gap: 24 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
