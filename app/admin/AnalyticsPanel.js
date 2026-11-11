@@ -110,6 +110,31 @@ const COUNTRY_NAMES = {
 const countryName = (code) =>
   !code || code === "unknown" ? "Unknown" : COUNTRY_NAMES[code.toUpperCase()] || code.toUpperCase();
 
+// Algeria's wilayas by official number. Cloudflare reports Algerian regions
+// with their ISO 3166-2 code, which is the wilaya number ("16" = Alger).
+const WILAYAS = {
+  "01": "Adrar", "02": "Chlef", "03": "Laghouat", "04": "Oum El Bouaghi", "05": "Batna",
+  "06": "Béjaïa", "07": "Biskra", "08": "Béchar", "09": "Blida", "10": "Bouira",
+  "11": "Tamanrasset", "12": "Tébessa", "13": "Tlemcen", "14": "Tiaret", "15": "Tizi Ouzou",
+  "16": "Alger", "17": "Djelfa", "18": "Jijel", "19": "Sétif", "20": "Saïda",
+  "21": "Skikda", "22": "Sidi Bel Abbès", "23": "Annaba", "24": "Guelma", "25": "Constantine",
+  "26": "Médéa", "27": "Mostaganem", "28": "M'Sila", "29": "Mascara", "30": "Ouargla",
+  "31": "Oran", "32": "El Bayadh", "33": "Illizi", "34": "Bordj Bou Arréridj", "35": "Boumerdès",
+  "36": "El Tarf", "37": "Tindouf", "38": "Tissemsilt", "39": "El Oued", "40": "Khenchela",
+  "41": "Souk Ahras", "42": "Tipaza", "43": "Mila", "44": "Aïn Defla", "45": "Naâma",
+  "46": "Aïn Témouchent", "47": "Ghardaïa", "48": "Relizane", "49": "Timimoun",
+  "50": "Bordj Badji Mokhtar", "51": "Ouled Djellal", "52": "Béni Abbès", "53": "In Salah",
+  "54": "In Guezzam", "55": "Touggourt", "56": "Djanet", "57": "El M'Ghair", "58": "El Meniaa",
+};
+
+function regionLabel(country, code, name) {
+  if (country === "DZ" && code) {
+    const n = String(code).replace(/^DZ-?/i, "").padStart(2, "0");
+    if (WILAYAS[n]) return `${n} · ${WILAYAS[n]}`;
+  }
+  return name || code || "Unknown";
+}
+
 const SOURCE_LABELS = {
   direct: "Direct", internal: "Internal nav", google: "Google", bing: "Bing",
   yahoo: "Yahoo", duckduckgo: "DuckDuckGo", yandex: "Yandex", baidu: "Baidu",
@@ -205,6 +230,9 @@ export default function AnalyticsPanel() {
   const [geo, setGeo] = useState(null);
   const [pages, setPages] = useState(null);
   const [events, setEvents] = useState(null);
+  const [regionCountry, setRegionCountry] = useState("DZ");
+  const [regions, setRegions] = useState(null);
+  const [regionsLoading, setRegionsLoading] = useState(true);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -261,6 +289,20 @@ export default function AnalyticsPanel() {
     };
   }, [start, end, refreshKey]);
 
+  // Regions load on their own so switching country doesn't refetch the rest.
+  useEffect(() => {
+    let cancelled = false;
+    setRegionsLoading(true);
+    fetchJSON("/api/admin/analytics/regions", { start, end, country: regionCountry })
+      .then((r) => { if (!cancelled) setRegions(r); })
+      .catch((e) => {
+        console.error("[analytics] regions failed:", e?.message);
+        if (!cancelled) setRegions({ data: null, _err: e?.message });
+      })
+      .finally(() => { if (!cancelled) setRegionsLoading(false); });
+    return () => { cancelled = true; };
+  }, [start, end, refreshKey, regionCountry]);
+
   return (
     <div style={{ background: T.bg, minHeight: "100vh", padding: "20px 24px", color: T.ink, fontFamily: "inherit" }}>
       <Header
@@ -310,6 +352,14 @@ export default function AnalyticsPanel() {
               <EventsList rows={events?.data} loading={loading} />
             </DetailCard>
           </div>
+
+          <RegionsCard
+            country={regionCountry}
+            onCountry={setRegionCountry}
+            countries={(geo?.data || []).map((r) => r.country).filter((c) => c && c !== "unknown")}
+            data={regions}
+            loading={regionsLoading}
+          />
         </>
       )}
     </div>
@@ -916,6 +966,114 @@ function GeoList({ rows, total, loading }) {
               }}>CF-IPCountry</code> header
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// REGIONS — wilaya (Algeria) / region (abroad) + top cities
+// =============================================================================
+
+function RegionsCard({ country, onCountry, countries, data, loading }) {
+  const options = Array.from(new Set(["DZ", ...countries])).slice(0, 15);
+  const rows = data?.data;
+  const cities = data?.cities || [];
+  const max = rows && rows.length ? Math.max(...rows.map((r) => r.sessions)) : 0;
+  const noHeaders = !loading && data && data.total > 0 && data.located === 0;
+
+  return (
+    <div style={{
+      background: T.white,
+      border: `0.5px solid ${T.border}`,
+      borderRadius: 8,
+      padding: "14px 16px",
+      marginTop: 12,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.ink }}>
+            Top {country === "DZ" ? "wilayas" : "regions"}
+          </div>
+          <div style={{ fontSize: 10, color: T.mute, marginTop: 1, maxWidth: 520, lineHeight: 1.5 }}>
+            Sessions by visitor location (from the IP, approximate).
+            {country === "DZ" && " Mobile operators route a lot of traffic through Algiers, so Alger reads high."}
+          </div>
+        </div>
+        <div style={{ display: "inline-flex", flexWrap: "wrap", gap: 2, background: T.white, border: `0.5px solid ${T.border}`, borderRadius: 6, padding: 2 }}>
+          {options.map((c) => {
+            const active = c === country;
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => onCountry(c)}
+                title={countryName(c)}
+                style={{
+                  border: 0,
+                  background: active ? T.ink : "transparent",
+                  color: active ? T.white : T.mute,
+                  padding: "4px 8px",
+                  fontSize: 11,
+                  fontWeight: 500,
+                  borderRadius: 4,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                {flagFor(c)} {c}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {loading && !rows ? (
+        <SkelList />
+      ) : noHeaders ? (
+        <Empty
+          message="No region data yet"
+          hint="Turn on Cloudflare → Rules → Transform Rules → Managed Transforms → “Add visitor location headers”. New visits will show here within minutes."
+        />
+      ) : !rows || rows.length === 0 ? (
+        <Empty message={`No visits from ${countryName(country)} in this range`} />
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 3fr) minmax(0, 2fr)", gap: 24 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {rows.slice(0, 15).map((r) => (
+              <BarRow
+                key={r.code || r.name}
+                leading={null}
+                label={regionLabel(country, r.code, r.name)}
+                value={r.sessions}
+                percentage={max > 0 ? (r.sessions / max) * 100 : 0}
+                accent={T.teal}
+                valueExtra={`${Math.round(r.percentage)}%`}
+              />
+            ))}
+            <div style={{ marginTop: 10, paddingTop: 8, borderTop: `0.5px solid ${T.border}`, fontSize: 10, color: T.mute }}>
+              Located: <strong style={{ color: T.ink, fontWeight: 600 }}>{fmtInt(data.located)}</strong> of {fmtInt(data.total)} sessions
+              {data.unknown > 0 && <span style={{ color: T.muteSoft }}> · {fmtInt(data.unknown)} without region (before the setting or unresolved)</span>}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 500, color: T.mute, letterSpacing: "0.02em", textTransform: "uppercase", marginBottom: 8 }}>
+              Top cities
+            </div>
+            {cities.length === 0 ? (
+              <div style={{ fontSize: 11, color: T.muteSoft }}>—</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                {cities.map((c, i) => (
+                  <div key={`${c.city}-${i}`} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, gap: 8 }}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: T.ink }}>{c.city}</span>
+                    <strong style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtInt(c.sessions)}</strong>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
