@@ -180,21 +180,43 @@ export default function ArabesqueGlow({ tone = "dark", clearAt = "40% 52%" }) {
           0%, 100% { opacity: 0.18; }
           50%      { opacity: 0.55; }
         }
-        /* Phones and touch screens: no moving light at all. On a narrow screen
-           the copy covers the whole width, so a drifting glow only ever shows
-           as clipped blobs between text and cards, and animating a mask is
-           costly on a phone. The lattice stays, still and fainter, and only
-           in the lower part of the section, under the copy rather than
-           behind it. */
+        /* Phones and touch screens. The copy covers the whole width there, so
+           a drifting spot only ever showed as clipped blobs between text and
+           cards. Instead: the lattice sits in the lower part of the section
+           (under the copy, not behind it), and a slow diagonal band of light
+           sweeps across it on a loop, like light passing over tiles. No blur
+           filter, which is costly on a phone. */
         @media (max-width: 720px), (hover: none) {
-          .nz-arab-glow { display: none; }
-        }
-        @media (max-width: 720px) {
           .nz-arab-base {
-            opacity: calc(var(--nz-arab-op, 0.15) * 0.6);
-            -webkit-mask-image: linear-gradient(to bottom, transparent 0%, transparent 40%, #000 100%);
-                    mask-image: linear-gradient(to bottom, transparent 0%, transparent 40%, #000 100%);
+            opacity: calc(var(--nz-arab-op, 0.15) * 0.75);
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0%, transparent 38%, #000 100%);
+                    mask-image: linear-gradient(to bottom, transparent 0%, transparent 38%, #000 100%);
           }
+          .nz-arab-glow,
+          .nz-arab-glow.is-follow {
+            filter: none;
+            opacity: 0.55;
+            -webkit-mask-image:
+              linear-gradient(115deg, transparent 0%, transparent 42%, #000 50%, transparent 58%, transparent 100%),
+              linear-gradient(to bottom, transparent 0%, transparent 38%, #000 100%);
+            -webkit-mask-size: 300% 100%, 100% 100%;
+            -webkit-mask-repeat: no-repeat, no-repeat;
+            -webkit-mask-position: 100% 0, 0 0;
+            -webkit-mask-composite: source-in;
+                    mask-image:
+              linear-gradient(115deg, transparent 0%, transparent 42%, #000 50%, transparent 58%, transparent 100%),
+              linear-gradient(to bottom, transparent 0%, transparent 38%, #000 100%);
+                    mask-size: 300% 100%, 100% 100%;
+                    mask-repeat: no-repeat, no-repeat;
+                    mask-position: 100% 0, 0 0;
+                    mask-composite: intersect;
+            animation: nzArabSweep 7s ease-in-out infinite;
+          }
+        }
+        @keyframes nzArabSweep {
+          0%   { -webkit-mask-position: 100% 0, 0 0; mask-position: 100% 0, 0 0; }
+          70%  { -webkit-mask-position: 0% 0, 0 0;   mask-position: 0% 0, 0 0; }
+          100% { -webkit-mask-position: 0% 0, 0 0;   mask-position: 0% 0, 0 0; }
         }
         @media (prefers-reduced-motion: reduce) {
           .nz-arab-glow { animation: none; opacity: 0.14; }
