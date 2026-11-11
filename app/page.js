@@ -6,6 +6,36 @@ import HomeSections from "../components/HomeSections";
 import { getFeaturedHotels, getHotelsPaged, getCities } from "../lib/api";
 import { Suspense } from "react";
 
+export const metadata = {
+  title: "Nzzor — Réservez votre hôtel en Algérie | CIB et Edahabia",
+  description:
+    "Hôtels vérifiés dans toutes les wilayas d'Algérie, de Djanet à la côte. Réservation en ligne, paiement par carte CIB ou Edahabia, assistance WhatsApp. Agence de voyage agréée.",
+  alternates: { canonical: "https://nzzor.com/" },
+};
+
+// Who runs the site, for Google's knowledge panel. Facts only: the agency,
+// its address, its phone and email, the payment it accepts.
+const ORG_LD = {
+  "@context": "https://schema.org",
+  "@type": "TravelAgency",
+  name: "Nzzor",
+  legalName: "ALLOUNI TRAVEL AGENCY",
+  url: "https://nzzor.com",
+  logo: "https://nzzor.com/icon.png",
+  image: "https://nzzor.com/og.jpg",
+  email: "contact@nzzor.com",
+  telephone: "+213770080830",
+  address: {
+    "@type": "PostalAddress",
+    streetAddress: "Cité 300 Logements Les Tours, Bât. A2",
+    addressLocality: "Sétif",
+    addressCountry: "DZ",
+  },
+  areaServed: { "@type": "Country", name: "Algeria" },
+  currenciesAccepted: "DZD",
+  paymentAccepted: "CIB, Edahabia",
+};
+
 export default async function HomePage() {
   // Counts are read from the API rather than written into copy. The homepage
   // previously claimed "10 hotels" and "9 wilayas" against a catalogue that had
@@ -24,6 +54,7 @@ export default async function HomePage() {
 
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ORG_LD) }} />
       <Nav overHero />
       <HomeHero />
       <Suspense fallback={null}>
