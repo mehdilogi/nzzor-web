@@ -349,7 +349,12 @@ export default function PaymentReceipt({ status, reference, message, rejectionCo
           <div className="rcpt-help">{s.helpline}</div>
 
           <div className="rcpt-cta no-print">
-            {status === "failed" && <a className="primary" href="/hotels">{s.try_again}</a>}
+            {/* Retries the SAME booking. It used to send the customer back to
+                the hotel list, which meant re-entering everything — most of
+                them simply left. */}
+            {status === "failed" && reference && (
+              <a className="primary" href={`/pay/${encodeURIComponent(reference)}?lang=${view}`}>{s.try_again}</a>
+            )}
             {status === "pending" && reference && (
               <a className="primary" href={`/booking/result?ref=${reference}&status=pending&lang=${view}`}>
                 {s.refresh}
