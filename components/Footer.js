@@ -5,7 +5,8 @@ import LogoMark from "./LogoMark";
 import { useLang } from "../lib/LangContext";
 
 export default function Footer() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const groupsLabel = { fr: "Voyages de groupe", en: "Group travel", ar: "رحلات المجموعات" }[lang] || "Voyages de groupe";
   return (
     <footer className="nz-footer">
       <div className="wrap nz-footer-top">
@@ -41,6 +42,7 @@ export default function Footer() {
           <Link className="nz-flink" style={{ display: "block" }} href="/#allouni">{t("footer.about")}</Link>
           <Link className="nz-flink" style={{ display: "block" }} href="/#allouni">{t("footer.agency")}</Link>
           <Link className="nz-flink" style={{ display: "block" }} href="/hotels">{t("footer.ourhotels")}</Link>
+          <Link className="nz-flink" style={{ display: "block" }} href="/groupes">{groupsLabel}</Link>
           {/* "Careers" removed: there is no careers page, and a link that lands
               on the homepage reads as a broken site. */}
         </div>

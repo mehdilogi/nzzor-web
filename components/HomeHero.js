@@ -14,9 +14,23 @@ import { parseQuery } from "../lib/nlSearch";
 // restores the toggle without another deploy.
 const SHOW_AI_SEARCH = true;
 
+// Online booking limits. Beyond these it is a group, which the agency quotes
+// by hand (/groupes): hotels price groups differently and most room types
+// here have only one or two units, so a 30-person search would just look empty.
+const MAX_ADULTS = 4;
+const MAX_CHILDREN = 3;
+const MAX_ROOMS = 4;
+
+const GROUP_CTA = {
+  fr: { q: "Groupe de 10 personnes ou plus ?", a: "Demander un tarif groupe" },
+  en: { q: "Group of 10 or more?", a: "Get a group rate" },
+  ar: { q: "مجموعة من 10 أشخاص أو أكثر؟", a: "اطلبوا سعر المجموعات" },
+};
+
 // search bar steps: city -> dates -> guests, with auto-advance
 export default function HomeHero() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const groupCta = GROUP_CTA[lang] || GROUP_CTA.fr;
   const router = useRouter();
   const [city, setCity] = useState("");
   const [checkIn, setCheckIn] = useState("");
@@ -32,7 +46,7 @@ export default function HomeHero() {
       list.map((r, i) => (i === idx ? { ...r, [field]: val } : r))
     );
   const addRoom = () =>
-    setRoomsList((list) => (list.length >= 8 ? list : [...list, { adults: 2, children: 0 }]));
+    setRoomsList((list) => (list.length >= MAX_ROOMS ? list : [...list, { adults: 2, children: 0 }]));
   const removeRoom = (idx) =>
     setRoomsList((list) => (list.length <= 1 ? list : list.filter((_, i) => i !== idx)));
 
@@ -282,7 +296,7 @@ export default function HomeHero() {
                         <div className="nzs-stepper">
                           <button onClick={() => setRoomField(idx, "adults", Math.max(1, room.adults - 1))} disabled={room.adults <= 1} aria-label="decrease adults">−</button>
                           <strong>{room.adults}</strong>
-                          <button onClick={() => setRoomField(idx, "adults", Math.min(10, room.adults + 1))} disabled={room.adults >= 10} aria-label="increase adults">+</button>
+                          <button onClick={() => setRoomField(idx, "adults", Math.min(MAX_ADULTS, room.adults + 1))} disabled={room.adults >= MAX_ADULTS} aria-label="increase adults">+</button>
                         </div>
                       </div>
                       <div className="nzs-occ-row">
@@ -292,7 +306,7 @@ export default function HomeHero() {
                         <div className="nzs-stepper">
                           <button onClick={() => setRoomField(idx, "children", Math.max(0, room.children - 1))} disabled={room.children <= 0} aria-label="decrease children">−</button>
                           <strong>{room.children}</strong>
-                          <button onClick={() => setRoomField(idx, "children", Math.min(10, room.children + 1))} disabled={room.children >= 10} aria-label="increase children">+</button>
+                          <button onClick={() => setRoomField(idx, "children", Math.min(MAX_CHILDREN, room.children + 1))} disabled={room.children >= MAX_CHILDREN} aria-label="increase children">+</button>
                         </div>
                       </div>
                     </div>
@@ -304,7 +318,7 @@ export default function HomeHero() {
                   type="button"
                   className="nzs-add-room"
                   onClick={addRoom}
-                  disabled={roomsList.length >= 8}
+                  disabled={roomsList.length >= MAX_ROOMS}
                 >
                   + {t("search.add_room") || "Add a room"}
                 </button>
@@ -312,6 +326,15 @@ export default function HomeHero() {
                   {t("search.search_hotels")}
                 </button>
               </div>
+              {/* The way out for groups. Highlighted once the online limits
+                  are reached, so nobody is left stuck at "4 rooms". */}
+              <a
+                href="/groupes"
+                className={`nzs-group${roomsList.length >= MAX_ROOMS || totalAdults + totalChildren >= 10 ? " hot" : ""}`}
+              >
+                <span>{groupCta.q}</span>
+                <strong>{groupCta.a} {lang === "ar" ? "←" : "→"}</strong>
+              </a>
             </div>
           )}
         </div>
@@ -592,6 +615,18 @@ export default function HomeHero() {
           border-radius: var(--r-sm); font-size: 15px; font-weight: 700; cursor: pointer;
         }
         .nzs-done:hover { background: var(--red-deep); }
+        .nzs-group {
+          display: flex; align-items: center; justify-content: space-between; gap: 12px;
+          margin-top: 16px; padding: 12px 14px; border-radius: 12px;
+          background: var(--cream); text-decoration: none; transition: background .15s;
+        }
+        .nzs-group span { font-size: 13px; color: var(--gray-400); font-weight: 600; }
+        .nzs-group strong { font-size: 13px; color: var(--ink); font-weight: 700; white-space: nowrap; }
+        .nzs-group:hover { background: var(--gray-100); }
+        .nzs-group.hot { background: var(--ink); }
+        .nzs-group.hot span { color: rgba(255,255,255,0.7); }
+        .nzs-group.hot strong { color: #fff; }
+        @media (max-width: 420px) { .nzs-group { flex-direction: column; align-items: flex-start; gap: 4px; } }
 
         .nz-hero-foot {
           position: absolute; left: 52px; right: 52px; bottom: 32px; z-index: 5;
