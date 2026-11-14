@@ -224,8 +224,231 @@ function GroupRow({ g, open, onToggle, onSave }) {
               {msg && <span style={{ fontSize: 11, color: msg === "Saved" ? T.teal : T.red }}>{msg}</span>}
             </div>
           </div>
+
+          <div style={{ gridColumn: "1 / -1", borderTop: `1px solid ${T.border}`, paddingTop: 14 }}>
+            {g.bookingRef ? (
+              <BookedBox g={g} />
+            ) : (
+              <ConvertForm g={g} onDone={() => onSave(g.id, {})} />
+            )}
+          </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// The group is booked: show the reference and the payment link.
+// -----------------------------------------------------------------------------
+function BookedBox({ g }) {
+  const payUrl = `https://nzzor.com/pay/${g.bookingRef}?lang=${g.lang || "fr"}`;
+  const [copied, setCopied] = useState(false);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", fontSize: 12 }}>
+      <span style={{ background: T.teal, color: "#fff", borderRadius: 980, padding: "4px 10px", fontSize: 10, fontWeight: 700, letterSpacing: "0.04em" }}>BOOKED</span>
+      <span>Booking <strong style={{ letterSpacing: "0.03em" }}>{g.bookingRef}</strong> — find it in the Bookings tab (payment, voucher resend, cancellation).</span>
+      <button style={btn()} onClick={() => { navigator.clipboard?.writeText(payUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>
+        {copied ? "Copied" : "Copy card payment link"}
+      </button>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Turn the request into a real booking.
+// -----------------------------------------------------------------------------
+const PAY_OPTIONS = [
+  ["BANK_TRANSFER", "Bank transfer to the agency", "Confirmed now: voucher to the customer and email to the hotel. Mark it PAID in Bookings when the transfer clears."],
+  ["CASH", "Paid at the hotel", "Confirmed now. The hotel collects; it owes Nzzor the commission in Accounting."],
+  ["CIB", "Card online (CIB / Edahabia)", "Waits for payment. You get a link to send; it confirms itself once paid. Rooms are not held while unpaid."],
+];
+
+function ConvertForm({ g, onDone }) {
+  const [openForm, setOpenForm] = useState(false);
+  const [q, setQ] = useState(g.destination || "");
+  const [hotels, setHotels] = useState([]);
+  const [hotelId, setHotelId] = useState("");
+  const [lines, setLines] = useState({}); // roomId -> { quantity, pricePerNight }
+  const ymd = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
+  const [checkIn, setCheckIn] = useState(ymd(g.checkIn));
+  const [checkOut, setCheckOut] = useState(ymd(g.checkOut));
+  const [pay, setPay] = useState("BANK_TRANSFER");
+  const [email, setEmail] = useState(g.email || "");
+  const [commission, setCommission] = useState("");
+  const [note, setNote] = useState("");
+  const [force, setForce] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    if (!openForm) return;
+    let off = false;
+    const id = setTimeout(() => {
+      call(`/hotels?q=${encodeURIComponent(q)}`).then((j) => { if (!off) setHotels(j.data || []); }).catch((e) => setErr(e.message));
+    }, 250);
+    return () => { off = true; clearTimeout(id); };
+  }, [q, openForm]);
+
+  const hotel = hotels.find((h) => h.id === hotelId);
+  const nights = checkIn && checkOut ? Math.round((new Date(checkOut) - new Date(checkIn)) / 86400000) : 0;
+  const chosen = Object.entries(lines)
+    .map(([roomId, l]) => ({ roomId, quantity: Number(l.quantity) || 0, pricePerNight: Number(l.pricePerNight) || 0 }))
+    .filter((l) => l.quantity > 0);
+  const roomsCount = chosen.reduce((a, l) => a + l.quantity, 0);
+  const total = chosen.reduce((a, l) => a + l.quantity * l.pricePerNight * Math.max(nights, 0), 0);
+
+  function pickHotel(id) {
+    setHotelId(id);
+    setLines({});
+    setErr(null);
+  }
+  function setLine(room, field, value) {
+    setLines((x) => ({ ...x, [room.id]: { quantity: x[room.id]?.quantity ?? "", pricePerNight: x[room.id]?.pricePerNight ?? room.basePrice, [field]: value } }));
+  }
+
+  async function create() {
+    setErr(null);
+    if (!hotelId) return setErr("Choose a hotel.");
+    if (!chosen.length) return setErr("Enter at least one room quantity.");
+    if (nights < 1) return setErr("Check the dates.");
+    setBusy(true);
+    try {
+      const j = await call(`/${g.id}/booking`, {
+        method: "POST",
+        body: JSON.stringify({
+          hotelId, rooms: chosen, checkIn, checkOut, paymentMethod: pay,
+          guestEmail: email || null,
+          commissionAmount: commission === "" ? null : Number(commission),
+          specialRequests: note || null,
+          force,
+        }),
+      });
+      setResult(j.data);
+    } catch (e) {
+      setErr(e.message);
+    }
+    setBusy(false);
+  }
+
+  if (result) {
+    return (
+      <div style={{ fontSize: 12, lineHeight: 1.7 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: T.teal }}>Booking {result.reference} created · {fmtDA(result.total)}</div>
+        {result.payUrl ? (
+          <>
+            <div>Send this payment link to the customer. The booking confirms itself (voucher + hotel email) once paid:</div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, flexWrap: "wrap" }}>
+              <code style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 6, padding: "6px 8px" }}>{result.payUrl}</code>
+              <a href={waLink(g.phone, result.payUrl)} target="_blank" rel="noopener noreferrer" style={{ ...btn(), background: "#25D366", color: "#fff", border: 0, textDecoration: "none" }}>Send on WhatsApp</a>
+            </div>
+          </>
+        ) : (
+          <div>Confirmed. The voucher went to the customer and the notification to the hotel.</div>
+        )}
+        <button style={{ ...btn(), marginTop: 10 }} onClick={onDone}>Done</button>
+      </div>
+    );
+  }
+
+  if (!openForm) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <button onClick={() => setOpenForm(true)} style={{ ...btn(), background: T.teal, color: "#fff", border: 0, padding: "8px 14px", fontSize: 12 }}>
+          Create booking from this request
+        </button>
+        <span style={{ fontSize: 11, color: T.mute }}>Once the customer accepts the quote: real booking, voucher, hotel email, Accounting.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, fontSize: 12 }}>
+      <div style={{ fontSize: 13, fontWeight: 700 }}>Create booking</div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div>
+          <div style={lbl}>Hotel</div>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search hotel or city" style={inp} />
+          <div style={{ maxHeight: 150, overflowY: "auto", marginTop: 6, border: `1px solid ${T.border}`, borderRadius: 6, background: T.white }}>
+            {hotels.length === 0 ? (
+              <div style={{ padding: 8, color: T.mute }}>No hotel found</div>
+            ) : hotels.map((h) => (
+              <button key={h.id} onClick={() => pickHotel(h.id)} style={{
+                display: "block", width: "100%", textAlign: "start", padding: "7px 10px", border: 0, cursor: "pointer", fontFamily: "inherit", fontSize: 12,
+                background: h.id === hotelId ? T.ink : "transparent", color: h.id === hotelId ? "#fff" : T.ink,
+                borderBottom: `1px solid ${T.soft}`,
+              }}>
+                {h.nameFr} <span style={{ opacity: 0.6 }}>· {h.cityFr || h.city}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, alignContent: "start" }}>
+          <div><div style={lbl}>Check-in</div><input type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} style={inp} /></div>
+          <div><div style={lbl}>Check-out</div><input type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} style={inp} /></div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <div style={lbl}>Customer email (voucher)</div>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="If empty, the voucher comes to contact@nzzor.com" style={inp} />
+          </div>
+        </div>
+      </div>
+
+      {hotel && (
+        <div>
+          <div style={lbl}>Rooms · negotiated group price per room per night</div>
+          <div style={{ border: `1px solid ${T.border}`, borderRadius: 6, background: T.white }}>
+            {hotel.rooms.length === 0 && <div style={{ padding: 8, color: T.mute }}>This hotel has no active room types. Add one in Hotels first.</div>}
+            {hotel.rooms.map((r) => (
+              <div key={r.id} style={{ display: "grid", gridTemplateColumns: "1fr 90px 130px", gap: 8, alignItems: "center", padding: "6px 10px", borderBottom: `1px solid ${T.soft}` }}>
+                <div>{r.typeFr} <span style={{ color: T.mute }}>· public {fmtDA(r.basePrice)} · {r.totalUnits} on Nzzor</span></div>
+                <input type="number" min="0" placeholder="Qty" value={lines[r.id]?.quantity ?? ""} onChange={(e) => setLine(r, "quantity", e.target.value)} style={inp} />
+                <input type="number" min="0" placeholder="DA / night" value={lines[r.id]?.pricePerNight ?? ""} onChange={(e) => setLine(r, "pricePerNight", e.target.value)} style={inp} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <div style={lbl}>Payment</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {PAY_OPTIONS.map(([k, label, help]) => (
+            <label key={k} style={{ display: "flex", gap: 8, alignItems: "flex-start", cursor: "pointer" }}>
+              <input type="radio" name={`pay-${g.id}`} checked={pay === k} onChange={() => setPay(k)} style={{ marginTop: 2 }} />
+              <span><strong>{label}</strong> <span style={{ color: T.mute }}>— {help}</span></span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12 }}>
+        <div>
+          <div style={lbl}>Nzzor commission (DA, optional)</div>
+          <input type="number" min="0" value={commission} onChange={(e) => setCommission(e.target.value)} placeholder={hotel ? (hotel.commissionType === "FIXED_PER_NIGHT" ? `Default ${hotel.commissionFixed} DA/night` : `Default ${hotel.commissionRate} %`) : "Hotel default"} style={inp} />
+        </div>
+        <div>
+          <div style={lbl}>Note on the voucher (optional)</div>
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Breakfast included, meeting room…" style={inp} />
+        </div>
+      </div>
+
+      <label style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer" }}>
+        <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} />
+        <span><strong>Confirmed with the hotel</strong> <span style={{ color: T.mute }}>— book even if Nzzor shows fewer free rooms than the group needs.</span></span>
+      </label>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", background: T.white, border: `1px solid ${T.border}`, borderRadius: 6, padding: "10px 12px" }}>
+        <span>{roomsCount} room{roomsCount === 1 ? "" : "s"} × {Math.max(nights, 0)} night{nights === 1 ? "" : "s"}</span>
+        <strong style={{ fontSize: 16 }}>{fmtDA(total)}</strong>
+        <span style={{ flex: 1 }} />
+        <button onClick={() => setOpenForm(false)} style={btn()}>Cancel</button>
+        <button disabled={busy} onClick={create} style={{ ...btn(), background: T.teal, color: "#fff", border: 0, padding: "8px 14px", fontSize: 12 }}>
+          {busy ? "Creating…" : pay === "CIB" ? "Create & get payment link" : "Create & confirm booking"}
+        </button>
+      </div>
+      {err && <div style={{ color: T.red, fontWeight: 600 }}>{err}</div>}
     </div>
   );
 }
