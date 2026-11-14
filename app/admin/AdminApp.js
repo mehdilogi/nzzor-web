@@ -15,6 +15,7 @@ import {
 } from "../../lib/adminApi";
 import AnalyticsPanel from "./AnalyticsPanel";
 import AccountingPanel from "./AccountingPanel";
+import GroupsPanel from "./GroupsPanel";
 import HotelMapPicker from "./HotelMapPicker";
 
 const fmt = (n) => Number(n || 0).toLocaleString("en") + " DZD";
@@ -185,6 +186,7 @@ function Dashboard({ user, onLogout }) {
             ["analytics", "Analytics"],
             ["hotels", "Hotels"],
             ["bookings", "Bookings"],
+            ["groups", "Groups"],
             ["accounting", "Accounting"],
             ["customers", "Customers"],
           ].map(([k, label]) => (
@@ -207,6 +209,7 @@ function Dashboard({ user, onLogout }) {
         {tab === "analytics" && <AnalyticsPanel />}
         {tab === "hotels" && <HotelsManager />}
         {tab === "bookings" && <BookingsManager />}
+        {tab === "groups" && <GroupsPanel />}
         {tab === "accounting" && <AccountingPanel />}
         {tab === "customers" && <CustomersManager />}
       </main>
