@@ -122,11 +122,35 @@ export default function PayAgain({ reference, lang }) {
   useEffect(() => {
     let cancelled = false;
     const base = process.env.NEXT_PUBLIC_API_URL || "";
-    fetch(`${base}/api/payments/satim/receipt/${encodeURIComponent(reference)}`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
+    const ref = encodeURIComponent(reference);
+    const getJson = (url) => fetch(url, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+
+    // The receipt endpoint only knows bookings that already have a payment
+    // attempt. A booking created by the agency (a group) and sent as a link
+    // has none yet, so fall back to the booking itself.
+    (async () => {
+      let d = (await getJson(`${base}/api/payments/satim/receipt/${ref}`))?.data || null;
+      if (!d) {
+        const b = (await getJson(`${base}/api/bookings/${ref}?lang=${lang || "fr"}`))?.data || null;
+        if (b) {
+          d = {
+            reference: b.reference,
+            paid: (b.payment && b.payment.status) === "PAID",
+            bookingStatus: b.status,
+            hotelName: b.hotel ? b.hotel.name : null,
+            hotelNameLatin: null,
+            guestName: b.guest ? `${b.guest.firstName || ""} ${b.guest.lastName || ""}`.trim() : null,
+            checkIn: b.checkIn,
+            checkOut: b.checkOut,
+            nights: b.nights,
+            amount: b.pricing ? b.pricing.total : null,
+          };
+        }
+      }
+      return d;
+    })()
+      .then((d) => {
         if (cancelled) return;
-        const d = j && j.data;
         if (!d) return setState("missing");
         setInfo(d);
         if (d.paid || d.bookingStatus === "CONFIRMED") return setState("paid");
@@ -136,7 +160,7 @@ export default function PayAgain({ reference, lang }) {
       })
       .catch(() => { if (!cancelled) setState("missing"); });
     return () => { cancelled = true; };
-  }, [reference]);
+  }, [reference, lang]);
 
   async function pay() {
     if (!terms) { setError(s.terms_required); return; }
