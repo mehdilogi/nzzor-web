@@ -32,6 +32,8 @@ const TX = {
     breakfast: "Petit-déjeuner inclus", total_stay: "total du séjour", select: "Choisir", selected: "Choisie ✓",
     cart: (n, q) => `Votre réservation · ${n} sur ${q} chambre${q > 1 ? "s" : ""}`,
     cart_empty: "Touchez « Choisir » sur un tarif pour ajouter une chambre.",
+    mr_dates: "Choisir les dates", mr_rooms: "Voir les chambres", mr_from: "dès",
+    mr_stay: (n) => `${n} nuit${n > 1 ? "s" : ""} · total`,
     book_now: "Réserver", on_request: "Sur demande", loading: "Chargement des tarifs…",
     too_small: (c, g) => `${c} pers. max · trop petite pour ${g}`,
     cap_one: (c, g) => `Cette chambre accueille ${c} pers., vous êtes ${g}. Choisissez une chambre plus grande.`,
@@ -51,6 +53,8 @@ const TX = {
     breakfast: "Breakfast included", total_stay: "total stay", select: "Select", selected: "Selected ✓",
     cart: (n, q) => `Your booking · ${n} of ${q} room${q > 1 ? "s" : ""}`,
     cart_empty: "Tap Select on a rate to add a room.",
+    mr_dates: "Choose dates", mr_rooms: "See rooms", mr_from: "from",
+    mr_stay: (n) => `${n} night${n > 1 ? "s" : ""} · total`,
     book_now: "Book", on_request: "On request", loading: "Loading rates…",
     too_small: (c, g) => `Sleeps ${c} · too small for ${g}`,
     cap_one: (c, g) => `This room sleeps ${c}, but you are ${g}. Please choose a larger room.`,
@@ -70,6 +74,8 @@ const TX = {
     breakfast: "الإفطار مشمول", total_stay: "مجموع الإقامة", select: "اختيار", selected: "تم الاختيار ✓",
     cart: (n, q) => `حجزك · ${n} من ${q} غرفة`,
     cart_empty: "اضغط «اختيار» على سعر لإضافة غرفة.",
+    mr_dates: "اختر التواريخ", mr_rooms: "عرض الغرف", mr_from: "ابتداءً من",
+    mr_stay: (n) => `${n} ${n > 1 ? "ليالٍ" : "ليلة"} · المجموع`,
     book_now: "احجز", on_request: "حسب الطلب", loading: "جارٍ تحميل الأسعار…",
     too_small: (c, g) => `تتسع لـ ${c} · صغيرة على ${g}`,
     cap_one: (c, g) => `هذه الغرفة تتسع لـ ${c} وأنتم ${g}. اختر غرفة أكبر.`,
@@ -492,7 +498,9 @@ export default function HotelDetail({ hotel }) {
           {hotel.location && (
             <section id="location" className="nz-dsection">
               <h2 className="display">{t("detail.location") || "Location"}</h2>
-              <HotelMap hotel={hotel} t={t} />
+              {/* Leaflet's panes carry z-index 400-1000; isolating the map keeps
+                  it under the sticky header and tabs while scrolling. */}
+              <div className="nz-map-wrap"><HotelMap hotel={hotel} t={t} /></div>
             </section>
           )}
 
@@ -930,15 +938,41 @@ export default function HotelDetail({ hotel }) {
         </div>
       ) : (
       <div className="nz-mobile-reserve">
-        <div className="nz-mr-price">
-          <span className="amt display">{
-            quote
-              ? (cheapestOption ? formatPriceShort(cheapestOption.pricePerNightPerRoom) : "—")
-              : (selectedRoom ? formatPriceShort(selectedRoom.price) : "—")
-          }</span>
-          <span className="unit">{t("detail.per_night")}</span>
-        </div>
-        <button className="nz-mr-btn" onClick={reserve}>{t("detail.reserve")}</button>
+        {/* The bar always offers the NEXT step: dates → rooms → book. It used
+            to say "Reserve" at every stage and silently do nothing until dates
+            and a room were picked. */}
+        {(() => {
+          const stage = !checkIn || !checkOut || dateError ? "dates" : canReserve ? "book" : "rooms";
+          const go = () => {
+            if (stage === "book") return reserve();
+            const el = stage === "dates" ? document.querySelector(".nz-widget") : document.getElementById("rooms");
+            if (el) el.scrollIntoView({ behavior: "smooth", block: stage === "dates" ? "center" : "start" });
+          };
+          const fromPrice = quote
+            ? (cheapestOption ? formatPriceShort(cheapestOption.pricePerNightPerRoom) : null)
+            : (selectedRoom ? formatPriceShort(selectedRoom.price) : null);
+          return (
+            <>
+              <div className="nz-mr-price">
+                {stage === "book" ? (
+                  <>
+                    <span className="amt display">{formatPrice(subtotal)}</span>
+                    <span className="unit">{L("mr_stay")(nights)}</span>
+                  </>
+                ) : fromPrice ? (
+                  <>
+                    <span className="from">{L("mr_from")}</span>
+                    <span className="amt display">{fromPrice}</span>
+                    <span className="unit">{t("detail.per_night")}</span>
+                  </>
+                ) : null}
+              </div>
+              <button className="nz-mr-btn" onClick={go}>
+                {stage === "dates" ? L("mr_dates") : stage === "rooms" ? L("mr_rooms") : L("book_now")}
+              </button>
+            </>
+          );
+        })()}
       </div>
       )}
 
@@ -1105,7 +1139,8 @@ function DetailStyles() {
         transform: scaleX(1);
       }
 
-      .nz-dsection { margin-bottom: 44px; }
+      .nz-dsection { margin-bottom: 44px; scroll-margin-top: 150px; }
+      .nz-map-wrap { position: relative; z-index: 0; isolation: isolate; border-radius: var(--r-lg); overflow: hidden; }
       .nz-dsection h2 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 18px; }
       .nz-about { font-size: 15.5px; line-height: 1.75; color: var(--ink-2); }
 
@@ -1204,11 +1239,37 @@ function DetailStyles() {
       .nz-cart-cta:hover { opacity: .9; }
       .nz-cart-cta:disabled { opacity: .4; cursor: default; }
       @media (max-width: 640px) {
-        .nz-rblock { flex-direction: column; gap: 10px; }
-        .nz-rcard { flex: none; width: 100%; flex-direction: row; gap: 12px; align-items: center; }
-        .nz-rcard-photo { width: 90px; height: 70px; flex-shrink: 0; margin-bottom: 0; }
-        .nz-rcard-specs { flex-direction: row; gap: 10px; }
+        /* Room = header (photo left, name + specs right) above its rates.
+           align-items must be stretch: with flex-start the rates column
+           shrank to its content and clipped the rate card in half. */
+        .nz-rblock { flex-direction: column; align-items: stretch; gap: 14px; padding: 16px; }
+        .nz-rcard {
+          flex: none; width: 100%;
+          display: grid; grid-template-columns: 88px minmax(0, 1fr); column-gap: 14px; row-gap: 3px;
+          align-items: start;
+        }
+        .nz-rcard-photo { grid-column: 1; grid-row: 1 / span 4; width: 88px; height: 72px; margin-bottom: 0; }
+        .nz-rcard > :not(.nz-rcard-photo) { grid-column: 2; }
+        .nz-rcard-name { font-size: 17px; }
+        .nz-rcard-specs { flex-direction: row; flex-wrap: wrap; gap: 4px 12px; margin-top: 2px; }
+        /* Rates stack full width — no sideways scrolling on a phone. */
+        .nz-rates { flex-direction: column; overflow: visible; padding: 0; gap: 10px; width: 100%; }
+        .nz-rate {
+          flex: none; width: 100%; box-sizing: border-box;
+          display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: end;
+          padding: 14px;
+        }
+        .nz-rate.selected { padding: 13px; }
+        .nz-rate-tag { grid-column: 1 / -1; min-height: 0; margin-bottom: 0; }
+        .nz-rate-tag:empty { display: none; }
+        .nz-rate-board { grid-column: 1; margin-bottom: 4px; }
+        .nz-rate-lines { grid-column: 1; line-height: 1.7; }
+        .nz-rate-foot { grid-column: 2; grid-row: 2 / span 2; margin-top: 0; text-align: end; display: flex; flex-direction: column; align-items: flex-end; }
+        .nz-rate-tag:empty ~ .nz-rate-foot { grid-row: 1 / span 2; }
+        .nz-rate-price .amt { font-size: 19px; }
+        .nz-rate-btn { width: auto; min-width: 112px; padding: 10px 16px; font-size: 13.5px; border-radius: 980px; }
         .nz-cart { flex-direction: column; align-items: stretch; } .nz-cart-foot { text-align: left; }
+        .nz-cart-cta { width: 100%; padding: 14px; }
       }
       .nz-room {
         display: grid; grid-template-columns: 200px 1fr auto; gap: 22px; align-items: center;
@@ -1240,12 +1301,13 @@ function DetailStyles() {
 
       .nz-policies { border: 1px solid var(--gray-200); border-radius: var(--r-lg); overflow: hidden; }
       .nz-policy-row {
-        display: flex; align-items: center; justify-content: space-between;
+        display: flex; align-items: center; justify-content: space-between; gap: 16px;
         padding: 16px 20px; border-bottom: 1px solid var(--gray-100);
       }
       .nz-policy-row:last-child { border-bottom: none; }
       .nz-policy-row .pl { display: flex; align-items: center; gap: 11px; font-size: 14px; font-weight: 700; }
-      .nz-policy-row .pv { font-size: 13.5px; color: var(--gray-400); font-weight: 600; }
+      .nz-policy-row .pl { flex-shrink: 0; }
+      .nz-policy-row .pv { font-size: 13.5px; color: var(--gray-400); font-weight: 600; text-align: end; min-width: 0; }
       .nz-policy-row .pv.good { color: var(--teal); }
 
       .nz-widget {
@@ -1346,6 +1408,7 @@ function DetailStyles() {
         .nz-hotel-head h1 { font-size: 28px; }
         .nz-hotel-sub { gap: 12px; }
         .nz-dtabs {
+          top: 63px; /* mobile header height — no gap for content to show through */
           /* Allow horizontal scroll if tabs overflow on small screens */
           overflow-x: auto;
           -webkit-overflow-scrolling: touch;
@@ -1367,7 +1430,9 @@ function DetailStyles() {
           width: 100%; margin-top: 4px;
         }
         .nz-amenities { grid-template-columns: 1fr; }
-        .nz-policy-row { padding: 14px 16px; }
+        .nz-policy-row { padding: 14px 16px; align-items: flex-start; }
+        .nz-policy-row .pv { max-width: 58%; line-height: 1.45; }
+        .nz-dsection { scroll-margin-top: 120px; }
         .nz-widget { border-radius: var(--r-md); }
         .nz-room-perks { gap: 10px; }
       }
@@ -1381,10 +1446,12 @@ function DetailStyles() {
           background: #fff; border-top: 1px solid var(--gray-200);
           padding: 12px 20px; box-shadow: 0 -8px 24px -12px rgba(20,20,30,0.2);
         }
-        .nz-mr-price .amt { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
-        .nz-mr-price .unit { font-size: 11px; color: var(--gray-400); font-weight: 600; margin-inline-start: 4px; }
+        .nz-mr-price { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+        .nz-mr-price .from { font-size: 11px; color: var(--gray-400); font-weight: 600; }
+        .nz-mr-price .amt { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; white-space: nowrap; }
+        .nz-mr-price .unit { font-size: 11px; color: var(--gray-400); font-weight: 600; }
         .nz-mr-btn {
-          flex: 1; max-width: 200px; padding: 14px; background: var(--red); color: #fff;
+          flex: 1; max-width: 220px; padding: 14px; background: var(--red); color: #fff;
           border: none; border-radius: var(--r-sm);
           font-family: 'Clash Display', sans-serif; font-size: 15px; font-weight: 600;
         }
