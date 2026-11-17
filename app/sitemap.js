@@ -2,6 +2,8 @@
 // Lists the homepage, /hotels, /terms and every hotel page.
 // Rebuilt at most once an hour, so new hotels appear without a redeploy.
 
+import { getCityGroups } from "../lib/seoData";
+
 export const revalidate = 3600;
 
 const SITE = "https://nzzor.com";
@@ -28,23 +30,9 @@ async function fetchAllHotels() {
   return hotels;
 }
 
-const citySlug = (key) =>
-  String(key || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-
-async function fetchCities() {
-  try {
-    const res = await fetch(API + "/api/hotels/meta/cities?lang=fr", { next: { revalidate: 3600 } });
-    if (!res.ok) return [];
-    const json = await res.json();
-    return (json.data || []).filter((c) => c && c.key && c.hotelCount > 0);
-  } catch (e) {
-    return [];
-  }
-}
-
 export default async function sitemap() {
   const now = new Date();
-  const [hotels, cities] = await Promise.all([fetchAllHotels(), fetchCities()]);
+  const [hotels, cities] = await Promise.all([fetchAllHotels(), getCityGroups()]);
 
   const staticPages = [
     { url: SITE + "/", changeFrequency: "daily", priority: 1 },
@@ -69,7 +57,7 @@ export default async function sitemap() {
   // One page per city ("Hôtels à Sétif"), the page Google should show for
   // "hôtel <ville>" searches.
   const cityPages = cities.map((c) => ({
-    url: SITE + "/hotels/ville/" + citySlug(c.key),
+    url: SITE + "/hotels/ville/" + c.slug,
     lastModified: now,
     changeFrequency: "weekly",
     priority: 0.85,
