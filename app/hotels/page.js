@@ -4,13 +4,40 @@ import WhatsAppButton from "../../components/WhatsAppButton";
 import SearchResults from "../../components/SearchResults";
 import { getHotelsPaged, getCities } from "../../lib/api";
 
-export const metadata = {
-  title: "Hotels in Algeria — Nzzor",
-  // No hotel count here. The old description said "Browse 10 verified hotels"
-  // while the platform carried 135 — a number embedded in copy goes stale
-  // silently, and this string is what Google indexes.
-  description: "Browse verified hotels across Algeria. Filter by wilaya, price, and rating.",
-};
+const SITE = "https://nzzor.com";
+
+// French, like the rest of the indexed site. No hotel count in the copy: a
+// number embedded here goes stale silently, and this string is what Google
+// indexes.
+//
+// Indexing rules, so Google sees one page per intent instead of thousands of
+// filter combinations:
+//   /hotels (and ?page=N)  → indexed, canonical to itself
+//   /hotels?city=setif     → canonical to /hotels/ville/setif, the city page
+//                            built for that search
+//   any other filter/sort  → noindex, follow (links to hotels still count)
+export async function generateMetadata({ searchParams }) {
+  const sp = searchParams || {};
+  const filterKeys = ["q", "stars", "sort", "maxPrice", "minPrice", "tags", "ai", "checkIn", "checkOut", "adults", "rooms", "children", "guests", "occ"];
+  const hasFilters = filterKeys.some((k) => sp[k]);
+  const city = sp.city ? String(sp.city).toLowerCase() : "";
+  const page = Math.max(1, parseInt(sp.page, 10) || 1);
+
+  const base = {
+    title: "Hôtels en Algérie — réservation en ligne, paiement CIB et Edahabia | Nzzor",
+    description:
+      "Hôtels vérifiés dans toute l'Algérie : comparez les prix par wilaya, réservez en ligne par carte CIB ou Edahabia avec confirmation immédiate. Nzzor, agence de voyage agréée.",
+    openGraph: { type: "website", siteName: "Nzzor", locale: "fr_DZ", images: [`${SITE}/og.jpg`] },
+  };
+
+  if (city && !hasFilters) {
+    return { ...base, alternates: { canonical: `${SITE}/hotels/ville/${encodeURIComponent(city)}` } };
+  }
+  if (city || hasFilters) {
+    return { ...base, robots: { index: false, follow: true } };
+  }
+  return { ...base, alternates: { canonical: page > 1 ? `${SITE}/hotels?page=${page}` : `${SITE}/hotels` } };
+}
 
 // 24 = eight clean rows at three across.
 const PER_PAGE = 24;
