@@ -10,7 +10,7 @@
 // Server component: no "use client", no styled-jsx. Plain <style> instead.
 // =============================================================================
 
-import { fmtDA } from "../lib/seoData";
+import { fmtDA, citySlug } from "../lib/seoData";
 
 function facts(h, lang) {
   if (!h) return [];
@@ -153,7 +153,7 @@ export default function HotelSeoBlock({ fr, ar, city, siblings = [] }) {
           <nav className="hs-city" aria-label={`Hôtels à ${city.nameFr}`}>
             <div className="hs-city-head">
               <h3>Autres hôtels à {city.nameFr} <span lang="ar" dir="rtl">· فنادق أخرى في {city.nameAr}</span></h3>
-              <a href={`/hotels/ville/${city.key}`}>Tous les hôtels à {city.nameFr} →</a>
+              <a href={`/hotels/ville/${citySlug(city.key)}`}>Tous les hôtels à {city.nameFr} →</a>
             </div>
             {others.length > 0 && (
               <ul>
