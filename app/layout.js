@@ -2,6 +2,7 @@ import "./globals.css";
 import StyledJsxRegistry from "./registry";
 import Providers from "./Providers";
 import AnalyticsBeacon from "./components/AnalyticsBeacon";
+import ClarityTracker from "../components/ClarityTracker";
 
 // French by default: it is the language the server renders (lib/LangContext.js)
 // and the one Google indexes. Pages override title/description/canonical.
@@ -59,7 +60,13 @@ export default function RootLayout({ children }) {
               won't opt static routes out of prerendering (the documented
               useSearchParams gotcha). */}
           <AnalyticsBeacon />
-          <Providers>{children}</Providers>
+          <Providers>
+            {/* Session recordings + heatmaps (Microsoft Clarity). Inside
+                Providers so it can tag sessions with the visitor's language.
+                Never loads on /admin. See components/ClarityTracker.js. */}
+            <ClarityTracker />
+            {children}
+          </Providers>
         </StyledJsxRegistry>
       </body>
     </html>
