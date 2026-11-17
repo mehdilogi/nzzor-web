@@ -28,6 +28,9 @@ async function fetchAllHotels() {
   return hotels;
 }
 
+const citySlug = (key) =>
+  String(key || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
 async function fetchCities() {
   try {
     const res = await fetch(API + "/api/hotels/meta/cities?lang=fr", { next: { revalidate: 3600 } });
@@ -56,7 +59,7 @@ export default async function sitemap() {
   const hotelPages = hotels
     .filter((h) => h && h.slug)
     .map((h) => ({
-      url: SITE + "/hotels/" + h.slug,
+      url: SITE + "/hotels/" + encodeURIComponent(h.slug),
       lastModified: h.updatedAt ? new Date(h.updatedAt) : now,
       changeFrequency: "weekly",
       // Bookable hotels first in Google's eyes
@@ -66,7 +69,7 @@ export default async function sitemap() {
   // One page per city ("Hôtels à Sétif"), the page Google should show for
   // "hôtel <ville>" searches.
   const cityPages = cities.map((c) => ({
-    url: SITE + "/hotels/ville/" + c.key,
+    url: SITE + "/hotels/ville/" + citySlug(c.key),
     lastModified: now,
     changeFrequency: "weekly",
     priority: 0.85,
