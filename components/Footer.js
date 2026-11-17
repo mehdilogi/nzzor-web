@@ -4,9 +4,31 @@ import Link from "next/link";
 import LogoMark from "./LogoMark";
 import { useLang } from "../lib/LangContext";
 
+// Main wilayas, linked from every page to their "Hôtels à …" page. These
+// links are what tells Google the city pages matter (a page only reachable
+// from the sitemap counts for little). Slugs are French names; the city page
+// also accepts the database key and redirects unknown cities to /hotels, so a
+// wilaya listed here can never lead to a dead page.
+const FOOTER_CITIES = [
+  ["alger", "Alger", "الجزائر", "Algiers"],
+  ["oran", "Oran", "وهران", "Oran"],
+  ["constantine", "Constantine", "قسنطينة", "Constantine"],
+  ["setif", "Sétif", "سطيف", "Setif"],
+  ["annaba", "Annaba", "عنابة", "Annaba"],
+  ["bejaia", "Béjaïa", "بجاية", "Bejaia"],
+  ["tlemcen", "Tlemcen", "تلمسان", "Tlemcen"],
+  ["tizi-ouzou", "Tizi Ouzou", "تيزي وزو", "Tizi Ouzou"],
+  ["batna", "Batna", "باتنة", "Batna"],
+  ["tipaza", "Tipaza", "تيبازة", "Tipaza"],
+  ["ghardaia", "Ghardaïa", "غرداية", "Ghardaia"],
+  ["djanet", "Djanet", "جانت", "Djanet"],
+];
+
 export default function Footer() {
   const { t, lang } = useLang();
   const groupsLabel = { fr: "Voyages de groupe", en: "Group travel", ar: "رحلات المجموعات" }[lang] || "Voyages de groupe";
+  const citiesLabel = { fr: "Hôtels par ville", en: "Hotels by city", ar: "الفنادق حسب المدينة" }[lang] || "Hôtels par ville";
+  const cityName = (c) => (lang === "ar" ? c[2] : lang === "en" ? c[3] : c[1]);
   return (
     <footer className="nz-footer">
       <div className="wrap nz-footer-top">
@@ -64,6 +86,15 @@ export default function Footer() {
         </div>
       </div>
 
+      <nav className="wrap nz-fcities" aria-label={citiesLabel}>
+        <h5>{citiesLabel}</h5>
+        <div className="nz-fcities-list">
+          {FOOTER_CITIES.map((c) => (
+            <Link key={c[0]} className="nz-fcity" href={`/hotels/ville/${c[0]}`}>{cityName(c)}</Link>
+          ))}
+        </div>
+      </nav>
+
       <div className="wrap nz-footer-bottom">
         <span>{t("footer.rights")}</span>
         <span>{t("footer.madein")}</span>
@@ -98,6 +129,11 @@ export default function Footer() {
           margin-bottom: 10px; transition: color .2s; text-decoration: none;
         }
         .nz-footer :global(.nz-flink:hover) { color: var(--red); }
+        .nz-fcities { padding-top: 26px; padding-bottom: 26px; border-bottom: 1px solid var(--gray-100); display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; }
+        .nz-fcities h5 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); margin: 0; flex-shrink: 0; }
+        .nz-fcities-list { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+        .nz-fcities-list :global(.nz-fcity) { font-size: 13.5px; font-weight: 500; color: var(--gray-400); text-decoration: none; transition: color .2s; }
+        .nz-fcities-list :global(.nz-fcity:hover) { color: var(--red); }
         .nz-footer-bottom {
           display: flex; align-items: center; justify-content: space-between;
           padding-top: 26px; padding-bottom: 32px; flex-wrap: wrap; gap: 12px;
@@ -134,6 +170,8 @@ export default function Footer() {
             margin-bottom: 12px;
           }
           .nz-pay :global(img) { height: 44px; }
+          .nz-fcities { flex-direction: column; gap: 14px; padding-top: 28px; border-top: 1px solid var(--gray-100); }
+          .nz-fcities-list { gap: 10px 16px; }
           /* Each link column becomes its own block with a top divider */
           .nz-fcol {
             border-top: 1px solid var(--gray-100);
