@@ -31,7 +31,8 @@ export async function generateMetadata({ searchParams }) {
   };
 
   if (city && !hasFilters) {
-    return { ...base, alternates: { canonical: `${SITE}/hotels/ville/${encodeURIComponent(city)}` } };
+    const slug = city.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    return { ...base, alternates: { canonical: `${SITE}/hotels/ville/${slug}` } };
   }
   if (city || hasFilters) {
     return { ...base, robots: { index: false, follow: true } };
