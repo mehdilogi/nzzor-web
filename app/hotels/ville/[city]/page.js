@@ -11,7 +11,7 @@ import { notFound } from "next/navigation";
 import Nav from "../../../../components/Nav";
 import Footer from "../../../../components/Footer";
 import WhatsAppButton from "../../../../components/WhatsAppButton";
-import { getCities, getCityHotels, fmtDA } from "../../../../lib/seoData";
+import { getCities, getCityHotels, fmtDA, citySlug } from "../../../../lib/seoData";
 
 export const revalidate = 3600;
 
@@ -19,7 +19,10 @@ const SITE = "https://nzzor.com";
 
 async function load(key) {
   const cities = await getCities();
-  const city = cities.find((c) => c.key === String(key).toLowerCase());
+  let wanted = String(key || "");
+  try { wanted = decodeURIComponent(wanted); } catch {}
+  wanted = citySlug(wanted); // accepts "tizi-ouzou", "tizi ouzou" and "tizi%20ouzou"
+  const city = cities.find((c) => citySlug(c.key) === wanted);
   if (!city) return null;
   const [fr, ar] = await Promise.all([getCityHotels(city.key, "fr"), getCityHotels(city.key, "ar")]);
   const arName = Object.fromEntries(ar.map((h) => [h.slug, h.name]));
@@ -39,7 +42,7 @@ export async function generateMetadata({ params }) {
     (minPrice ? `, à partir de ${fmtDA(minPrice)} DA la nuit` : "") +
     `. Réservez en ligne par carte CIB ou Edahabia, ou via WhatsApp. Nzzor, agence de voyage agréée.`
   ).slice(0, 160);
-  const url = `${SITE}/hotels/ville/${city.key}`;
+  const url = `${SITE}/hotels/ville/${citySlug(city.key)}`;
   return {
     title,
     description,
@@ -89,7 +92,7 @@ export default async function CityPage({ params }) {
       itemListElement: [
         { "@type": "ListItem", position: 1, name: "Nzzor", item: SITE },
         { "@type": "ListItem", position: 2, name: "Hôtels", item: `${SITE}/hotels` },
-        { "@type": "ListItem", position: 3, name: `Hôtels à ${city.nameFr}`, item: `${SITE}/hotels/ville/${city.key}` },
+        { "@type": "ListItem", position: 3, name: `Hôtels à ${city.nameFr}`, item: `${SITE}/hotels/ville/${citySlug(city.key)}` },
       ],
     },
     {
@@ -122,7 +125,7 @@ export default async function CityPage({ params }) {
             {n} فندق في {city.nameAr}
             {minPrice ? `، ابتداءً من ${fmtDA(minPrice)} دج لليلة` : ""}. الدفع ببطاقة CIB أو الذهبية مع تأكيد فوري، أو الحجز عبر واتساب مع وكالتنا المعتمدة.
           </p>
-          <a className="cp-cta" href={`/hotels?city=${city.key}`}>Choisir mes dates à {city.nameFr} →</a>
+          <a className="cp-cta" href={`/hotels?city=${encodeURIComponent(city.key)}`}>Choisir mes dates à {city.nameFr} →</a>
 
           <ul className="cp-grid">
             {hotels.map((h) => (
@@ -164,7 +167,7 @@ export default async function CityPage({ params }) {
               <h2>Hôtels dans les autres villes</h2>
               <ul>
                 {otherCities.map((c) => (
-                  <li key={c.key}><a href={`/hotels/ville/${c.key}`}>Hôtels à {c.nameFr} <span>({c.hotelCount})</span></a></li>
+                  <li key={c.key}><a href={`/hotels/ville/${citySlug(c.key)}`}>Hôtels à {c.nameFr} <span>({c.hotelCount})</span></a></li>
                 ))}
               </ul>
             </nav>
