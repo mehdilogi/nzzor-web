@@ -97,6 +97,13 @@ function localized(obj, lang) {
   return obj[lang] || obj.en || obj.fr || "";
 }
 
+// Vercel image optimizer URL (same mechanism as RegionStage). Local paths and
+// data URLs are left alone.
+function optimized(url, w) {
+  if (!url || url.startsWith("data:")) return url;
+  return `/_next/image?url=${encodeURIComponent(url)}&w=${w}&q=70`;
+}
+
 export default function HotelDetail({ hotel }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -418,8 +425,30 @@ export default function HotelDetail({ hotel }) {
               onClick={() => setLightboxIndex(i)}
               aria-label="View photo"
             >
+              {/* Resized through Vercel's image optimizer: the originals are
+                  full-size uploads, and the first one was the slowest thing on
+                  the page (Clarity: 3.9 s LCP on mobile, Facebook in-app
+                  browser). If the optimizer refuses the image, fall back to
+                  the original so a photo is never lost. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.url} alt={hotel.name} loading={i === 0 ? "eager" : "lazy"} />
+              <img
+                src={optimized(p.url, i === 0 ? 828 : 384)}
+                srcSet={i === 0
+                  ? `${optimized(p.url, 640)} 640w, ${optimized(p.url, 828)} 828w, ${optimized(p.url, 1200)} 1200w`
+                  : `${optimized(p.url, 384)} 384w, ${optimized(p.url, 640)} 640w`}
+                sizes={i === 0 ? "(max-width: 640px) 100vw, 60vw" : "(max-width: 640px) 50vw, 25vw"}
+                alt={hotel.name}
+                loading={i === 0 ? "eager" : "lazy"}
+                fetchPriority={i === 0 ? "high" : "auto"}
+                decoding={i === 0 ? "sync" : "async"}
+                onError={(e) => {
+                  const el = e.currentTarget;
+                  if (el.dataset.fallback) return;
+                  el.dataset.fallback = "1";
+                  el.removeAttribute("srcset");
+                  el.src = p.url;
+                }}
+              />
               {i === 4 && photos.length > 5 && (
                 <div className="nz-gal-overlay">
                   <Icon name="view" size={18} style={{ color: "#fff" }} />
