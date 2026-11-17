@@ -5,7 +5,7 @@ import WhatsAppButton from "../../../components/WhatsAppButton";
 import HotelDetail from "../../../components/HotelDetail";
 import { getHotel } from "../../../lib/api";
 import HotelSeoBlock, { hotelFaqJsonLd } from "../../../components/HotelSeoBlock";
-import { getHotelLangs, cityFor, getCityHotels } from "../../../lib/seoData";
+import { getHotelLangs, cityFor, getCityHotels, citySlug } from "../../../lib/seoData";
 
 const SITE = "https://nzzor.com";
 
@@ -107,7 +107,7 @@ export default async function HotelPage({ params }) {
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Nzzor", item: SITE },
       { "@type": "ListItem", position: 2, name: "Hôtels", item: `${SITE}/hotels` },
-      ...(city ? [{ "@type": "ListItem", position: 3, name: `Hôtels à ${city.nameFr}`, item: `${SITE}/hotels/ville/${city.key}` }] : []),
+      ...(city ? [{ "@type": "ListItem", position: 3, name: `Hôtels à ${city.nameFr}`, item: `${SITE}/hotels/ville/${citySlug(city.key)}` }] : []),
       { "@type": "ListItem", position: city ? 4 : 3, name: (fr || hotel).name, item: `${SITE}/hotels/${hotel.slug}` },
     ],
   };
