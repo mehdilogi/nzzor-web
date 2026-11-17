@@ -28,9 +28,20 @@ async function fetchAllHotels() {
   return hotels;
 }
 
+async function fetchCities() {
+  try {
+    const res = await fetch(API + "/api/hotels/meta/cities?lang=fr", { next: { revalidate: 3600 } });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return (json.data || []).filter((c) => c && c.key && c.hotelCount > 0);
+  } catch (e) {
+    return [];
+  }
+}
+
 export default async function sitemap() {
   const now = new Date();
-  const hotels = await fetchAllHotels();
+  const [hotels, cities] = await Promise.all([fetchAllHotels(), fetchCities()]);
 
   const staticPages = [
     { url: SITE + "/", changeFrequency: "daily", priority: 1 },
@@ -52,5 +63,14 @@ export default async function sitemap() {
       priority: h.priceFrom != null ? 0.8 : 0.5,
     }));
 
-  return [...staticPages, ...hotelPages];
+  // One page per city ("Hôtels à Sétif"), the page Google should show for
+  // "hôtel <ville>" searches.
+  const cityPages = cities.map((c) => ({
+    url: SITE + "/hotels/ville/" + c.key,
+    lastModified: now,
+    changeFrequency: "weekly",
+    priority: 0.85,
+  }));
+
+  return [...staticPages, ...cityPages, ...hotelPages];
 }

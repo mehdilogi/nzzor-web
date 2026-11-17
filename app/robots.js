@@ -5,7 +5,7 @@ export default function robots() {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/admin", "/account", "/booking", "/partner", "/api/"],
+        disallow: ["/admin", "/account", "/booking", "/pay/", "/partner", "/api/"],
       },
     ],
     sitemap: "https://nzzor.com/sitemap.xml",
