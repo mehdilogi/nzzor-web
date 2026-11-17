@@ -4,8 +4,9 @@ import Footer from "../../../components/Footer";
 import WhatsAppButton from "../../../components/WhatsAppButton";
 import HotelDetail from "../../../components/HotelDetail";
 import { getHotel } from "../../../lib/api";
-import HotelSeoBlock, { hotelFaqJsonLd } from "../../../components/HotelSeoBlock";
-import { getHotelLangs, cityFor, getCityHotels, citySlug } from "../../../lib/seoData";
+import HotelSeoBlock from "../../../components/HotelSeoBlock";
+import { hotelFaqJsonLd } from "../../../lib/hotelFacts";
+import { getHotelLangs, findCityGroup, getGroupHotelsAllLangs, cityPath } from "../../../lib/seoData";
 
 const SITE = "https://nzzor.com";
 
@@ -97,8 +98,8 @@ export default async function HotelPage({ params }) {
   // internal links. All cached for an hour; any failure only drops the block.
   const langs = await getHotelLangs(params.slug);
   const fr = langs ? langs.fr : null;
-  const city = fr ? await cityFor(fr.city) : null;
-  const siblings = city ? await getCityHotels(city.key, "fr") : [];
+  const city = fr ? await findCityGroup(fr.city) : null;
+  const siblings = city ? await getGroupHotelsAllLangs(city) : [];
   const faq = fr ? hotelFaqJsonLd(fr) : null;
 
   const breadcrumb = {
@@ -107,7 +108,7 @@ export default async function HotelPage({ params }) {
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Nzzor", item: SITE },
       { "@type": "ListItem", position: 2, name: "Hôtels", item: `${SITE}/hotels` },
-      ...(city ? [{ "@type": "ListItem", position: 3, name: `Hôtels à ${city.nameFr}`, item: `${SITE}/hotels/ville/${citySlug(city.key)}` }] : []),
+      ...(city ? [{ "@type": "ListItem", position: 3, name: `Hôtels à ${city.nameFr}`, item: `${SITE}${cityPath(city)}` }] : []),
       { "@type": "ListItem", position: city ? 4 : 3, name: (fr || hotel).name, item: `${SITE}/hotels/${hotel.slug}` },
     ],
   };
@@ -122,7 +123,7 @@ export default async function HotelPage({ params }) {
       />
       <Nav />
       <HotelDetail hotel={hotel} />
-      <HotelSeoBlock fr={fr} ar={langs ? langs.ar : null} city={city} siblings={siblings} />
+      <HotelSeoBlock hotel={langs} city={city} siblings={siblings} />
       <Footer />
       <WhatsAppButton />
     </>
