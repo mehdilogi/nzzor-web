@@ -273,6 +273,14 @@ export default function GroupRequest() {
       <style jsx>{`
         .gr { position: relative; overflow: hidden; isolation: isolate; background: var(--cream, #FAF8F4); min-height: 80vh; }
         .gr-wrap { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 56px; padding-top: 64px; padding-bottom: 96px; align-items: start; }
+        /* A soft cream halo behind the text column: the zellige glow keeps
+           moving around it, but never under the words. */
+        .gr-copy { position: relative; isolation: isolate; }
+        .gr-copy::before {
+          content: ""; position: absolute; z-index: -1; pointer-events: none;
+          inset: -56px -72px -48px -72px;
+          background: radial-gradient(ellipse 62% 60% at 45% 48%, var(--cream, #FAF8F4) 62%, rgba(250, 248, 244, 0.85) 76%, rgba(250, 248, 244, 0) 100%);
+        }
         .gr-kicker { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--red); margin-bottom: 14px; }
         .gr-copy h1 { font-size: clamp(34px, 4.4vw, 54px); line-height: 1.04; letter-spacing: -0.03em; font-weight: 600; color: var(--ink); margin: 0; }
         .gr-intro { font-size: 16.5px; line-height: 1.7; color: var(--ink-2); margin: 20px 0 32px; max-width: 520px; }
@@ -308,6 +316,7 @@ export default function GroupRequest() {
         .gr-ref { display: inline-block; border: 1px dashed var(--gray-300); border-radius: 12px; padding: 10px 18px; font-size: 20px; font-weight: 700; letter-spacing: .05em; color: var(--ink); }
         .gr-link { margin-top: 14px; background: none; border: 0; color: var(--gray-400); font-size: 14px; cursor: pointer; font-family: inherit; text-decoration: underline; }
         @media (max-width: 900px) {
+          .gr-copy::before { inset: -24px -20px; background: radial-gradient(ellipse 80% 70% at 50% 50%, var(--cream, #FAF8F4) 70%, rgba(250, 248, 244, 0) 100%); }
           .gr-wrap { grid-template-columns: 1fr; gap: 32px; padding-top: 36px; padding-bottom: 72px; }
         }
         @media (max-width: 520px) {

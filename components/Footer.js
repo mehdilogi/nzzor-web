@@ -62,7 +62,9 @@ export default function Footer() {
         <div className="nz-fcol">
           <h5>{t("footer.company")}</h5>
           <Link className="nz-flink" style={{ display: "block" }} href="/#allouni">{t("footer.about")}</Link>
-          <Link className="nz-flink" style={{ display: "block" }} href="/#allouni">{t("footer.agency")}</Link>
+          {/* The agency's own website, in a new tab. It used to point back to
+              the #allouni block on the homepage, which looked like a dead link. */}
+          <a className="nz-flink" style={{ display: "block" }} href="https://allounitravel.agency" target="_blank" rel="noopener noreferrer">{t("footer.agency")} ↗</a>
           <Link className="nz-flink" style={{ display: "block" }} href="/hotels">{t("footer.ourhotels")}</Link>
           <Link className="nz-flink" style={{ display: "block" }} href="/groupes">{groupsLabel}</Link>
           {/* "Careers" removed: there is no careers page, and a link that lands
