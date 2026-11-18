@@ -37,6 +37,7 @@ const BAND_COPY = {
     sec: "s", confirm: "To a confirmed booking", confirmHint: "Voucher in your inbox, no callback",
     support: "WhatsApp support", supportHint: "A real person, in Arabic, French or English",
     go: "Message us \u2192",
+    more: "See all hotels", moreSub: (h, w) => `${h} verified hotels across ${w} wilayas`,
     supportAria: "WhatsApp support, available 24 hours a day, 7 days a week. Opens WhatsApp.",
   },
   fr: {
@@ -48,6 +49,7 @@ const BAND_COPY = {
     sec: "s", confirm: "Pour une réservation confirmée", confirmHint: "Bon dans votre boîte mail, sans rappel",
     support: "Assistance WhatsApp", supportHint: "Une vraie personne, en arabe, français ou anglais",
     go: "Écrivez-nous \u2192",
+    more: "Voir tous les hôtels", moreSub: (h, w) => `${h} hôtels vérifiés dans ${w} wilayas`,
     supportAria: "Assistance WhatsApp, 24 heures sur 24, 7 jours sur 7. Ouvre WhatsApp.",
   },
   ar: {
@@ -59,6 +61,7 @@ const BAND_COPY = {
     sec: " ث", confirm: "لتأكيد الحجز", confirmHint: "القسيمة في بريدك، دون انتظار اتصال",
     support: "دعم عبر واتساب", supportHint: "شخص حقيقي، بالعربية أو الفرنسية أو الإنجليزية",
     go: "\u2190 راسلنا",
+    more: "عرض كل الفنادق", moreSub: (h, w) => `${h} فندقاً موثّقاً في ${w} ولاية`,
     supportAria: "دعم عبر واتساب على مدار الساعة طوال أيام الأسبوع. يفتح واتساب.",
   },
 };
@@ -263,6 +266,18 @@ export default function HomeSections({ featured, cities = [], wilayaCount = 0, h
             <HotelCard key={h.id} hotel={h} />
           ))}
         </div>
+
+        {/* The way on, where the eye lands after the last card. The small link
+            at the top stays; this one is for people who scrolled through. */}
+        <div className="nz-moreall">
+          <a href="/hotels" className="nz-moreall-btn">
+            <span>{bc.more}{hotelCount ? ` (${hotelCount})` : ""}</span>
+            <span className="nz-moreall-arrow" aria-hidden="true">{isAr ? "\u2190" : "\u2192"}</span>
+          </a>
+          {hotelCount > 0 && wilayaCount > 0 && (
+            <p className="nz-moreall-sub">{bc.moreSub(hotelCount, wilayaCount)}</p>
+          )}
+        </div>
       </section>
 
       {/* WHY NZZOR */}
@@ -457,6 +472,26 @@ export default function HomeSections({ featured, cities = [], wilayaCount = 0, h
 
         @media (max-width: 860px) {
           .nz-why-promises { padding-top: 56px; }
+        }
+
+        /* ---- "SEE ALL HOTELS" under the featured grid ---- */
+        .nz-moreall { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 44px; }
+        .nz-moreall-btn {
+          display: inline-flex; align-items: center; gap: 12px;
+          background: var(--red); color: #fff; text-decoration: none;
+          padding: 16px 30px; border-radius: 980px;
+          font-size: 16px; font-weight: 700; letter-spacing: -.005em;
+          box-shadow: 0 14px 30px -14px rgba(230, 57, 70, .65);
+          transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
+        }
+        .nz-moreall-btn:hover { background: var(--red-deep); transform: translateY(-2px); box-shadow: 0 18px 34px -14px rgba(230, 57, 70, .75); }
+        .nz-moreall-arrow { display: inline-block; transition: transform .25s cubic-bezier(.16, 1, .3, 1); }
+        .nz-moreall-btn:hover .nz-moreall-arrow { transform: translateX(4px); }
+        :global([dir="rtl"]) .nz-moreall-btn:hover .nz-moreall-arrow { transform: translateX(-4px); }
+        .nz-moreall-sub { margin: 0; font-size: 13px; font-weight: 500; color: var(--gray-400); }
+        @media (max-width: 560px) {
+          .nz-moreall { margin-top: 32px; }
+          .nz-moreall-btn { width: 100%; justify-content: center; padding: 16px 20px; }
         }
 
         /* ---- STATS BAND ----
