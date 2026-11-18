@@ -478,13 +478,13 @@ export default function HomeSections({ featured, cities = [], wilayaCount = 0, h
         .nz-moreall { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 44px; }
         .nz-moreall-btn {
           display: inline-flex; align-items: center; gap: 12px;
-          background: var(--red); color: #fff; text-decoration: none;
+          background: var(--ink); color: #fff; text-decoration: none;
           padding: 16px 30px; border-radius: 980px;
           font-size: 16px; font-weight: 700; letter-spacing: -.005em;
-          box-shadow: 0 14px 30px -14px rgba(230, 57, 70, .65);
+          box-shadow: 0 14px 30px -14px rgba(22, 22, 26, .55);
           transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
         }
-        .nz-moreall-btn:hover { background: var(--red-deep); transform: translateY(-2px); box-shadow: 0 18px 34px -14px rgba(230, 57, 70, .75); }
+        .nz-moreall-btn:hover { background: var(--red); transform: translateY(-2px); box-shadow: 0 18px 34px -14px rgba(230, 57, 70, .7); }
         .nz-moreall-arrow { display: inline-block; transition: transform .25s cubic-bezier(.16, 1, .3, 1); }
         .nz-moreall-btn:hover .nz-moreall-arrow { transform: translateX(4px); }
         :global([dir="rtl"]) .nz-moreall-btn:hover .nz-moreall-arrow { transform: translateX(-4px); }
