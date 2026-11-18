@@ -1,5 +1,5 @@
 "use client";
-
+import HowItWorks from "./HowItWorks";
 import { useState, useEffect, useRef } from "react";
 import HotelCard from "./HotelCard";
 import Icon from "./Icon";
@@ -266,7 +266,8 @@ export default function HomeSections({ featured, cities = [], wilayaCount = 0, h
       </section>
 
       {/* WHY NZZOR */}
-      <section className="nz-why-v2" id="how">
+      <HowItWorks />
+      <section className="nz-why-v2" id="why">
         {/* HERO STRIP — designed background (real photo swaps in here later) */}
         <div className="nz-why-hero">
           <div className="nz-why-hero-bg" />
