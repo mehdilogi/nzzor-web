@@ -3393,6 +3393,16 @@ function BookingDetailPanel({ id, onClose, onChanged }) {
     } catch (e) { setErr(e.message); }
     setBusy(false);
   }
+  // Clarity: copy the reference and open the recordings, where it is pasted in
+  // Filters → Custom tags → booking (sessions are tagged on the payment and
+  // result pages, see components/ClarityTracker.js).
+  const [clarityMsg, setClarityMsg] = useState("");
+  function watchInClarity() {
+    const ref = b && b.reference;
+    try { if (ref && navigator.clipboard) navigator.clipboard.writeText(ref); } catch (e) {}
+    setClarityMsg(ref ? `${ref} copied — in Clarity: Filters → Custom tags → booking, then paste.` : "");
+    window.open("https://clarity.microsoft.com/projects/view/" + (process.env.NEXT_PUBLIC_CLARITY_ID || "zf6099tgas") + "/impressions", "_blank", "noopener");
+  }
   // Resend the customer's voucher email and the hotel notification. Called
   // directly rather than through lib/adminApi so this ships as one file; same
   // base URL and token as every other admin call.
@@ -3498,6 +3508,11 @@ function BookingDetailPanel({ id, onClose, onChanged }) {
               </Section>
             </div>
 
+            <div className="bd-clarity">
+              <button type="button" onClick={watchInClarity}>▶ Watch this customer's visit (Clarity)</button>
+              {clarityMsg && <span>{clarityMsg}</span>}
+            </div>
+
             {b.status === "PENDING" && (
               <div className="bd-actions">
                 <button className="bd-reject" onClick={reject} disabled={busy}>Reject booking</button>
@@ -3551,6 +3566,10 @@ function BookingDetailPanel({ id, onClose, onChanged }) {
             font-size: 14px; font-weight: 700; font-family: inherit;
           }
           .bd-confirm { background: var(--teal); color: #fff; }
+          .bd-clarity { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--gray-100); }
+          .bd-clarity button { background: #fff; border: 1px solid var(--gray-200); border-radius: 980px; padding: 8px 14px; font-size: 13px; font-weight: 700; color: var(--ink); cursor: pointer; font-family: inherit; }
+          .bd-clarity button:hover { border-color: var(--ink); }
+          .bd-clarity span { font-size: 12px; color: var(--gray-400); }
           .bd-resend-msg { align-self: center; margin-right: auto; font-size: 13px; font-weight: 600; color: var(--ink-2); }
           .bd-reject { background: var(--red-soft); color: var(--red-deep); }
           .bd-confirm:disabled, .bd-reject:disabled { opacity: 0.6; cursor: default; }

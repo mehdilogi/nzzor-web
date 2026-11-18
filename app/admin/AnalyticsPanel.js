@@ -22,6 +22,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
+// Microsoft Clarity (session recordings + heatmaps). Its own dashboard; these
+// links open it on the right page.
+const CLARITY = "https://clarity.microsoft.com/projects/view/" + (process.env.NEXT_PUBLIC_CLARITY_ID || "zf6099tgas");
 
 // -----------------------------------------------------------------------------
 // Design tokens — single source of truth so every visual rule is consistent.
@@ -399,6 +402,21 @@ function Header({ preset, start, end, loading, lastFetchAt, onPreset, onStartCha
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        {[["Recordings", "/impressions"], ["Heatmaps", "/heatmaps"]].map(([label, path]) => (
+          <a
+            key={label}
+            href={CLARITY + path}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`Open Clarity ${label.toLowerCase()}`}
+            style={{
+              border: `0.5px solid ${T.border}`, background: T.white, padding: "5px 12px", borderRadius: 6,
+              fontSize: 11, fontWeight: 500, color: T.ink, textDecoration: "none",
+            }}
+          >
+            {label === "Recordings" ? "▶" : "◉"} {label} ↗
+          </a>
+        ))}
         <div style={{
           display: "inline-flex",
           background: T.white,
