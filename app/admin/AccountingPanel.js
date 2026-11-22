@@ -311,6 +311,31 @@ export default function AccountingPanel() {
               ))}
             </tbody>
           </table>
+
+          {/* Phone: one card per hotel. */}
+          <div className="acc-cards">
+            {data.hotels.map((h) => (
+              <div key={h.hotelId} className="acc-hcard">
+                <div className="acc-hcard-top">
+                  <strong>{h.hotelName}</strong>
+                  <span>{h.terms}</span>
+                </div>
+                <div className="acc-hcard-nums">
+                  <span>{h.count} booking{h.count === 1 ? "" : "s"}</span>
+                  <span>Gross {fmt(h.gross)}</span>
+                  <span>Commission {fmt(h.commission)}</span>
+                </div>
+                <div className="acc-hcard-bal">
+                  {h.balance === 0
+                    ? <span className="acc-zero">Settled</span>
+                    : h.balance > 0
+                      ? <span className="acc-out">Pay hotel {fmt(h.balance)}</span>
+                      : <span className="acc-in">Collect {fmt(-h.balance)}</span>}
+                  {h.balance !== 0 && <button className="acc-btn small" onClick={() => openSettleHotel(h)}>Settle</button>}
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
       )}
 
@@ -384,6 +409,37 @@ export default function AccountingPanel() {
             </table>
           </div>
         )}
+        {lines.length > 0 && (
+          <div className="acc-cards">
+            <label className="acc-selall">
+              <input type="checkbox" checked={sel.size === lines.length} onChange={toggleAll} />
+              Select all
+            </label>
+            {lines.map((l) => (
+              <label key={l.id} className={"acc-bcard" + (sel.has(l.id) ? " sel" : "")}>
+                <input type="checkbox" checked={sel.has(l.id)} onChange={() => toggle(l.id)} aria-label={"Select " + l.reference} />
+                <div className="acc-bcard-body">
+                  <div className="acc-bcard-top">
+                    <strong className="mono">{l.reference}</strong>
+                    {l.settled
+                      ? <span className="acc-zero">Settled {fmtDate(l.hotelPaidAt)}</span>
+                      : <span className="acc-pending">Unsettled</span>}
+                  </div>
+                  <div>{l.hotelName} · {l.guest}</div>
+                  <div className="acc-dim">
+                    {fmtDate(l.checkIn)} → {fmtDate(l.checkOut)} · {METHOD[l.paymentMethod] || l.paymentMethod}
+                    <span className={"acc-by " + (l.collectedBy === "NZZOR" ? "n" : "h")}>{l.collectedBy === "NZZOR" ? "Nzzor holds" : "Hotel holds"}</span>
+                  </div>
+                  <div className="acc-bcard-nums">
+                    <span>Gross <b>{fmt(l.gross)}</b></span>
+                    <span>Comm. <b>{fmt(l.commission)}</b></span>
+                    <span>Net <b>{fmt(l.net)}</b></span>
+                  </div>
+                </div>
+              </label>
+            ))}
+          </div>
+        )}
       </section>
 
       <style jsx>{`
@@ -442,8 +498,51 @@ export default function AccountingPanel() {
         .acc-modal label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ink-2); }
         .acc-modal input { height: 40px; border: 1px solid var(--gray-200); border-radius: var(--r-sm); padding: 0 12px; font-family: inherit; font-size: 14px; font-weight: 400; }
         .acc-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+        .acc-cards { display: none; }
         @media (max-width: 980px) { .acc-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-        @media (max-width: 560px) { .acc-kpis { grid-template-columns: 1fr; } }
+        @media (max-width: 720px) {
+          .acc { gap: 14px; }
+          .acc-head h1 { font-size: 24px; }
+          .acc-period { width: 100%; }
+          .acc-period span { flex: 1; min-width: 0; }
+          .acc-period button { width: 40px; height: 40px; }
+          .acc-filters select { flex: 1 1 100%; height: 44px; }
+          .acc-filters .acc-btn { flex: 1; height: 42px; }
+          .acc-kpis { gap: 10px; }
+          .acc-kpi { padding: 14px; border-radius: var(--r-md); }
+          .acc-kpi strong { font-size: 18px; }
+          .acc-card { padding: 16px; border-radius: var(--r-md); }
+          .acc-rates { grid-template-columns: 1fr; }
+          .acc-rate { flex-wrap: wrap; }
+          .acc-rate-name { flex: 1 1 100%; }
+          .acc-rate select, .acc-rate input { height: 40px; }
+          .acc-rate input { flex: 1; width: auto; }
+          .acc-rate .acc-btn.small { height: 40px; }
+          /* Tables become cards on a phone. */
+          .acc-table, .acc-scroll { display: none; }
+          .acc-cards { display: flex; flex-direction: column; gap: 8px; }
+          .acc-hcard, .acc-bcard { border: 1px solid var(--gray-100); border-radius: var(--r-sm); padding: 12px; font-size: 13px; background: #fff; }
+          .acc-hcard-top, .acc-bcard-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+          .acc-hcard-top span { font-size: 12px; color: var(--gray-400); white-space: nowrap; }
+          .acc-hcard-nums { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--gray-400); font-size: 12px; margin: 6px 0 10px; }
+          .acc-hcard-bal { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+          .acc-hcard-bal .acc-btn.small { height: 38px; padding: 0 18px; }
+          .acc-selall { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; padding: 4px 2px; }
+          .acc-bcard { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; }
+          .acc-bcard.sel { background: #fdf6f6; border-color: #f3d4d6; }
+          .acc-bcard input, .acc-selall input { width: 20px; height: 20px; flex-shrink: 0; margin-top: 1px; }
+          .acc-bcard-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+          .acc-bcard .mono { font-weight: 700; letter-spacing: 0.02em; }
+          .acc-dim { color: var(--gray-400); font-size: 12px; }
+          .acc-bcard-nums { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--gray-400); margin-top: 4px; }
+          .acc-bcard-nums b { color: var(--ink); }
+          .acc-bar { position: sticky; top: 56px; z-index: 3; background: #fff; padding: 6px 0; }
+          .acc-bar .acc-btn.small { height: 36px; }
+          /* Settle dialog as a bottom sheet. */
+          .acc-modal-back { align-items: flex-end; padding: 0; }
+          .acc-modal { max-width: none; border-radius: 22px 22px 0 0; padding: 22px 20px calc(22px + env(safe-area-inset-bottom)); }
+          .acc-modal-actions .acc-btn { flex: 1; height: 46px; }
+        }
       `}</style>
     </div>
   );

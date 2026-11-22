@@ -1,0 +1,42 @@
+/* =============================================================================
+   Admin on a phone — rules that apply across every admin section.
+   -----------------------------------------------------------------------------
+   Imported once by app/admin/AdminApp.js. Everything is scoped under
+   .nzad-shell, so the public site is not affected. Layout per section lives in
+   each component; this file only holds what every section needs:
+   - 16px form fields, otherwise iPhone Safari zooms into the page on every tap
+     in a field and does not zoom back out;
+   - controls that only appeared on mouse hover are shown on touch screens;
+   - small icon buttons get a finger-sized hit area.
+   ============================================================================= */
+
+@media (max-width: 860px) {
+  body .nzad-shell input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  body .nzad-shell select,
+  body .nzad-shell textarea {
+    font-size: 16px !important;
+  }
+
+  body .nzad-shell .nzad-btn-primary,
+  body .nzad-shell .nzad-btn-ghost,
+  body .nzad-shell .nzad-btn-danger {
+    min-height: 42px;
+  }
+
+  /* Tables that stay tables on a phone scroll sideways inside their card
+     (the page itself never scrolls sideways). */
+  body .nzad-shell .nzad-panel { padding: 16px; border-radius: var(--r-md); }
+}
+
+/* Touch screens have no hover: show "Make primary" on every photo and make
+   the delete crosses big enough to hit. Phone widths are included because
+   some Android browsers report a hover-capable pointer. */
+@media (hover: none), (max-width: 860px) {
+  body .nzad-shell .nzad-photo-make-primary { opacity: 1 !important; padding: 6px 10px; }
+  body .nzad-shell .nzad-photo-del,
+  body .nzad-shell .nzad-room-photo-del {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 18px !important;
+  }
+}

@@ -15,6 +15,20 @@ import { getToken } from "../../lib/adminApi";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "https://api.nzzor.com";
 
+// Phone layout: inline styles cannot use media queries, so components read
+// this and stack their columns below 760px.
+function useNarrow(max = 760) {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${max}px)`);
+    const on = () => setNarrow(mq.matches);
+    on();
+    mq.addEventListener ? mq.addEventListener("change", on) : mq.addListener(on);
+    return () => { mq.removeEventListener ? mq.removeEventListener("change", on) : mq.removeListener(on); };
+  }, [max]);
+  return narrow;
+}
+
 const T = {
   ink: "#16161A", bg: "#F7F6F2", white: "#fff", red: "#E63946", teal: "#1B8A5A", amber: "#B4801A",
   border: "rgba(22,22,26,0.10)", mute: "rgba(22,22,26,0.55)", soft: "rgba(22,22,26,0.04)",
@@ -62,6 +76,7 @@ function greeting(g) {
 }
 
 export default function GroupsPanel() {
+  const narrow = useNarrow();
   const [filter, setFilter] = useState("");
   const [rows, setRows] = useState(null);
   const [counts, setCounts] = useState({});
@@ -92,16 +107,16 @@ export default function GroupsPanel() {
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
   return (
-    <div style={{ background: T.bg, minHeight: "100vh", padding: "20px 24px", color: T.ink }}>
+    <div style={{ background: T.bg, minHeight: narrow ? 0 : "100vh", padding: narrow ? 0 : "20px 24px", color: T.ink }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>Groups</h1>
           <p style={{ fontSize: 11, color: T.mute, margin: "3px 0 0" }}>Requests from nzzor.com/groupes · 10+ travellers, quoted by the agency</p>
         </div>
-        <button onClick={load} style={btn()}>↻ Refresh</button>
+        <button onClick={load} style={btn(narrow)}>↻ Refresh</button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0,1fr))", gap: 8, marginBottom: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: narrow ? "repeat(3, minmax(0,1fr))" : "repeat(5, minmax(0,1fr))", gap: 8, marginBottom: 14 }}>
         {[
           ["", "All", total, T.ink],
           ["NEW", "New", counts.NEW, T.red],
@@ -140,6 +155,7 @@ export default function GroupsPanel() {
 }
 
 function GroupRow({ g, open, onToggle, onSave }) {
+  const narrow = useNarrow();
   const [quote, setQuote] = useState(g.quoteAmount ?? "");
   const [notes, setNotes] = useState(g.adminNotes || "");
   const [saving, setSaving] = useState(false);
@@ -155,34 +171,36 @@ function GroupRow({ g, open, onToggle, onSave }) {
   return (
     <div style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden" }}>
       <button onClick={onToggle} style={{
-        width: "100%", display: "grid", gridTemplateColumns: "110px 1.3fr 1fr 1fr 90px", gap: 12, alignItems: "center",
+        width: "100%", display: "grid", gap: narrow ? "8px 12px" : 12, alignItems: "center",
+        gridTemplateColumns: narrow ? "minmax(0,1fr) auto" : "110px 1.3fr 1fr 1fr 90px",
+        gridTemplateAreas: narrow ? '"ref st" "name name" "ppl dates"' : undefined,
         padding: "12px 14px", background: "transparent", border: 0, cursor: "pointer", textAlign: "start", fontFamily: "inherit", color: T.ink,
       }}>
-        <div>
+        <div style={{ gridArea: narrow ? "ref" : undefined }}>
           <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.03em" }}>{g.reference}</div>
           <div style={{ fontSize: 10, color: T.mute }}>{fmtAgo(g.createdAt)}</div>
         </div>
-        <div style={{ minWidth: 0 }}>
+        <div style={{ minWidth: 0, gridArea: narrow ? "name" : undefined }}>
           <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {g.contactName}{g.organization ? ` · ${g.organization}` : ""}
           </div>
           <div style={{ fontSize: 11, color: T.mute }}>{TYPE[g.groupType] || g.groupType}</div>
         </div>
-        <div style={{ fontSize: 12 }}>
+        <div style={{ fontSize: 12, gridArea: narrow ? "ppl" : undefined }}>
           <strong>{g.people}</strong> people{g.rooms ? ` · ${g.rooms} rooms` : ""}
           <div style={{ fontSize: 11, color: T.mute }}>{g.destination || "Destination TBD"}</div>
         </div>
-        <div style={{ fontSize: 12 }}>
+        <div style={{ fontSize: 12, gridArea: narrow ? "dates" : undefined, textAlign: narrow ? "end" : undefined }}>
           {g.checkIn ? `${fmtDay(g.checkIn)} → ${fmtDay(g.checkOut)}` : "Dates TBD"}
           {g.quoteAmount != null && <div style={{ fontSize: 11, color: T.mute }}>Quote {fmtDA(g.quoteAmount)}</div>}
         </div>
-        <span style={{ justifySelf: "end", fontSize: 10, fontWeight: 700, color: "#fff", background: st.color, borderRadius: 980, padding: "4px 10px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+        <span style={{ gridArea: narrow ? "st" : undefined, justifySelf: "end", fontSize: 10, fontWeight: 700, color: "#fff", background: st.color, borderRadius: 980, padding: "4px 10px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
           {st.label}
         </span>
       </button>
 
       {open && (
-        <div style={{ borderTop: `1px solid ${T.border}`, padding: 14, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, background: T.soft }}>
+        <div style={{ borderTop: `1px solid ${T.border}`, padding: 14, display: "grid", gridTemplateColumns: narrow ? "minmax(0,1fr)" : "1fr 1fr", gap: 18, background: T.soft }}>
           <div style={{ fontSize: 12, lineHeight: 1.8 }}>
             <Line k="Phone" v={g.phone} />
             {g.email && <Line k="Email" v={<a href={`mailto:${g.email}`} style={{ color: T.ink }}>{g.email}</a>} />}
@@ -193,8 +211,8 @@ function GroupRow({ g, open, onToggle, onSave }) {
               <div style={{ marginTop: 8, background: T.white, border: `1px solid ${T.border}`, borderRadius: 6, padding: "8px 10px", whiteSpace: "pre-line" }}>{g.message}</div>
             )}
             <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-              <a href={waLink(g.phone, greeting(g))} target="_blank" rel="noopener noreferrer" style={{ ...btn(), background: "#25D366", color: "#fff", border: 0, textDecoration: "none" }}>WhatsApp</a>
-              <a href={`tel:${g.phone}`} style={{ ...btn(), textDecoration: "none" }}>Call</a>
+              <a href={waLink(g.phone, greeting(g))} target="_blank" rel="noopener noreferrer" style={{ ...btn(narrow), background: "#25D366", color: "#fff", border: 0, textDecoration: "none" }}>WhatsApp</a>
+              <a href={`tel:${String(g.phone || "").replace(/[^\d+]/g, "")}`} style={{ ...btn(narrow), textDecoration: "none" }}>Call</a>
             </div>
           </div>
 
@@ -204,7 +222,7 @@ function GroupRow({ g, open, onToggle, onSave }) {
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {Object.entries(STATUS).map(([k, s]) => (
                   <button key={k} disabled={saving} onClick={() => patch({ status: k })} style={{
-                    ...btn(), background: g.status === k ? s.color : T.white, color: g.status === k ? "#fff" : T.ink,
+                    ...btn(narrow), background: g.status === k ? s.color : T.white, color: g.status === k ? "#fff" : T.ink,
                     border: `1px solid ${g.status === k ? s.color : T.border}`,
                   }}>{s.label}</button>
                 ))}
@@ -220,7 +238,7 @@ function GroupRow({ g, open, onToggle, onSave }) {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <button disabled={saving} onClick={() => patch({ quoteAmount: quote === "" ? null : Number(quote), adminNotes: notes || null })}
-                style={{ ...btn(), background: T.ink, color: "#fff", border: 0 }}>{saving ? "Saving…" : "Save"}</button>
+                style={{ ...btn(narrow), background: T.ink, color: "#fff", border: 0 }}>{saving ? "Saving…" : "Save"}</button>
               {msg && <span style={{ fontSize: 11, color: msg === "Saved" ? T.teal : T.red }}>{msg}</span>}
             </div>
           </div>
@@ -242,13 +260,14 @@ function GroupRow({ g, open, onToggle, onSave }) {
 // The group is booked: show the reference and the payment link.
 // -----------------------------------------------------------------------------
 function BookedBox({ g }) {
+  const narrow = useNarrow();
   const payUrl = `https://nzzor.com/pay/${g.bookingRef}?lang=${g.lang || "fr"}`;
   const [copied, setCopied] = useState(false);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", fontSize: 12 }}>
       <span style={{ background: T.teal, color: "#fff", borderRadius: 980, padding: "4px 10px", fontSize: 10, fontWeight: 700, letterSpacing: "0.04em" }}>BOOKED</span>
       <span>Booking <strong style={{ letterSpacing: "0.03em" }}>{g.bookingRef}</strong> — find it in the Bookings tab (payment, voucher resend, cancellation).</span>
-      <button style={btn()} onClick={() => { navigator.clipboard?.writeText(payUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>
+      <button style={btn(narrow)} onClick={() => { navigator.clipboard?.writeText(payUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>
         {copied ? "Copied" : "Copy card payment link"}
       </button>
     </div>
@@ -265,6 +284,7 @@ const PAY_OPTIONS = [
 ];
 
 function ConvertForm({ g, onDone }) {
+  const narrow = useNarrow();
   const [openForm, setOpenForm] = useState(false);
   const [q, setQ] = useState(g.destination || "");
   const [hotels, setHotels] = useState([]);
@@ -340,14 +360,14 @@ function ConvertForm({ g, onDone }) {
           <>
             <div>Send this payment link to the customer. The booking confirms itself (voucher + hotel email) once paid:</div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, flexWrap: "wrap" }}>
-              <code style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 6, padding: "6px 8px" }}>{result.payUrl}</code>
-              <a href={waLink(g.phone, result.payUrl)} target="_blank" rel="noopener noreferrer" style={{ ...btn(), background: "#25D366", color: "#fff", border: 0, textDecoration: "none" }}>Send on WhatsApp</a>
+              <code style={{ background: T.white, border: `1px solid ${T.border}`, borderRadius: 6, padding: "6px 8px", wordBreak: "break-all" }}>{result.payUrl}</code>
+              <a href={waLink(g.phone, result.payUrl)} target="_blank" rel="noopener noreferrer" style={{ ...btn(narrow), background: "#25D366", color: "#fff", border: 0, textDecoration: "none" }}>Send on WhatsApp</a>
             </div>
           </>
         ) : (
           <div>Confirmed. The voucher went to the customer and the notification to the hotel.</div>
         )}
-        <button style={{ ...btn(), marginTop: 10 }} onClick={onDone}>Done</button>
+        <button style={{ ...btn(narrow), marginTop: 10 }} onClick={onDone}>Done</button>
       </div>
     );
   }
@@ -355,7 +375,7 @@ function ConvertForm({ g, onDone }) {
   if (!openForm) {
     return (
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <button onClick={() => setOpenForm(true)} style={{ ...btn(), background: T.teal, color: "#fff", border: 0, padding: "8px 14px", fontSize: 12 }}>
+        <button onClick={() => setOpenForm(true)} style={{ ...btn(narrow), background: T.teal, color: "#fff", border: 0, padding: narrow ? "11px 16px" : "8px 14px", fontSize: narrow ? 13 : 12 }}>
           Create booking from this request
         </button>
         <span style={{ fontSize: 11, color: T.mute }}>Once the customer accepts the quote: real booking, voucher, hotel email, Accounting.</span>
@@ -367,7 +387,7 @@ function ConvertForm({ g, onDone }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 12, fontSize: 12 }}>
       <div style={{ fontSize: 13, fontWeight: 700 }}>Create booking</div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: narrow ? "minmax(0,1fr)" : "1fr 1fr", gap: 12 }}>
         <div>
           <div style={lbl}>Hotel</div>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search hotel or city" style={inp} />
@@ -385,7 +405,7 @@ function ConvertForm({ g, onDone }) {
             ))}
           </div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, alignContent: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 8, alignContent: "start" }}>
           <div><div style={lbl}>Check-in</div><input type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} style={inp} /></div>
           <div><div style={lbl}>Check-out</div><input type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} style={inp} /></div>
           <div style={{ gridColumn: "1 / -1" }}>
@@ -401,8 +421,8 @@ function ConvertForm({ g, onDone }) {
           <div style={{ border: `1px solid ${T.border}`, borderRadius: 6, background: T.white }}>
             {hotel.rooms.length === 0 && <div style={{ padding: 8, color: T.mute }}>This hotel has no active room types. Add one in Hotels first.</div>}
             {hotel.rooms.map((r) => (
-              <div key={r.id} style={{ display: "grid", gridTemplateColumns: "1fr 90px 130px", gap: 8, alignItems: "center", padding: "6px 10px", borderBottom: `1px solid ${T.soft}` }}>
-                <div>{r.typeFr} <span style={{ color: T.mute }}>· public {fmtDA(r.basePrice)} · {r.totalUnits} on Nzzor</span></div>
+              <div key={r.id} style={{ display: "grid", gridTemplateColumns: narrow ? "80px minmax(0,1fr)" : "1fr 90px 130px", gap: 8, alignItems: "center", padding: narrow ? "10px" : "6px 10px", borderBottom: `1px solid ${T.soft}` }}>
+                <div style={{ gridColumn: narrow ? "1 / -1" : undefined }}>{r.typeFr} <span style={{ color: T.mute }}>· public {fmtDA(r.basePrice)} · {r.totalUnits} on Nzzor</span></div>
                 <input type="number" min="0" placeholder="Qty" value={lines[r.id]?.quantity ?? ""} onChange={(e) => setLine(r, "quantity", e.target.value)} style={inp} />
                 <input type="number" min="0" placeholder="DA / night" value={lines[r.id]?.pricePerNight ?? ""} onChange={(e) => setLine(r, "pricePerNight", e.target.value)} style={inp} />
               </div>
@@ -423,7 +443,7 @@ function ConvertForm({ g, onDone }) {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: narrow ? "minmax(0,1fr)" : "1fr 2fr", gap: 12 }}>
         <div>
           <div style={lbl}>Nzzor commission (DA, optional)</div>
           <input type="number" min="0" value={commission} onChange={(e) => setCommission(e.target.value)} placeholder={hotel ? (hotel.commissionType === "FIXED_PER_NIGHT" ? `Default ${hotel.commissionFixed} DA/night` : `Default ${hotel.commissionRate} %`) : "Hotel default"} style={inp} />
@@ -443,8 +463,8 @@ function ConvertForm({ g, onDone }) {
         <span>{roomsCount} room{roomsCount === 1 ? "" : "s"} × {Math.max(nights, 0)} night{nights === 1 ? "" : "s"}</span>
         <strong style={{ fontSize: 16 }}>{fmtDA(total)}</strong>
         <span style={{ flex: 1 }} />
-        <button onClick={() => setOpenForm(false)} style={btn()}>Cancel</button>
-        <button disabled={busy} onClick={create} style={{ ...btn(), background: T.teal, color: "#fff", border: 0, padding: "8px 14px", fontSize: 12 }}>
+        <button onClick={() => setOpenForm(false)} style={btn(narrow)}>Cancel</button>
+        <button disabled={busy} onClick={create} style={{ ...btn(narrow), background: T.teal, color: "#fff", border: 0, padding: narrow ? "11px 16px" : "8px 14px", fontSize: narrow ? 13 : 12 }}>
           {busy ? "Creating…" : pay === "CIB" ? "Create & get payment link" : "Create & confirm booking"}
         </button>
       </div>
@@ -464,6 +484,7 @@ function Line({ k, v }) {
 
 const lbl = { fontSize: 10, fontWeight: 600, color: T.mute, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: 5 };
 const inp = { width: "100%", boxSizing: "border-box", border: `1px solid ${T.border}`, borderRadius: 6, padding: "8px 10px", fontSize: 12, fontFamily: "inherit", color: T.ink, background: T.white };
-function btn() {
-  return { border: `1px solid ${T.border}`, background: T.white, color: T.ink, borderRadius: 6, padding: "6px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-block" };
+// big: finger-sized on a phone.
+function btn(big) {
+  return { border: `1px solid ${T.border}`, background: T.white, color: T.ink, borderRadius: 6, padding: big ? "10px 14px" : "6px 12px", fontSize: big ? 13 : 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-block" };
 }

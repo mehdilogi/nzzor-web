@@ -17,8 +17,20 @@ import AnalyticsPanel from "./AnalyticsPanel";
 import AccountingPanel from "./AccountingPanel";
 import GroupsPanel from "./GroupsPanel";
 import HotelMapPicker from "./HotelMapPicker";
+import "./admin-mobile.css";
 
 const fmt = (n) => Number(n || 0).toLocaleString("en") + " DZD";
+
+// Algerian numbers are often typed locally (0661…, 00213…). WhatsApp needs the
+// international form without "+" or zeros in front.
+function waNumber(phone) {
+  let d = String(phone || "").replace(/\D/g, "");
+  if (d.startsWith("00")) d = d.slice(2);
+  if (d.startsWith("0")) d = "213" + d.slice(1);
+  return d;
+}
+const telHref = (phone) => "tel:" + String(phone || "").replace(/[^\d+]/g, "");
+const BOOKING_STATUSES = ["PENDING", "CONFIRMED", "REJECTED", "CANCELLED", "COMPLETED", "NO_SHOW", "REFUNDED"];
 
 // =============================================================================
 // ROOT
@@ -167,29 +179,75 @@ function Login({ onLogin }) {
 // =============================================================================
 // DASHBOARD SHELL
 // =============================================================================
+const TABS = [
+  ["overview", "Overview"],
+  ["analytics", "Analytics"],
+  ["hotels", "Hotels"],
+  ["bookings", "Bookings"],
+  ["groups", "Groups"],
+  ["accounting", "Accounting"],
+  ["customers", "Customers"],
+];
+
 function Dashboard({ user, onLogout }) {
-  const [tab, setTab] = useState("overview");
+  // The open section lives in the URL hash (#bookings), so a refresh, a shared
+  // link or the phone's back button lands on the same section.
+  const [tab, setTabState] = useState("overview");
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const read = () => {
+      const h = window.location.hash.replace("#", "");
+      if (TABS.some(([k]) => k === h)) setTabState(h);
+    };
+    read();
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
+  }, []);
+
+  function setTab(k) {
+    setMenuOpen(false);
+    if (k === tab) return;
+    setTabState(k);
+    try { window.history.pushState(null, "", "#" + k); } catch (e) {}
+    window.scrollTo(0, 0);
+  }
+
+  // Phone menu: Escape closes it, and the page behind does not scroll.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e) => { if (e.key === "Escape") setMenuOpen(false); };
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
+  }, [menuOpen]);
+
+  const current = (TABS.find(([k]) => k === tab) || TABS[0])[1];
 
   return (
     <div className="nzad-shell">
-      <aside className="nzad-sidebar">
+      <header className="nzad-topbar">
+        <button className="nzad-menu-btn" onClick={() => setMenuOpen(true)} aria-label="Open menu" aria-expanded={menuOpen}>
+          <span /><span /><span />
+        </button>
+        <div className="nzad-top-title">{current}</div>
+        <span className="nzad-logo-mark nzad-top-mark" />
+      </header>
+
+      {menuOpen && <div className="nzad-scrim" onClick={() => setMenuOpen(false)} />}
+
+      <aside className={"nzad-sidebar" + (menuOpen ? " open" : "")}>
         <div className="nzad-side-brand">
           <span className="nzad-logo-mark" />
           <div>
             <div className="nzad-side-name display">Nzzor</div>
             <div className="nzad-side-sub">Admin</div>
           </div>
+          <button className="nzad-side-close" onClick={() => setMenuOpen(false)} aria-label="Close menu">×</button>
         </div>
         <nav>
-          {[
-            ["overview", "Overview"],
-            ["analytics", "Analytics"],
-            ["hotels", "Hotels"],
-            ["bookings", "Bookings"],
-            ["groups", "Groups"],
-            ["accounting", "Accounting"],
-            ["customers", "Customers"],
-          ].map(([k, label]) => (
+          {TABS.map(([k, label]) => (
             <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
               {label}
             </button>
@@ -219,13 +277,6 @@ function Dashboard({ user, onLogout }) {
         .nzad-sidebar {
           width: 240px; flex-shrink: 0; background: var(--ink); color: #fff;
           display: flex; flex-direction: column; padding: 24px 16px;
-          /* Sticky to viewport top so the sidebar stays visible as the
-             admin scrolls through long content (booking lists, hotel
-             managers). align-items: flex-start on the shell prevents
-             grid/flex from stretching the aside vertically, which would
-             defeat sticky. The 100vh height lets the inner nav fill
-             the viewport; if the nav ever gets too tall it scrolls
-             internally rather than pushing the foot off-screen. */
           position: sticky;
           top: 0;
           height: 100vh;
@@ -239,6 +290,7 @@ function Dashboard({ user, onLogout }) {
         }
         .nzad-side-name { font-size: 19px; font-weight: 600; letter-spacing: -0.02em; }
         .nzad-side-sub { font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; color: rgba(255,255,255,0.5); }
+        .nzad-side-close { display: none; }
         .nzad-sidebar nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
         .nzad-sidebar nav button {
           text-align: left; padding: 11px 14px; border: none; background: transparent;
@@ -250,7 +302,7 @@ function Dashboard({ user, onLogout }) {
         .nzad-side-foot { border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px; }
         .nzad-side-user { padding: 0 8px 12px; }
         .nzad-side-user strong { display: block; font-size: 13px; }
-        .nzad-side-user span { font-size: 11px; color: rgba(255,255,255,0.5); }
+        .nzad-side-user span { font-size: 11px; color: rgba(255,255,255,0.5); word-break: break-all; }
         .nzad-logout {
           width: 100%; padding: 9px; background: rgba(255,255,255,0.08);
           color: #fff; border: none; border-radius: var(--r-sm);
@@ -258,22 +310,51 @@ function Dashboard({ user, onLogout }) {
         }
         .nzad-logout:hover { background: rgba(255,255,255,0.14); }
         .nzad-main { flex: 1; min-width: 0; padding: 32px 40px; overflow-x: clip; }
-        @media (max-width: 720px) {
-          .nzad-shell { flex-direction: column; align-items: stretch; }
-          /* On mobile, the sidebar collapses to a horizontal bar at the top
-             — sticky positioning would keep it pinned and waste vertical
-             space. position: static + height: auto lets it scroll away
-             naturally, which is the right pattern for mobile admin work. */
-          .nzad-sidebar {
-            width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 12px 16px;
-            position: static; height: auto; overflow: visible;
+        .nzad-topbar, .nzad-scrim { display: none; }
+
+        /* Phone and small tablet: a top bar with the section name, and the
+           sidebar becomes a drawer that slides in from the left. */
+        @media (max-width: 860px) {
+          .nzad-shell { display: block; }
+          .nzad-topbar {
+            display: flex; align-items: center; gap: 12px;
+            position: sticky; top: 0; z-index: 60;
+            height: 56px; padding: 0 12px 0 6px;
+            padding-top: env(safe-area-inset-top);
+            background: var(--ink); color: #fff;
           }
-          .nzad-side-brand { padding: 0; }
-          .nzad-sidebar nav { flex-direction: row; flex: 0; gap: 4px; }
-          .nzad-side-foot { border: none; padding: 0; display: flex; align-items: center; gap: 8px; }
-          .nzad-side-user { display: none; }
-          .nzad-main { padding: 20px; }
+          .nzad-menu-btn {
+            width: 44px; height: 44px; border: none; background: transparent; border-radius: var(--r-sm);
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; cursor: pointer;
+          }
+          .nzad-menu-btn span { display: block; width: 20px; height: 2px; border-radius: 2px; background: #fff; }
+          .nzad-menu-btn:active { background: rgba(255,255,255,0.1); }
+          .nzad-top-title { flex: 1; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+          .nzad-top-mark { width: 22px; height: 22px; }
+          .nzad-scrim {
+            display: block; position: fixed; inset: 0; z-index: 80;
+            background: rgba(0,0,0,0.45); animation: nzadFade 0.2s ease;
+          }
+          .nzad-sidebar {
+            position: fixed; top: 0; left: 0; bottom: 0; z-index: 90;
+            width: min(300px, 84vw); height: 100%;
+            padding: calc(18px + env(safe-area-inset-top)) 14px calc(18px + env(safe-area-inset-bottom));
+            transform: translateX(-100%); visibility: hidden;
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.25s;
+          }
+          .nzad-sidebar.open {
+            transform: none; visibility: visible; box-shadow: 10px 0 40px rgba(0,0,0,0.3);
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s;
+          }
+          .nzad-side-brand { padding: 0 4px 22px; }
+          .nzad-side-close {
+            display: block; margin-left: auto; width: 40px; height: 40px; border-radius: 50%;
+            border: none; background: rgba(255,255,255,0.08); color: #fff; font-size: 24px; line-height: 1; cursor: pointer;
+          }
+          .nzad-sidebar nav button { padding: 14px 16px; font-size: 16px; }
+          .nzad-main { padding: 18px 14px calc(40px + env(safe-area-inset-bottom)); }
         }
+        @keyframes nzadFade { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
     </div>
   );
@@ -297,9 +378,11 @@ function Overview() {
     <div>
       <PageHead title="Overview" subtitle="Your platform at a glance" />
 
-      <TodayPanel />
-
+      {/* Bookings waiting on a hotel come first: they are the only thing on
+          this page that needs someone to act (call the hotel) right now. */}
       <OpsPanel />
+
+      <TodayPanel />
 
       <div className="nzad-stats">
         <Stat label="Total bookings" value={data.bookings.total} />
@@ -352,7 +435,13 @@ function Overview() {
         .nzad-status-chip strong { font-size: 16px; font-weight: 800; }
         .nzad-status-chip span { color: var(--gray-400); font-weight: 600; font-size: 11px; }
         .nzad-empty-inline { color: var(--gray-400); font-size: 13px; }
-        @media (max-width: 720px) { .nzad-stats { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 720px) {
+          .nzad-stats { grid-template-columns: 1fr 1fr; gap: 10px; }
+          /* Three short columns fit a phone; wrap names instead of scrolling. */
+          .nzad-table { display: table; white-space: normal; }
+          .nzad-table td, .nzad-table th { padding-left: 6px; padding-right: 6px; }
+          .nzad-table td:last-child { white-space: nowrap; }
+        }
       `}</style>
     </div>
   );
@@ -473,11 +562,20 @@ function TodayPanel() {
         .nzad-today-amt { font-weight: 700; }
         .nzad-empty-inline { color: var(--gray-400); font-size: 13px; }
         @media (max-width: 720px) {
-          .nzad-today-counts { grid-template-columns: 1fr 1fr; }
+          .nzad-today-counts { grid-template-columns: 1fr 1fr; gap: 10px; }
+          /* Two lines per event: time, status and amount, then the reference
+             and who it is for. */
           .nzad-today-row {
-            grid-template-columns: 60px 80px 1fr auto;
+            grid-template-columns: auto auto 1fr;
+            grid-template-areas: "time kind amt" "ref ref ref" "meta meta meta";
+            gap: 4px 10px; padding: 10px 12px;
           }
-          .nzad-today-meta { display: none; }
+          .nzad-today-time { grid-area: time; }
+          .nzad-today-kind { grid-area: kind; justify-self: start; }
+          .nzad-today-amt { grid-area: amt; justify-self: end; }
+          .nzad-today-ref { grid-area: ref; }
+          .nzad-today-meta { grid-area: meta; white-space: normal; }
+          .nzad-today-feed { max-height: none; }
         }
       `}</style>
     </div>
@@ -504,6 +602,10 @@ function TodayChip({ label, value, tone = "ink" }) {
         .nzad-today-chip span {
           font-size: 11.5px; color: var(--gray-400); font-weight: 600;
           letter-spacing: 0.02em;
+        }
+        @media (max-width: 720px) {
+          .nzad-today-chip { padding: 12px 14px; }
+          .nzad-today-chip strong { font-size: 19px; }
         }
       `}</style>
     </div>
@@ -630,6 +732,14 @@ function OpsPanel() {
         .ops-call:hover { background: var(--red); }
         .ops-row.urgent .ops-call { background: var(--red); }
         .ops-nophone { font-size: 12px; color: var(--gray-400); font-style: italic; }
+        @media (max-width: 720px) {
+          .ops-panel { padding: 16px; }
+          .ops-row { flex-direction: column; align-items: stretch; gap: 10px; }
+          .ops-row-main { gap: 4px 12px; }
+          .ops-hotel { order: 3; flex-basis: 100%; }
+          .ops-row-actions { display: flex; }
+          .ops-call { flex: 1; text-align: center; padding: 12px 16px; font-size: 14px; }
+        }
       `}</style>
     </div>
   );
@@ -1136,8 +1246,22 @@ function HotelsManager() {
         .nzad-filter-count strong { color: var(--ink); }
 
         @media (max-width: 720px) {
-          .nzad-filter-search, .nzad-filter-select { width: 100%; flex: 1 1 100%; }
+          .nzad-filter-search, .nzad-filter-select { width: 100%; flex: 1 1 100%; min-width: 0; }
           .nzad-filter-spacer { display: none; }
+          .nzad-filter-pill-group { flex: 1 1 100%; }
+          .nzad-filter-pill-group .nzad-pill { flex: 1; padding: 9px 4px; }
+          .nzad-pill { padding: 9px 12px; }
+          /* Card per hotel: photo and name on top, the actions on a row of
+             their own so every button can be reached with a thumb. */
+          .nzad-hotel-row { flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+          .nzad-hotel-thumb { width: 72px; height: 56px; }
+          .nzad-hotel-meta { flex: 1 1 0; min-width: 0; }
+          .nzad-hotel-name { flex-wrap: wrap; gap: 4px 6px; font-size: 14.5px; line-height: 1.3; }
+          .nzad-row-actions { flex: 1 1 100%; }
+          .nzad-row-actions button { flex: 1; padding: 10px 6px; min-height: 42px; }
+          .nzad-row-confirm { flex: 1 1 100%; }
+          .nzad-row-confirm span { flex: 1 1 100%; max-width: none; }
+          .nzad-row-confirm button { flex: 1; min-height: 42px; }
         }
       `}</style>
     </div>
@@ -1411,7 +1535,18 @@ function HotelEditor({ hotel, onClose, onSaved }) {
         .nzad-toggles { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
         .nzad-editor-actions { display: flex; gap: 10px; margin-bottom: 24px; }
         .nzad-note { padding: 16px; background: var(--cream); border: 1px dashed var(--gray-300); border-radius: var(--r-md); font-size: 13px; color: var(--gray-400); }
-        @media (max-width: 720px) { .nzad-grid3 { grid-template-columns: 1fr; } }
+        @media (max-width: 720px) {
+          .nzad-grid3 { grid-template-columns: 1fr; }
+          .nzad-toggles { flex-direction: column; gap: 8px; }
+          /* Save stays at the bottom of the screen while the hotel details
+             above it are being edited. */
+          .nzad-editor-actions {
+            position: sticky; bottom: 0; z-index: 5;
+            margin: 0 -14px 24px; padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+            background: rgba(250, 248, 244, 0.96); border-top: 1px solid var(--gray-200);
+            backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+          }
+        }
       `}</style>
     </div>
   );
@@ -2093,7 +2228,14 @@ function RoomCard({ room, onDelete, onRoomChange }) {
         }
         .nzad-room-meta strong { font-size: 14px; }
         .nzad-room-meta span { font-size: 12.5px; color: var(--gray-400); font-weight: 600; margin-left: 6px; }
-        .nzad-room-actions { display: flex; gap: 8px; align-items: center; }
+        .nzad-room-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        /* nzad-btn-mini was used on these buttons but defined nowhere. */
+        .nzad-btn-mini {
+          background: #fff; color: var(--ink); border: 1.5px solid var(--gray-200);
+          padding: 6px 11px; border-radius: var(--r-sm); font-size: 12.5px; font-weight: 700;
+          cursor: pointer; font-family: inherit; white-space: nowrap;
+        }
+        .nzad-btn-mini:hover { border-color: var(--ink); }
         .nzad-room-edit {
           padding: 14px;
           border-top: 1px solid var(--gray-100);
@@ -2122,8 +2264,11 @@ function RoomCard({ room, onDelete, onRoomChange }) {
         }
         @media (max-width: 720px) {
           .nzad-room-head { flex-direction: column; align-items: stretch; }
-          .nzad-room-actions { justify-content: flex-end; }
+          .nzad-room-actions { display: grid; grid-template-columns: 1fr 1fr; }
+          .nzad-room-actions button { min-height: 40px; }
+          .nzad-room-meta span { display: block; margin: 2px 0 0; }
           .nzad-redit-grid { grid-template-columns: 1fr; }
+          .nzad-redit-actions button { flex: 1; }
         }
       `}</style>
     </div>
@@ -3001,6 +3146,31 @@ function ManagersPanel({ hotelId }) {
           border-radius: var(--r-sm); font-size: 13px; outline: none; font-family: inherit;
         }
         .nzad-mgr-field input:focus { border-color: var(--red); }
+        /* These classes were used here but never defined, so the buttons and
+           the form grid rendered unstyled. */
+        .nzad-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+        .nzad-panel-head h3 { margin: 0; }
+        .nzad-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .nzad-btn {
+          background: #fff; color: var(--ink); border: 1.5px solid var(--gray-200);
+          padding: 8px 14px; border-radius: var(--r-sm); font-size: 13px; font-weight: 700;
+          cursor: pointer; font-family: inherit; white-space: nowrap;
+        }
+        .nzad-btn:hover { border-color: var(--ink); }
+        .nzad-btn.primary { background: var(--red); border-color: var(--red); color: #fff; }
+        .nzad-btn.primary:hover { background: var(--red-deep); border-color: var(--red-deep); }
+        @media (max-width: 720px) {
+          .nzad-grid2 { grid-template-columns: 1fr; }
+          .nzad-btn { min-height: 42px; }
+          .nzad-mgr-actions .nzad-btn { flex: 1; }
+          /* One stacked block per partner account instead of a table. */
+          .nzad-table, .nzad-table tbody, .nzad-table tr, .nzad-table td { display: block; white-space: normal; overflow: visible; }
+          .nzad-table thead { display: none; }
+          .nzad-table tr { padding: 12px 0; border-bottom: 1px solid var(--gray-100); }
+          .nzad-table td { padding: 2px 0; border: none; word-break: break-all; }
+          .nzad-table td:last-child { padding-top: 8px; word-break: normal; }
+          .nzad-link, .nzad-link-danger { font-size: 13.5px; padding: 6px 0; }
+        }
       `}</style>
     </div>
   );
@@ -3275,10 +3445,11 @@ function BookingsManager() {
                   <td>{b.hotel?.name}</td>
                   <td className="nzad-dim">{(b.checkIn || "").slice(0, 10)} → {(b.checkOut || "").slice(0, 10)}</td>
                   <td>{fmt(b.pricing?.total)}</td>
-                  <td><span className={`ad-bstatus s-${b.status}`}>{b.status}</span></td>
+                  <td><span className={`nzad-bstatus s-${b.status}`}>{b.status}</span></td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <select value={b.status} onChange={(e) => setBookingStatus(b.id, e.target.value)}>
-                      {["PENDING", "CONFIRMED", "REJECTED", "CANCELLED", "COMPLETED", "NO_SHOW", "REFUNDED"].map((s) => (
+                      {!BOOKING_STATUSES.includes(b.status) && <option value={b.status}>{b.status}</option>}
+                      {BOOKING_STATUSES.map((s) => (
                         <option key={s} value={s}>{s}</option>
                       ))}
                     </select>
@@ -3287,6 +3458,35 @@ function BookingsManager() {
               ))}
             </tbody>
           </table>
+
+          {/* Phone: one card per booking instead of a 7-column table. Tap the
+              card for the full booking; call or WhatsApp the guest directly. */}
+          <div className="nzad-bcards">
+            {data.map((b) => (
+              <div key={b.id} className="nzad-bcard" onClick={() => setSelected(b.id)} role="button" tabIndex={0}>
+                <div className="nzad-bcard-top">
+                  <strong className="nzad-bcard-ref">{b.reference}</strong>
+                  <span className={`nzad-bstatus s-${b.status}`}>{b.status}</span>
+                </div>
+                <div className="nzad-bcard-hotel">{b.hotel?.name}</div>
+                <div className="nzad-bcard-line">
+                  <span>{b.guest?.firstName} {b.guest?.lastName}</span>
+                  <strong>{fmt(b.pricing?.total)}</strong>
+                </div>
+                <div className="nzad-dim">{(b.checkIn || "").slice(0, 10)} → {(b.checkOut || "").slice(0, 10)}</div>
+                <div className="nzad-bcard-actions" onClick={(e) => e.stopPropagation()}>
+                  {b.guest?.phone && <a className="nzad-bcard-btn" href={telHref(b.guest.phone)}>Call</a>}
+                  {b.guest?.phone && <a className="nzad-bcard-btn wa" href={"https://wa.me/" + waNumber(b.guest.phone)} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
+                  <select value={b.status} onChange={(e) => setBookingStatus(b.id, e.target.value)} aria-label={"Status of " + b.reference}>
+                    {!BOOKING_STATUSES.includes(b.status) && <option value={b.status}>{b.status}</option>}
+                    {BOOKING_STATUSES.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ))}
+          </div>
 
           {/* ---- Pagination controls ----
               Shown when there's more than one page. Prev/Next buttons plus
@@ -3362,9 +3562,33 @@ function BookingsManager() {
         .s-PENDING { background: #FFF4E0; color: #9A6700; }
         .s-REJECTED, .s-CANCELLED, .s-NO_SHOW, .s-REFUNDED { background: var(--red-soft); color: var(--red-deep); }
         select { padding: 6px 8px; border: 1.5px solid var(--gray-200); border-radius: var(--r-sm); font-size: 12px; }
+        .s-PENDING_PAYMENT, .s-PAYMENT_FAILED { background: var(--gray-100); color: var(--ink-2); }
+        .nzad-bcards { display: none; }
         @media (max-width: 720px) {
-          .nzad-filters { flex-direction: column; align-items: stretch; }
+          .nzad-filters { flex-direction: column; align-items: stretch; padding: 12px; gap: 8px; }
           .nzad-filter-search { min-width: 0; }
+          .nzad-filter-date { justify-content: space-between; }
+          .nzad-filter-date input { flex: 1; max-width: 70%; }
+          .nzad-table { display: none; }
+          .nzad-bcards { display: flex; flex-direction: column; gap: 10px; }
+          .nzad-bcard {
+            border: 1px solid var(--gray-200); border-radius: var(--r-md); padding: 12px 14px;
+            display: flex; flex-direction: column; gap: 5px; cursor: pointer; background: #fff;
+          }
+          .nzad-bcard:active { background: var(--cream); }
+          .nzad-bcard-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+          .nzad-bcard-ref { font-size: 13.5px; letter-spacing: 0.02em; }
+          .nzad-bcard-hotel { font-size: 14px; font-weight: 700; color: var(--ink); }
+          .nzad-bcard-line { display: flex; justify-content: space-between; gap: 10px; font-size: 13.5px; color: var(--ink-2); }
+          .nzad-bcard-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+          .nzad-bcard-btn {
+            flex: 1; display: flex; align-items: center; justify-content: center; min-height: 40px;
+            border: 1.5px solid var(--gray-200); border-radius: var(--r-sm);
+            font-size: 13px; font-weight: 700; color: var(--ink); text-decoration: none;
+          }
+          .nzad-bcard-btn.wa { background: #25D366; border-color: #25D366; color: #fff; }
+          .nzad-bcard-actions select { grid-column: 1 / -1; width: 100%; min-height: 42px; font-weight: 700; background: #fff; }
+          .nzad-result-row { gap: 8px; }
         }
       `}</style>
     </div>
@@ -3383,6 +3607,15 @@ function BookingDetailPanel({ id, onClose, onChanged }) {
   useEffect(() => {
     adminBookingDetail(id).then(setB).catch((e) => setErr(e.message));
   }, [id]);
+
+  // Escape closes; the list behind does not scroll while the booking is open.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
+  }, [onClose]);
 
   async function confirm() {
     setBusy(true);
@@ -3451,7 +3684,7 @@ function BookingDetailPanel({ id, onClose, onChanged }) {
             <div className="bd-head">
               <div>
                 <div className="bd-ref">{b.reference}</div>
-                <span className={`ad-bstatus s-${b.status}`}>{b.status}</span>
+                <span className={`bd-status s-${b.status}`}>{b.status}</span>
               </div>
               <div className="bd-total">
                 <span>Total</span>
@@ -3459,11 +3692,19 @@ function BookingDetailPanel({ id, onClose, onChanged }) {
               </div>
             </div>
 
+            {(b.guest?.phone || b.hotel?.contactPhone) && (
+              <div className="bd-contact">
+                {b.guest?.phone && <a href={telHref(b.guest.phone)}>Call guest</a>}
+                {b.guest?.phone && <a className="wa" href={"https://wa.me/" + waNumber(b.guest.phone)} target="_blank" rel="noopener noreferrer">WhatsApp guest</a>}
+                {b.hotel?.contactPhone && <a href={telHref(b.hotel.contactPhone)}>Call hotel</a>}
+              </div>
+            )}
+
             <div className="bd-grid">
               <Section title="Guest">
                 <Row label="Name" value={`${b.guest?.firstName || ""} ${b.guest?.lastName || ""}`.trim()} />
                 <Row label="Email" value={b.guest?.email} link={b.guest?.email ? `mailto:${b.guest.email}` : null} />
-                <Row label="Phone" value={b.guest?.phone} link={b.guest?.phone ? `https://wa.me/${(b.guest.phone || "").replace(/\D/g, "")}` : null} />
+                <Row label="Phone" value={b.guest?.phone} link={b.guest?.phone ? `https://wa.me/${waNumber(b.guest.phone)}` : null} />
               </Section>
 
               <Section title="Stay">
@@ -3573,9 +3814,35 @@ function BookingDetailPanel({ id, onClose, onChanged }) {
           .bd-resend-msg { align-self: center; margin-right: auto; font-size: 13px; font-weight: 600; color: var(--ink-2); }
           .bd-reject { background: var(--red-soft); color: var(--red-deep); }
           .bd-confirm:disabled, .bd-reject:disabled { opacity: 0.6; cursor: default; }
-          @media (max-width: 640px) {
-            .bd-grid { grid-template-columns: 1fr; }
-            .bd-panel { padding: 22px; }
+          .bd-status { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 980px; background: var(--gray-100); color: var(--ink-2); }
+          .bd-status.s-CONFIRMED, .bd-status.s-COMPLETED { background: var(--teal-soft); color: var(--teal); }
+          .bd-status.s-PENDING { background: #FFF4E0; color: #9A6700; }
+          .bd-status.s-REJECTED, .bd-status.s-CANCELLED, .bd-status.s-NO_SHOW, .bd-status.s-REFUNDED { background: var(--red-soft); color: var(--red-deep); }
+          .bd-contact { display: flex; gap: 8px; flex-wrap: wrap; margin: -8px 0 20px; }
+          .bd-contact a {
+            display: inline-flex; align-items: center; justify-content: center; min-height: 38px; padding: 0 14px;
+            border: 1.5px solid var(--gray-200); border-radius: 980px; font-size: 13px; font-weight: 700;
+            color: var(--ink); text-decoration: none; background: #fff;
+          }
+          .bd-contact a.wa { background: #25D366; border-color: #25D366; color: #fff; }
+          @media (max-width: 720px) {
+            /* globals.css turns this modal into a bottom sheet on phones
+               (shared with the partner portal); this only arranges the
+               content inside it and pins the actions to its bottom edge. */
+            .bd-head { flex-direction: column; gap: 12px; margin-bottom: 18px; }
+            .bd-total { text-align: left; }
+            .bd-ref { font-size: 20px; }
+            .bd-grid { grid-template-columns: 1fr; gap: 20px; }
+            .bd-contact { margin: -4px 0 18px; }
+            .bd-contact a { flex: 1; min-height: 44px; }
+            .bd-actions {
+              position: sticky; bottom: 0; margin: 20px -22px -24px; padding: 12px 22px calc(12px + env(safe-area-inset-bottom));
+              background: #fff; border-top: 1px solid var(--gray-200); flex-direction: column-reverse; z-index: 2;
+            }
+            .bd-actions button { width: 100%; min-height: 48px; }
+            .bd-resend-msg { margin: 0; }
+            .bd-clarity { padding-bottom: 20px; }
+            .bd-clarity button { min-height: 42px; }
           }
         `}</style>
       </div>
@@ -3706,6 +3973,22 @@ function CustomersManager() {
             </tbody>
           </table>
 
+          <div className="nzad-ccards">
+            {data.map((u) => (
+              <div key={u.id} className="nzad-ccard" onClick={() => setSelected(u.id)} role="button" tabIndex={0}>
+                <div className="nzad-ccard-top">
+                  <strong>{u.firstName || u.lastName ? `${u.firstName || ""} ${u.lastName || ""}`.trim() : "—"}</strong>
+                  <span>{u.bookingsCount} booking{u.bookingsCount === 1 ? "" : "s"}</span>
+                </div>
+                <div className="nzad-ccard-sub">{u.email}</div>
+                <div className="nzad-ccard-sub">
+                  {u.phone || "No phone"}
+                  {u.lifetimeRevenue > 0 && <> · <b>{fmt(u.lifetimeRevenue)}</b></>}
+                </div>
+              </div>
+            ))}
+          </div>
+
           {totalPages > 1 && (
             <Pagination page={page} totalPages={totalPages} onChange={(p) => setPage(p)} />
           )}
@@ -3759,6 +4042,25 @@ function CustomersManager() {
         .nzad-page-size select:hover { border-color: var(--ink); }
         .nzad-err { background: var(--red-soft); color: var(--red-deep); padding: 12px 14px; border-radius: var(--r-sm); margin-bottom: 14px; font-size: 13.5px; }
         .nzad-load, .nzad-empty { padding: 40px; text-align: center; color: var(--gray-400); font-size: 14px; }
+        .nzad-ccards { display: none; }
+        @media (max-width: 720px) {
+          .nzad-page-head { margin-bottom: 16px; }
+          .nzad-page-head h1 { font-size: 22px; }
+          .nzad-filters { padding: 12px; }
+          .nzad-filter-search { min-width: 0; }
+          .nzad-table { display: none; }
+          .nzad-ccards { display: flex; flex-direction: column; gap: 8px; }
+          .nzad-ccard {
+            background: #fff; border: 1px solid var(--gray-200); border-radius: var(--r-md);
+            padding: 12px 14px; cursor: pointer; min-width: 0;
+          }
+          .nzad-ccard:active { background: var(--cream); }
+          .nzad-ccard-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+          .nzad-ccard-top strong { font-size: 14.5px; color: var(--ink); }
+          .nzad-ccard-top span { font-size: 12px; font-weight: 700; color: var(--gray-400); flex-shrink: 0; }
+          .nzad-ccard-sub { font-size: 12.5px; color: var(--gray-400); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+          .nzad-ccard-sub b { color: var(--ink); }
+        }
       `}</style>
     </div>
   );
@@ -3816,6 +4118,12 @@ function CustomerDetailPanel({ id, onClose }) {
                 <div className="cd-name display">{fullName || u.email}</div>
                 <div className="cd-email">{u.email}</div>
                 {u.phone && <div className="cd-phone">{u.phone}</div>}
+                {u.phone && (
+                  <div className="cd-contact">
+                    <a href={telHref(u.phone)}>Call</a>
+                    <a className="wa" href={"https://wa.me/" + waNumber(u.phone)} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                  </div>
+                )}
               </div>
               <div className="cd-badges">
                 {u.isActive ? (
@@ -3873,100 +4181,127 @@ function CustomerDetailPanel({ id, onClose }) {
           </>
         )}
 
-        <style jsx>{`
-          .cd-back {
-            position: fixed; inset: 0; z-index: 100;
-            background: rgba(0,0,0,0.6);
-            display: flex; align-items: center; justify-content: center;
-            padding: 24px; overflow-y: auto;
-          }
-          .cd-panel {
-            position: relative; background: #fff;
-            border-radius: var(--r-lg);
-            max-width: 760px; width: 100%; max-height: 92vh;
-            overflow-y: auto;
-            padding: 32px 36px;
-            box-shadow: 0 30px 80px rgba(0,0,0,0.3);
-          }
-          .cd-close {
-            position: absolute; top: 14px; right: 14px;
-            width: 36px; height: 36px; border-radius: 50%;
-            border: none; background: var(--gray-100);
-            font-size: 22px; line-height: 1; cursor: pointer;
-          }
-          .cd-close:hover { background: var(--gray-200); }
-          .cd-err { background: var(--red-soft); color: var(--red-deep); padding: 12px; border-radius: var(--r-sm); }
-          .cd-load { padding: 40px; text-align: center; color: var(--gray-400); }
-
-          .cd-head {
-            display: flex; justify-content: space-between; align-items: flex-start;
-            gap: 18px; margin-bottom: 22px; padding-bottom: 20px;
-            border-bottom: 1px solid var(--gray-100);
-          }
-          .cd-name { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 6px; color: var(--ink); }
-          .cd-email { font-size: 14px; color: var(--ink-2); font-weight: 600; }
-          .cd-phone { font-size: 13px; color: var(--gray-400); margin-top: 2px; }
-          .cd-badges { display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; }
-          .cd-badge { font-size: 10.5px; font-weight: 700; padding: 4px 10px; border-radius: 980px; letter-spacing: 0.04em; }
-          .cd-badge.ok { background: var(--teal-soft); color: var(--teal); }
-          .cd-badge.off { background: var(--red-soft); color: var(--red-deep); }
-          .cd-badge.soft { background: var(--gray-100); color: var(--ink-2); }
-
-          .cd-stats {
-            display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
-            margin-bottom: 26px;
-          }
-          .cd-stat {
-            background: var(--cream); border: 1px solid var(--gray-100);
-            border-radius: var(--r-sm); padding: 12px 14px;
-          }
-          .cd-stat-k {
-            font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em;
-            text-transform: uppercase; color: var(--gray-400); margin-bottom: 6px;
-          }
-          .cd-stat-v { font-size: 17px; font-weight: 700; color: var(--ink); }
-          .cd-stat-v.small { font-size: 13.5px; }
-
-          .cd-section h3 {
-            font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
-            text-transform: uppercase; color: var(--gray-400); margin-bottom: 12px;
-          }
-          .cd-empty {
-            padding: 28px; text-align: center; color: var(--gray-400);
-            background: var(--cream); border-radius: var(--r-sm); font-size: 13.5px;
-          }
-          .cd-bookings {
-            width: 100%; border-collapse: collapse;
-            background: #fff; border: 1px solid var(--gray-100); border-radius: var(--r-sm);
-            overflow: hidden;
-          }
-          .cd-bookings th, .cd-bookings td {
-            padding: 10px 14px; font-size: 13px; text-align: left;
-            border-bottom: 1px solid var(--gray-100);
-          }
-          .cd-bookings th {
-            font-size: 10.5px; font-weight: 700; text-transform: uppercase;
-            letter-spacing: 0.06em; color: var(--gray-400); background: var(--cream);
-          }
-          .cd-bookings tr:last-child td { border-bottom: none; }
-          .cd-dim { color: var(--gray-400); }
-          .cd-st {
-            font-size: 10.5px; font-weight: 700; padding: 3px 9px;
-            border-radius: 980px; letter-spacing: 0.04em;
-          }
-          .cd-st.s-CONFIRMED, .cd-st.s-COMPLETED { background: var(--teal-soft); color: var(--teal); }
-          .cd-st.s-PENDING { background: #FFF4E0; color: #9A6700; }
-          .cd-st.s-REJECTED, .cd-st.s-CANCELLED, .cd-st.s-NO_SHOW, .cd-st.s-REFUNDED {
-            background: var(--red-soft); color: var(--red-deep);
-          }
-
-          @media (max-width: 720px) {
-            .cd-panel { padding: 24px 22px; }
-            .cd-head { flex-direction: column; }
-            .cd-stats { grid-template-columns: repeat(2, 1fr); }
-          }
-        `}</style>
       </div>
+      <style jsx>{`
+        .cd-back {
+          position: fixed; inset: 0; z-index: 100;
+          background: rgba(0,0,0,0.6);
+          display: flex; align-items: center; justify-content: center;
+          padding: 24px; overflow-y: auto;
+        }
+        .cd-panel {
+          position: relative; background: #fff;
+          border-radius: var(--r-lg);
+          max-width: 760px; width: 100%; max-height: 92vh;
+          overflow-y: auto;
+          padding: 32px 36px;
+          box-shadow: 0 30px 80px rgba(0,0,0,0.3);
+        }
+        .cd-close {
+          position: absolute; top: 14px; right: 14px;
+          width: 36px; height: 36px; border-radius: 50%;
+          border: none; background: var(--gray-100);
+          font-size: 22px; line-height: 1; cursor: pointer;
+        }
+        .cd-close:hover { background: var(--gray-200); }
+        .cd-err { background: var(--red-soft); color: var(--red-deep); padding: 12px; border-radius: var(--r-sm); }
+        .cd-load { padding: 40px; text-align: center; color: var(--gray-400); }
+
+        .cd-head {
+          display: flex; justify-content: space-between; align-items: flex-start;
+          gap: 18px; margin-bottom: 22px; padding-bottom: 20px;
+          border-bottom: 1px solid var(--gray-100);
+        }
+        .cd-name { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 6px; color: var(--ink); }
+        .cd-email { font-size: 14px; color: var(--ink-2); font-weight: 600; }
+        .cd-phone { font-size: 13px; color: var(--gray-400); margin-top: 2px; }
+        .cd-badges { display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; }
+        .cd-badge { font-size: 10.5px; font-weight: 700; padding: 4px 10px; border-radius: 980px; letter-spacing: 0.04em; }
+        .cd-badge.ok { background: var(--teal-soft); color: var(--teal); }
+        .cd-badge.off { background: var(--red-soft); color: var(--red-deep); }
+        .cd-badge.soft { background: var(--gray-100); color: var(--ink-2); }
+
+        .cd-stats {
+          display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+          margin-bottom: 26px;
+        }
+        .cd-stat {
+          background: var(--cream); border: 1px solid var(--gray-100);
+          border-radius: var(--r-sm); padding: 12px 14px;
+        }
+        .cd-stat-k {
+          font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em;
+          text-transform: uppercase; color: var(--gray-400); margin-bottom: 6px;
+        }
+        .cd-stat-v { font-size: 17px; font-weight: 700; color: var(--ink); }
+        .cd-stat-v.small { font-size: 13.5px; }
+
+        .cd-section h3 {
+          font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+          text-transform: uppercase; color: var(--gray-400); margin-bottom: 12px;
+        }
+        .cd-empty {
+          padding: 28px; text-align: center; color: var(--gray-400);
+          background: var(--cream); border-radius: var(--r-sm); font-size: 13.5px;
+        }
+        .cd-bookings {
+          width: 100%; border-collapse: collapse;
+          background: #fff; border: 1px solid var(--gray-100); border-radius: var(--r-sm);
+          overflow: hidden;
+        }
+        .cd-bookings th, .cd-bookings td {
+          padding: 10px 14px; font-size: 13px; text-align: left;
+          border-bottom: 1px solid var(--gray-100);
+        }
+        .cd-bookings th {
+          font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+          letter-spacing: 0.06em; color: var(--gray-400); background: var(--cream);
+        }
+        .cd-bookings tr:last-child td { border-bottom: none; }
+        .cd-dim { color: var(--gray-400); }
+        .cd-st {
+          font-size: 10.5px; font-weight: 700; padding: 3px 9px;
+          border-radius: 980px; letter-spacing: 0.04em;
+        }
+        .cd-st.s-CONFIRMED, .cd-st.s-COMPLETED { background: var(--teal-soft); color: var(--teal); }
+        .cd-st.s-PENDING { background: #FFF4E0; color: #9A6700; }
+        .cd-st.s-REJECTED, .cd-st.s-CANCELLED, .cd-st.s-NO_SHOW, .cd-st.s-REFUNDED {
+          background: var(--red-soft); color: var(--red-deep);
+        }
+
+        .cd-contact { display: flex; gap: 8px; margin-top: 10px; }
+        .cd-contact a {
+          display: inline-flex; align-items: center; justify-content: center; min-height: 36px; padding: 0 14px;
+          border: 1.5px solid var(--gray-200); border-radius: 980px; font-size: 13px; font-weight: 700;
+          color: var(--ink); text-decoration: none;
+        }
+        .cd-contact a.wa { background: #25D366; border-color: #25D366; color: #fff; }
+        @media (max-width: 720px) {
+          /* Bottom sheet, like the booking detail. */
+          .cd-back { padding: 0; align-items: flex-end; }
+          .cd-panel {
+            max-width: none; max-height: 90vh; border-radius: 22px 22px 0 0;
+            padding: 22px 20px calc(28px + env(safe-area-inset-bottom));
+          }
+          .cd-close { top: 12px; right: 12px; width: 40px; height: 40px; }
+          .cd-head { flex-direction: column; gap: 12px; }
+          .cd-name { font-size: 20px; }
+          .cd-email { word-break: break-all; }
+          .cd-contact a { flex: 1; min-height: 44px; }
+          .cd-stats { grid-template-columns: repeat(2, 1fr); }
+          /* Booking history as stacked rows: reference and status, then
+             hotel, dates and amount. */
+          .cd-bookings, .cd-bookings tbody, .cd-bookings tr, .cd-bookings td { display: block; }
+          .cd-bookings thead { display: none; }
+          .cd-bookings { border: none; background: transparent; }
+          .cd-bookings tr {
+            position: relative; border: 1px solid var(--gray-100); border-radius: var(--r-sm);
+            padding: 10px 12px; margin-bottom: 8px; background: #fff;
+          }
+          .cd-bookings td { padding: 2px 0; border: none; }
+          .cd-bookings td:last-child { position: absolute; top: 10px; right: 12px; padding: 0; }
+        }
+      `}</style>
     </div>
   );
 }
@@ -4024,6 +4359,10 @@ function PageHead({ title, subtitle, action }) {
         .nzad-pagehead { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; gap: 16px; }
         .nzad-pagehead h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
         .nzad-pagehead p { font-size: 13.5px; color: var(--gray-400); margin-top: 3px; }
+        @media (max-width: 720px) {
+          .nzad-pagehead { margin-bottom: 16px; gap: 12px; }
+          .nzad-pagehead h1 { font-size: 22px; }
+        }
       `}</style>
     </div>
   );
@@ -4038,6 +4377,10 @@ function Stat({ label, value }) {
         .nzad-stat { background: #fff; border: 1px solid var(--gray-200); border-radius: var(--r-md); padding: 18px; }
         .nzad-stat-value { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
         .nzad-stat-label { font-size: 12px; color: var(--gray-400); font-weight: 600; margin-top: 4px; }
+        @media (max-width: 720px) {
+          .nzad-stat { padding: 14px; }
+          .nzad-stat-value { font-size: 21px; }
+        }
       `}</style>
     </div>
   );
@@ -4155,6 +4498,10 @@ function Toggle({ label, v, onChange }) {
           white-space: nowrap;
         }
         .nzad-toggle.on .nzad-toggle-label { color: var(--ink); }
+        @media (max-width: 720px) {
+          .nzad-toggle { width: 100%; padding: 10px 14px 10px 10px; text-align: left; }
+          .nzad-toggle-label { white-space: normal; font-size: 13.5px; }
+        }
       `}</style>
     </button>
   );

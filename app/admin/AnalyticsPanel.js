@@ -27,6 +27,22 @@ const API = process.env.NEXT_PUBLIC_API_URL || "";
 const CLARITY = "https://clarity.microsoft.com/projects/view/" + (process.env.NEXT_PUBLIC_CLARITY_ID || "zf6099tgas");
 
 // -----------------------------------------------------------------------------
+// Phone layout. Styles here are inline, so media queries cannot reach them;
+// components read this instead and switch to one column below 760px.
+// -----------------------------------------------------------------------------
+function useNarrow(max = 760) {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${max}px)`);
+    const on = () => setNarrow(mq.matches);
+    on();
+    mq.addEventListener ? mq.addEventListener("change", on) : mq.addListener(on);
+    return () => { mq.removeEventListener ? mq.removeEventListener("change", on) : mq.removeListener(on); };
+  }, [max]);
+  return narrow;
+}
+
+// -----------------------------------------------------------------------------
 // Design tokens — single source of truth so every visual rule is consistent.
 // Kept as a plain object (not CSS vars) because we use inline styles only.
 // -----------------------------------------------------------------------------
@@ -223,6 +239,7 @@ async function fetchJSON(path, params) {
 // =============================================================================
 
 export default function AnalyticsPanel() {
+  const narrow = useNarrow();
   const [preset, setPreset] = useState("7d");
   const [start, setStart] = useState(() => toISODate(daysAgo(6)));
   const [end, setEnd] = useState(() => toISODate(todayUTC()));
@@ -307,7 +324,7 @@ export default function AnalyticsPanel() {
   }, [start, end, refreshKey, regionCountry]);
 
   return (
-    <div style={{ background: T.bg, minHeight: "100vh", padding: "20px 24px", color: T.ink, fontFamily: "inherit" }}>
+    <div style={{ background: T.bg, minHeight: narrow ? 0 : "100vh", padding: narrow ? 0 : "20px 24px", color: T.ink, fontFamily: "inherit" }}>
       <Header
         preset={preset}
         start={start}
@@ -335,7 +352,7 @@ export default function AnalyticsPanel() {
 
           <div style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr",
+            gridTemplateColumns: narrow ? "minmax(0, 1fr)" : "1fr 1fr",
             gap: 12,
             marginTop: 12,
           }}>
@@ -373,6 +390,7 @@ export default function AnalyticsPanel() {
 // =============================================================================
 
 function Header({ preset, start, end, loading, lastFetchAt, onPreset, onStartChange, onEndChange, onRefresh }) {
+  const narrow = useNarrow();
   return (
     <div style={{
       display: "flex",
@@ -401,7 +419,7 @@ function Header({ preset, start, end, loading, lastFetchAt, onPreset, onStartCha
         </p>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", width: narrow ? "100%" : "auto" }}>
         {[["Recordings", "/impressions"], ["Heatmaps", "/heatmaps"]].map(([label, path]) => (
           <a
             key={label}
@@ -410,8 +428,9 @@ function Header({ preset, start, end, loading, lastFetchAt, onPreset, onStartCha
             rel="noopener noreferrer"
             title={`Open Clarity ${label.toLowerCase()}`}
             style={{
-              border: `0.5px solid ${T.border}`, background: T.white, padding: "5px 12px", borderRadius: 6,
-              fontSize: 11, fontWeight: 500, color: T.ink, textDecoration: "none",
+              border: `0.5px solid ${T.border}`, background: T.white, padding: narrow ? "10px 12px" : "5px 12px", borderRadius: 6,
+              fontSize: narrow ? 13 : 11, fontWeight: 500, color: T.ink, textDecoration: "none",
+              flex: narrow ? 1 : "none", textAlign: "center",
             }}
           >
             {label === "Recordings" ? "▶" : "◉"} {label} ↗
@@ -423,6 +442,7 @@ function Header({ preset, start, end, loading, lastFetchAt, onPreset, onStartCha
           border: `0.5px solid ${T.border}`,
           borderRadius: 6,
           padding: 2,
+          flex: narrow ? "1 1 100%" : "none",
         }}>
           {[
             ["today", "Today"],
@@ -440,10 +460,11 @@ function Header({ preset, start, end, loading, lastFetchAt, onPreset, onStartCha
                   border: 0,
                   background: active ? T.ink : "transparent",
                   color: active ? T.white : T.mute,
-                  padding: "4px 10px",
-                  fontSize: 11,
+                  padding: narrow ? "9px 0" : "4px 10px",
+                  fontSize: narrow ? 13 : 11,
                   fontWeight: 500,
                   borderRadius: 4,
+                  flex: narrow ? 1 : "none",
                   cursor: "pointer",
                   fontFamily: "inherit",
                 }}
@@ -462,6 +483,8 @@ function Header({ preset, start, end, loading, lastFetchAt, onPreset, onStartCha
           border: `0.5px solid ${T.border}`,
           borderRadius: 6,
           padding: "4px 8px",
+          flex: narrow ? "1 1 100%" : "none",
+          minWidth: 0,
         }}>
           <input
             type="date"
@@ -475,7 +498,9 @@ function Header({ preset, start, end, loading, lastFetchAt, onPreset, onStartCha
               fontFamily: "inherit",
               color: T.ink,
               background: "transparent",
-              width: 110,
+              width: narrow ? "auto" : 110,
+              flex: narrow ? 1 : "none",
+              minWidth: 0,
             }}
             aria-label="Start date"
           />
@@ -493,7 +518,9 @@ function Header({ preset, start, end, loading, lastFetchAt, onPreset, onStartCha
               fontFamily: "inherit",
               color: T.ink,
               background: "transparent",
-              width: 110,
+              width: narrow ? "auto" : 110,
+              flex: narrow ? 1 : "none",
+              minWidth: 0,
             }}
             aria-label="End date"
           />
@@ -507,9 +534,10 @@ function Header({ preset, start, end, loading, lastFetchAt, onPreset, onStartCha
           style={{
             border: `0.5px solid ${T.border}`,
             background: T.white,
-            padding: "5px 12px",
+            padding: narrow ? "10px 12px" : "5px 12px",
+            flex: narrow ? "1 1 100%" : "none",
             borderRadius: 6,
-            fontSize: 11,
+            fontSize: narrow ? 13 : 11,
             fontWeight: 500,
             fontFamily: "inherit",
             cursor: loading ? "not-allowed" : "pointer",
@@ -544,6 +572,7 @@ function timeseriesSubtitle(start, end) {
 // =============================================================================
 
 function KpiRow({ data, loading }) {
+  const narrow = useNarrow();
   const curr = data?.current;
   const prev = data?.previous;
 
@@ -559,7 +588,7 @@ function KpiRow({ data, loading }) {
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "repeat(6, 1fr)",
+      gridTemplateColumns: narrow ? "repeat(2, minmax(0, 1fr))" : "repeat(6, 1fr)",
       gap: 8,
       marginBottom: 14,
     }}>
@@ -681,6 +710,7 @@ function ChartCard({ title, subtitle, points, loading }) {
 }
 
 function TimeseriesChart({ points, loading }) {
+  const narrow = useNarrow();
   const [hoverIdx, setHoverIdx] = useState(null);
   const svgRef = useRef(null);
 
@@ -691,9 +721,11 @@ function TimeseriesChart({ points, loading }) {
     return <Empty message="No data for this range yet" tall />;
   }
 
-  const W = 800;
-  const H = 200;
-  const PAD = { top: 12, right: 12, bottom: 24, left: 36 };
+  // A narrower drawing on a phone, so the axis labels are not shrunk to
+  // nothing when 800 units are squeezed into 350 pixels.
+  const W = narrow ? 420 : 800;
+  const H = narrow ? 230 : 200;
+  const PAD = { top: 12, right: narrow ? 22 : 12, bottom: 24, left: 36 };
   const innerW = W - PAD.left - PAD.right;
   const innerH = H - PAD.top - PAD.bottom;
 
@@ -730,15 +762,16 @@ function TimeseriesChart({ points, loading }) {
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
-        onMouseMove={handleMove}
-        onMouseLeave={() => setHoverIdx(null)}
+        onPointerMove={handleMove}
+        onPointerDown={handleMove}
+        onPointerLeave={() => setHoverIdx(null)}
         style={{ width: "100%", height: "auto", display: "block", fontFamily: "inherit" }}
       >
         {gridYs.map((g, i) => (
           <g key={i}>
             <line x1={PAD.left} x2={W - PAD.right} y1={g.y} y2={g.y}
               stroke={T.borderSoft} strokeWidth="0.5" strokeDasharray="2 3" />
-            <text x={PAD.left - 6} y={g.y + 3} fontSize="9" fill={T.muteSoft} textAnchor="end">
+            <text x={PAD.left - 6} y={g.y + 3} fontSize={narrow ? 11 : 9} fill={T.muteSoft} textAnchor="end">
               {fmtInt(g.v)}
             </text>
           </g>
@@ -751,7 +784,7 @@ function TimeseriesChart({ points, loading }) {
 
         {points.map((p, i) =>
           (i % xLabelEvery === 0 || i === points.length - 1) ? (
-            <text key={i} x={x(i)} y={H - 6} fontSize="9" fill={T.muteSoft} textAnchor="middle">
+            <text key={i} x={x(i)} y={H - 6} fontSize={narrow ? 11 : 9} fill={T.muteSoft} textAnchor="middle">
               {shortDate(p.date)}
             </text>
           ) : null
@@ -774,7 +807,8 @@ function TimeseriesChart({ points, loading }) {
           position: "absolute",
           top: 12,
           left: `${(x(hoverIdx) / W) * 100}%`,
-          transform: "translateX(-50%)",
+          // Keep the tooltip inside the card at both ends of the chart.
+          transform: hoverIdx < points.length / 3 ? "translateX(-10%)" : hoverIdx > (points.length * 2) / 3 ? "translateX(-90%)" : "translateX(-50%)",
           background: T.ink,
           color: T.white,
           padding: "6px 10px",
@@ -845,13 +879,15 @@ function longDate(iso) {
 // =============================================================================
 
 function DetailCard({ title, subtitle, children }) {
+  const narrow = useNarrow();
   return (
     <div style={{
       background: T.white,
       border: `0.5px solid ${T.border}`,
       borderRadius: 8,
       padding: "14px 16px",
-      minHeight: 240,
+      minHeight: narrow ? 0 : 240,
+      minWidth: 0,
       display: "flex",
       flexDirection: "column",
     }}>
@@ -865,13 +901,15 @@ function DetailCard({ title, subtitle, children }) {
 }
 
 function BarRow({ leading, label, value, percentage, accent, valueExtra }) {
+  const narrow = useNarrow();
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "120px 1fr 60px",
+      gridTemplateColumns: narrow ? "minmax(0, 1.3fr) minmax(0, 1fr) auto" : "120px 1fr 60px",
       gap: 8,
       alignItems: "center",
-      fontSize: 11,
+      fontSize: narrow ? 12.5 : 11,
+      minHeight: narrow ? 24 : 0,
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
         {leading != null && (
@@ -994,6 +1032,7 @@ function GeoList({ rows, total, loading }) {
 // =============================================================================
 
 function RegionsCard({ country, onCountry, data, loading }) {
+  const narrow = useNarrow();
   // Only countries that already have located visits get a button; Algeria
   // always stays first. Names, not flag emoji — Windows renders flags as
   // two plain letters.
@@ -1033,8 +1072,8 @@ function RegionsCard({ country, onCountry, data, loading }) {
                   border: 0,
                   background: active ? T.ink : "transparent",
                   color: active ? T.white : T.mute,
-                  padding: "4px 8px",
-                  fontSize: 11,
+                  padding: narrow ? "8px 10px" : "4px 8px",
+                  fontSize: narrow ? 12.5 : 11,
                   fontWeight: 500,
                   borderRadius: 4,
                   cursor: "pointer",
@@ -1057,7 +1096,7 @@ function RegionsCard({ country, onCountry, data, loading }) {
           hint="Region and city are recorded from 11 Nov 2026 onward. Earlier visits only have the country, and the IP was never stored, so they cannot be located afterwards."
         />
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 3fr) minmax(0, 2fr)", gap: 24 }}>
+        <div style={{ display: "grid", gridTemplateColumns: narrow ? "minmax(0, 1fr)" : "minmax(0, 3fr) minmax(0, 2fr)", gap: narrow ? 18 : 24 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
             {rows.slice(0, 15).map((r) => (
               <BarRow
