@@ -33,11 +33,283 @@ const telHref = (phone) => "tel:" + String(phone || "").replace(/[^\d+]/g, "");
 const BOOKING_STATUSES = ["PENDING", "CONFIRMED", "REJECTED", "CANCELLED", "COMPLETED", "NO_SHOW", "REFUNDED"];
 
 // =============================================================================
+// PHONE NOTIFICATIONS
+// -----------------------------------------------------------------------------
+// The admin can be installed on a phone's home screen (admin.webmanifest) and
+// receive a notification for every booking event (API: pushService). Tapping
+// a notification opens that booking (/admin?booking=<id>#bookings).
+//
+// iPhone: notifications only work once the admin is added to the home screen
+// and opened from its icon (iOS 16.4 or later). Android and computers: they
+// work straight from the browser.
+// =============================================================================
+const PUSH_API = (process.env.NEXT_PUBLIC_API_URL || "https://api.nzzor.com") + "/api/admin/push";
+
+async function pushCall(path, body) {
+  const res = await fetch(PUSH_API + path, {
+    method: body ? "POST" : "GET",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + getToken() },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || "Request failed (" + res.status + ")");
+  return json.data;
+}
+
+function keyBytes(b64) {
+  const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+  const raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+}
+
+function pushEnv() {
+  if (typeof window === "undefined") return "loading";
+  const ua = navigator.userAgent || "";
+  const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const supported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  if (ios && !standalone) return "ios-install";
+  if (!supported) return "unsupported";
+  if (Notification.permission === "denied") return "denied";
+  return "ok";
+}
+
+function registerAdminWorker() {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return null;
+  return navigator.serviceWorker.register("/admin-sw.js", { scope: "/admin" });
+}
+
+// The manifest and home-screen icon of the admin, so "Add to Home Screen"
+// installs "Nzzor Admin" and not the public site.
+function useAdminManifest() {
+  useEffect(() => {
+    const head = document.head;
+    const set = (selector, tag, attrs) => {
+      let el = head.querySelector(selector);
+      const prev = el ? el.getAttribute(attrs.href ? "href" : "content") : null;
+      if (!el) { el = document.createElement(tag); head.appendChild(el); el.dataset.nzad = "1"; }
+      Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+      return () => {
+        if (el.dataset.nzad) el.remove();
+        else if (prev !== null) el.setAttribute(attrs.href ? "href" : "content", prev);
+      };
+    };
+    const undo = [
+      set('link[rel="manifest"]', "link", { rel: "manifest", href: "/admin.webmanifest" }),
+      set('link[rel="apple-touch-icon"]', "link", { rel: "apple-touch-icon", href: "/admin-apple-touch-icon.png" }),
+      set('meta[name="apple-mobile-web-app-capable"]', "meta", { name: "apple-mobile-web-app-capable", content: "yes" }),
+      set('meta[name="apple-mobile-web-app-title"]', "meta", { name: "apple-mobile-web-app-title", content: "Nzzor Admin" }),
+      set('meta[name="apple-mobile-web-app-status-bar-style"]', "meta", { name: "apple-mobile-web-app-status-bar-style", content: "black" }),
+      set('meta[name="theme-color"]', "meta", { name: "theme-color", content: "#16161A" }),
+    ];
+    return () => undo.forEach((f) => f());
+  }, []);
+}
+
+// One state for every place that shows the control (sidebar, overview).
+function usePhoneAlerts() {
+  const [state, setState] = useState("loading"); // loading | ios-install | unsupported | denied | off | on | busy
+  const [devices, setDevices] = useState(0);
+  const [note, setNote] = useState("");
+
+  const refresh = useCallback(async () => {
+    const env = pushEnv();
+    if (env !== "ok") { setState(env); return; }
+    try {
+      const reg = await registerAdminWorker();
+      const sub = reg && (await reg.pushManager.getSubscription());
+      const r = await pushCall("/status", { endpoint: sub ? sub.endpoint : null });
+      setDevices(r.devices || 0);
+      if (sub && !r.on) {
+        // Subscribed in this browser but unknown to the server: send it again.
+        await pushCall("/subscribe", sub.toJSON());
+        setState("on");
+      } else {
+        setState(sub && r.on ? "on" : "off");
+      }
+    } catch (e) {
+      setState("off");
+    }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    const on = () => refresh();
+    window.addEventListener("nzad-push", on);
+    return () => window.removeEventListener("nzad-push", on);
+  }, [refresh]);
+
+  async function enable() {
+    setNote("");
+    // Ask first, straight from the tap: iPhone refuses the question if
+    // anything else runs before it.
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") { setState(permission === "denied" ? "denied" : "off"); return; }
+    setState("busy");
+    try {
+      const reg = await registerAdminWorker();
+      await navigator.serviceWorker.ready;
+      const { publicKey } = await pushCall("/key");
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(publicKey) });
+      await pushCall("/subscribe", sub.toJSON());
+      await pushCall("/test", { endpoint: sub.endpoint });
+      setNote("Test notification sent.");
+    } catch (e) {
+      setNote(e.message || "Could not turn on notifications.");
+    }
+    window.dispatchEvent(new Event("nzad-push"));
+  }
+
+  async function disable() {
+    setState("busy");
+    try {
+      const reg = await registerAdminWorker();
+      const sub = reg && (await reg.pushManager.getSubscription());
+      if (sub) {
+        await pushCall("/unsubscribe", { endpoint: sub.endpoint }).catch(() => {});
+        await sub.unsubscribe();
+      }
+    } catch (e) { /* state is refreshed below either way */ }
+    setNote("");
+    window.dispatchEvent(new Event("nzad-push"));
+  }
+
+  async function test() {
+    setNote("");
+    try {
+      const reg = await registerAdminWorker();
+      const sub = await reg.pushManager.getSubscription();
+      const r = await pushCall("/test", { endpoint: sub.endpoint });
+      setNote(r.sent ? "Test notification sent." : "Not delivered. Turn notifications off and on again.");
+    } catch (e) {
+      setNote(e.message);
+    }
+  }
+
+  return { state, devices, note, enable, disable, test };
+}
+
+// Compact control at the bottom of the sidebar / phone menu.
+function PhoneAlertsSide() {
+  const p = usePhoneAlerts();
+  if (p.state === "loading" || p.state === "unsupported") return null;
+  return (
+    <div className="pa-side">
+      <div className="pa-side-row">
+        <span className={"pa-dot" + (p.state === "on" ? " on" : "")} />
+        <span className="pa-side-label">{p.state === "on" ? "Notifications on" : "Notifications off"}</span>
+        {p.state === "on" && <button onClick={p.test}>Test</button>}
+        {p.state === "on" && <button onClick={p.disable}>Off</button>}
+        {p.state === "off" && <button className="go" onClick={p.enable}>Turn on</button>}
+        {p.state === "busy" && <span className="pa-side-label">…</span>}
+      </div>
+      {p.state === "ios-install" && <div className="pa-side-note">Add to Home Screen to get notifications.</div>}
+      {p.state === "denied" && <div className="pa-side-note">Blocked in this browser&apos;s settings.</div>}
+      {p.note && <div className="pa-side-note">{p.note}</div>}
+      <style jsx>{`
+        .pa-side { padding: 0 8px 14px; }
+        .pa-side-row { display: flex; align-items: center; gap: 8px; }
+        .pa-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.3); flex-shrink: 0; }
+        .pa-dot.on { background: #34C759; box-shadow: 0 0 0 3px rgba(52,199,89,0.2); }
+        .pa-side-label { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.75); flex: 1; }
+        .pa-side button {
+          border: none; background: rgba(255,255,255,0.1); color: #fff; font-family: inherit;
+          font-size: 11.5px; font-weight: 700; padding: 6px 10px; border-radius: 980px; cursor: pointer;
+        }
+        .pa-side button.go { background: var(--red); }
+        .pa-side-note { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 6px; line-height: 1.4; }
+        @media (max-width: 860px) { .pa-side button { padding: 9px 13px; font-size: 12.5px; } }
+      `}</style>
+    </div>
+  );
+}
+
+// Card at the top of the Overview until notifications are on for this device.
+function PhoneAlertsCard() {
+  const p = usePhoneAlerts();
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    try { setHidden(localStorage.getItem("nzad-push-card") === "hidden"); } catch (e) {}
+  }, []);
+  const hide = () => {
+    setHidden(true);
+    try { localStorage.setItem("nzad-push-card", "hidden"); } catch (e) {}
+  };
+  const show = ["off", "ios-install", "busy"].includes(p.state) || (p.state === "on" && p.note);
+  if (hidden || !show) return null;
+
+  return (
+    <div className="pa-card">
+      <div className="pa-bell" aria-hidden="true">🔔</div>
+      <div className="pa-body">
+        {p.state === "ios-install" ? (
+          <>
+            <strong>Get a notification for every booking</strong>
+            <ol>
+              <li>In Safari, tap <b>Share</b> <span className="pa-share">⬆︎</span> then <b>Add to Home Screen</b>.</li>
+              <li>Open <b>Nzzor Admin</b> from the new icon and sign in.</li>
+              <li>Tap <b>Turn on</b> here and allow notifications.</li>
+            </ol>
+          </>
+        ) : p.state === "on" ? (
+          <>
+            <strong>Notifications are on for this device</strong>
+            <span>{p.note} New bookings, confirmed payments, failed payments, cancellations and group requests will appear here.</span>
+          </>
+        ) : (
+          <>
+            <strong>Get a notification for every booking</strong>
+            <span>New bookings, confirmed payments, failed payments and group requests, the moment they happen.</span>
+            {p.note && <span className="pa-err">{p.note}</span>}
+          </>
+        )}
+      </div>
+      <div className="pa-actions">
+        {p.state === "off" && <button className="pa-on" onClick={p.enable}>Turn on</button>}
+        {p.state === "busy" && <button className="pa-on" disabled>Turning on…</button>}
+        <button className="pa-later" onClick={hide}>{p.state === "on" ? "Close" : "Later"}</button>
+      </div>
+      <style jsx>{`
+        .pa-card {
+          display: flex; align-items: center; gap: 16px; margin-bottom: 20px;
+          background: var(--ink); color: #fff; border-radius: var(--r-lg); padding: 18px 20px;
+        }
+        .pa-bell { font-size: 26px; flex-shrink: 0; }
+        .pa-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; text-align: left; }
+        .pa-body strong { font-size: 15px; }
+        .pa-body span, .pa-body li { font-size: 13px; color: rgba(255,255,255,0.7); line-height: 1.5; }
+        .pa-body ol { margin: 4px 0 0; padding-left: 18px; }
+        .pa-body b { color: #fff; }
+        .pa-body .pa-err { color: #FF8A93; font-weight: 600; }
+        .pa-share { display: inline-block; padding: 0 4px; border: 1px solid rgba(255,255,255,0.4); border-radius: 4px; font-size: 11px; }
+        .pa-actions { display: flex; gap: 8px; flex-shrink: 0; }
+        .pa-actions button {
+          border: none; border-radius: 980px; padding: 10px 18px; font-family: inherit;
+          font-size: 13.5px; font-weight: 700; cursor: pointer;
+        }
+        .pa-on { background: var(--red); color: #fff; }
+        .pa-on:disabled { opacity: 0.7; cursor: default; }
+        .pa-later { background: rgba(255,255,255,0.1); color: #fff; }
+        @media (max-width: 720px) {
+          .pa-card { flex-wrap: wrap; padding: 16px; gap: 12px; margin-bottom: 16px; }
+          .pa-bell { font-size: 22px; }
+          .pa-body { flex: 1 1 calc(100% - 40px); }
+          .pa-actions { flex: 1 1 100%; }
+          .pa-actions button { flex: 1; min-height: 44px; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// =============================================================================
 // ROOT
 // =============================================================================
 export default function AdminPage() {
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
+  useAdminManifest();
 
   useEffect(() => {
     if (!getToken()) { setChecking(false); return; }
@@ -194,6 +466,18 @@ function Dashboard({ user, onLogout }) {
   // link or the phone's back button lands on the same section.
   const [tab, setTabState] = useState("overview");
   const [menuOpen, setMenuOpen] = useState(false);
+  // A tapped notification opens /admin?booking=<id>#bookings.
+  const [openBooking, setOpenBooking] = useState(null);
+
+  useEffect(() => {
+    registerAdminWorker()?.catch(() => {});
+    const id = new URLSearchParams(window.location.search).get("booking");
+    if (id) {
+      setOpenBooking(id);
+      setTabState("bookings");
+      try { window.history.replaceState(null, "", window.location.pathname + "#bookings"); } catch (e) {}
+    }
+  }, []);
 
   useEffect(() => {
     const read = () => {
@@ -254,6 +538,7 @@ function Dashboard({ user, onLogout }) {
           ))}
         </nav>
         <div className="nzad-side-foot">
+          <PhoneAlertsSide />
           <div className="nzad-side-user">
             <strong>{user.firstName || "Admin"}</strong>
             <span>{user.email}</span>
@@ -266,7 +551,7 @@ function Dashboard({ user, onLogout }) {
         {tab === "overview" && <Overview />}
         {tab === "analytics" && <AnalyticsPanel />}
         {tab === "hotels" && <HotelsManager />}
-        {tab === "bookings" && <BookingsManager />}
+        {tab === "bookings" && <BookingsManager openId={openBooking} />}
         {tab === "groups" && <GroupsPanel />}
         {tab === "accounting" && <AccountingPanel />}
         {tab === "customers" && <CustomersManager />}
@@ -380,6 +665,8 @@ function Overview() {
 
       {/* Bookings waiting on a hotel come first: they are the only thing on
           this page that needs someone to act (call the hotel) right now. */}
+      <PhoneAlertsCard />
+
       <OpsPanel />
 
       <TodayPanel />
@@ -3293,10 +3580,10 @@ function Pagination({ page, totalPages, onChange }) {
   );
 }
 
-function BookingsManager() {
+function BookingsManager({ openId = null }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
-  const [selected, setSelected] = useState(null); // booking id for the detail panel
+  const [selected, setSelected] = useState(openId); // booking id for the detail panel
 
   // ---- Filter state -------------------------------------------------------
   // Each filter is a simple controlled value. `searchInput` is what the
