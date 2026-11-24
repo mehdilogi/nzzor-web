@@ -44,8 +44,13 @@ export default async function sitemap() {
     { url: SITE + "/privacy", changeFrequency: "yearly", priority: 0.2 },
   ].map((p) => ({ ...p, lastModified: now }));
 
+  // Each hotel once (the API's pages used to overlap), and only hotels whose
+  // page is worth indexing: the others are marked noindex on the page itself,
+  // and listing a noindex page here sends Google mixed signals. They join the
+  // sitemap on their own once their photo and description are in.
+  const seen = new Set();
   const hotelPages = hotels
-    .filter((h) => h && h.slug)
+    .filter((h) => h && h.slug && h.indexable !== false && !seen.has(h.slug) && seen.add(h.slug))
     .map((h) => ({
       url: SITE + "/hotels/" + encodeURIComponent(h.slug),
       lastModified: h.updatedAt ? new Date(h.updatedAt) : now,
