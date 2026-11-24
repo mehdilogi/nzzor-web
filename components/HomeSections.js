@@ -139,9 +139,16 @@ function useCountUp(target, active, { duration = 1100, decimals = 0 } = {}) {
 // 215 hotels across 47 wilayas. Copy that states a count will always drift,
 // because nothing breaks when it does.
 //
-// The `city` column stores wilaya keys (see lib/wilayas.js), so this is
-// WILAYAS, not cities — the stronger and more accurate claim locally.
-export default function HomeSections({ featured, cities = [], wilayaCount = 0, hotelCount = 0 }) {
+// WILAYAS, not towns. A hotel's `city` is its town (Tichy, Bou Saâda…), and
+// several towns can sit in one wilaya, so counting towns overstated it (73
+// "wilayas" when Algeria has 69). Each town from /meta/cities carries its
+// wilaya code; the count is the number of DISTINCT codes. The prop is only a
+// fallback for an API that does not send codes yet.
+export default function HomeSections({ featured, cities = [], wilayaCount: wilayaCountProp = 0, hotelCount = 0 }) {
+  const hasCodes = Array.isArray(cities) && cities.some((c) => c && c.wilaya);
+  const wilayaCount = hasCodes
+    ? new Set(cities.map((c) => c.wilaya).filter(Boolean)).size
+    : wilayaCountProp;
   const { t, lang } = useLang();
   const bc = BAND_COPY[lang] || BAND_COPY.en;
   const isAr = lang === "ar";
