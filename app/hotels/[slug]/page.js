@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import Nav from "../../../components/Nav";
 import Footer from "../../../components/Footer";
 import WhatsAppButton from "../../../components/WhatsAppButton";
@@ -9,6 +9,15 @@ import { hotelFaqJsonLd } from "../../../lib/hotelFacts";
 import { getHotelLangs, findCityGroup, getGroupHotelsAllLangs, cityPath } from "../../../lib/seoData";
 
 const SITE = "https://nzzor.com";
+
+// Addresses Google indexed before a hotel was renamed. They answered 404,
+// which throws away what the old page had earned; a permanent redirect hands
+// it to the current page. Add a line whenever a hotel's address changes.
+const MOVED = {
+  "royal-maqam-algiers": "golden-hills-hotel-setif",
+  "tassili-sands-djanet": "rusica-park-skikda",
+  "sheraton-club-des-pins": "sheraton-club-des-pins-resort",
+};
 
 // One description that reads well in a Google result and a WhatsApp preview,
 // even for hotels whose own description is a single English line.
@@ -26,6 +35,12 @@ export async function generateMetadata({ params }) {
   const hotel = langs ? langs.fr : await getHotel(params.slug);
   if (!hotel) return { title: "Hôtel introuvable — Nzzor", robots: { index: false } };
   const url = `${SITE}/hotels/${hotel.slug}`;
+  // A page with no photo, or with neither a description nor a price, is a
+  // name and a town: Google indexes few such pages and rates the whole site
+  // lower for them. It stays open to visitors but asks Google not to index
+  // it until the hotel is filled in (photo + description or rooms with
+  // prices). Links on it are still followed. The API decides (indexable).
+  const thin = hotel.indexable === false;
   // The title is what people match against their search. Both the French and
   // the Arabic name, so "فندق الهضاب سطيف" finds this page as well as
   // "hôtel El Hidhab Sétif".
@@ -37,6 +52,7 @@ export async function generateMetadata({ params }) {
     title,
     description,
     alternates: { canonical: url },
+    ...(thin ? { robots: { index: false, follow: true } } : {}),
     openGraph: {
       type: "website",
       url,
@@ -91,6 +107,7 @@ function hotelJsonLd(hotel, langs) {
 }
 
 export default async function HotelPage({ params }) {
+  if (MOVED[params.slug]) permanentRedirect(`/hotels/${MOVED[params.slug]}`);
   const hotel = await getHotel(params.slug);
   if (!hotel) notFound();
 
