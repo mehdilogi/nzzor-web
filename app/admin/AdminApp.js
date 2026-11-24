@@ -1395,6 +1395,7 @@ function HotelsManager() {
                     {h.onlineBooking === false
                       ? <span className="nzad-tag-wa">No contract · WhatsApp</span>
                       : <span className="nzad-tag-ct">Contract</span>}
+                    {h.isActive && h.wilaya === null && <span className="nzad-tag-nowil">No wilaya</span>}
                   </div>
                   <div className="nzad-hotel-sub">
                     {Number(h.stars) > 0 ? "★".repeat(h.stars) : "N/C"} · {h.city} · {h.rooms?.length || 0} room types · from {fmt(h.priceFrom)}
@@ -1480,6 +1481,7 @@ function HotelsManager() {
         .nzad-hotel-meta { flex: 1; }
         .nzad-hotel-name { font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px; }
         .nzad-hotel-sub { font-size: 12.5px; color: var(--gray-400); font-weight: 600; margin-top: 2px; }
+        .nzad-tag-nowil { font-size: 10px; background: var(--red-soft); color: var(--red-deep); padding: 2px 7px; border-radius: 980px; font-weight: 700; }
         .nzad-tag-off { font-size: 10px; background: var(--gray-100); color: var(--gray-400); padding: 2px 7px; border-radius: 980px; font-weight: 700; }
         .nzad-tag-feat { font-size: 10px; background: var(--red-soft); color: var(--red-deep); padding: 2px 7px; border-radius: 980px; font-weight: 700; }
         .nzad-tag-ct { font-size: 10px; background: #FDECEE; color: #C42A36; padding: 2px 7px; border-radius: 980px; font-weight: 700; }
@@ -1558,12 +1560,28 @@ function HotelsManager() {
 // =============================================================================
 // HOTEL EDITOR
 // =============================================================================
+// The 69 wilayas, from the API (src/utils/wilayas.js), so the list lives in
+// one place. Loaded once per page.
+let wilayaCache = null;
+function useWilayas() {
+  const [list, setList] = useState(wilayaCache || []);
+  useEffect(() => {
+    if (wilayaCache) return;
+    fetch((process.env.NEXT_PUBLIC_API_URL || "https://api.nzzor.com") + "/api/hotels/meta/wilayas")
+      .then((r) => r.json())
+      .then((j) => { wilayaCache = j.data || []; setList(wilayaCache); })
+      .catch(() => {});
+  }, []);
+  return list;
+}
+
 const BLANK_HOTEL = {
   nameEn: "", nameFr: "", nameAr: "",
   descEn: "", descFr: "", descAr: "",
   stars: 4, city: "",
   cityEn: "", cityFr: "", cityAr: "",
   regionEn: "", regionFr: "", regionAr: "",
+  wilaya: "",
   address: "", contactEmail: "", contactPhone: "",
   latitude: null, longitude: null,
   checkInTime: "14:00", checkOutTime: "12:00", cancellationHours: 48,
@@ -1584,6 +1602,7 @@ function hotelPayload(h) {
     stars: Number(h.stars ?? 0), city: h.city ?? "",
     cityEn: h.cityEn ?? "", cityFr: h.cityFr ?? "", cityAr: h.cityAr ?? "",
     regionEn: h.regionEn ?? "", regionFr: h.regionFr ?? "", regionAr: h.regionAr ?? "",
+    wilaya: h.wilaya || null,
     address: h.address ?? "", contactEmail: h.contactEmail ?? "", contactPhone: h.contactPhone ?? "",
     latitude: h.latitude ?? null, longitude: h.longitude ?? null,
     checkInTime: h.checkInTime ?? "14:00", checkOutTime: h.checkOutTime ?? "12:00",
@@ -1638,6 +1657,8 @@ function HotelEditor({ hotel, onClose, onSaved }) {
       stars: hotel.stars ?? 4, city: hotel.city ?? "",
       cityEn: hotel.cityEn ?? "", cityFr: hotel.cityFr ?? "", cityAr: hotel.cityAr ?? "",
       regionEn: hotel.regionEn ?? "", regionFr: hotel.regionFr ?? "", regionAr: hotel.regionAr ?? "",
+      // Saved wilaya, or the one the town / region names point to.
+      wilaya: hotel.wilaya || hotel.wilayaSuggested || "",
       address: hotel.address ?? "", contactEmail: hotel.contactEmail ?? "", contactPhone: hotel.contactPhone ?? "",
       latitude: hotel.latitude ?? null, longitude: hotel.longitude ?? null,
       checkInTime: hotel.checkInTime ?? "14:00", checkOutTime: hotel.checkOutTime ?? "12:00",
@@ -1658,6 +1679,7 @@ function HotelEditor({ hotel, onClose, onSaved }) {
   const [savedId, setSavedId] = useState(hotel?.id || null);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const wilayas = useWilayas();
 
   async function save() {
     setErr(""); setBusy(true);
@@ -1665,6 +1687,7 @@ function HotelEditor({ hotel, onClose, onSaved }) {
       const payload = {
         ...form,
         stars: Number(form.stars),
+        wilaya: form.wilaya || null,
         cancellationHours: Number(form.cancellationHours),
         latitude: form.latitude == null || form.latitude === "" || Number.isNaN(Number(form.latitude)) ? null : Number(form.latitude),
         longitude: form.longitude == null || form.longitude === "" || Number.isNaN(Number(form.longitude)) ? null : Number(form.longitude),
@@ -1724,6 +1747,23 @@ function HotelEditor({ hotel, onClose, onSaved }) {
         <h3>Location &amp; rating</h3>
         <div className="nzad-grid3">
           <Field label="City key (lowercase, e.g. algiers)" v={form.city} onChange={(v) => set("city", v)} required />
+          <div>
+            <Choice
+              label="Wilaya"
+              v={form.wilaya}
+              onChange={(v) => set("wilaya", v)}
+              options={[
+                { value: "", label: wilayas.length ? "— Choose the wilaya —" : "Loading…" },
+                ...wilayas.map((w) => ({ value: w.code, label: `${w.code} · ${w.fr}` })),
+              ]}
+              required
+            />
+            <div className={"nzad-wil-hint" + (form.wilaya ? "" : " warn")}>
+              {form.wilaya
+                ? "The city is the town; the wilaya is what the homepage counts."
+                : "Not counted in the wilaya total until chosen."}
+            </div>
+          </div>
           <Choice
             label="Stars"
             v={String(form.stars)}
@@ -1822,6 +1862,8 @@ function HotelEditor({ hotel, onClose, onSaved }) {
         .nzad-toggles { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
         .nzad-editor-actions { display: flex; gap: 10px; margin-bottom: 24px; }
         .nzad-note { padding: 16px; background: var(--cream); border: 1px dashed var(--gray-300); border-radius: var(--r-md); font-size: 13px; color: var(--gray-400); }
+        .nzad-wil-hint { font-size: 11.5px; color: var(--gray-400); margin-top: 5px; }
+        .nzad-wil-hint.warn { color: var(--red-deep); font-weight: 600; }
         @media (max-width: 720px) {
           .nzad-grid3 { grid-template-columns: 1fr; }
           .nzad-toggles { flex-direction: column; gap: 8px; }
