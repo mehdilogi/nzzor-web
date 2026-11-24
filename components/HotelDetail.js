@@ -45,6 +45,7 @@ const TX = {
     wa_cta: "Réserver via WhatsApp", wa_room: "Demander cette chambre",
     wa_steps: ["Envoyez-nous vos dates", "Nous vérifions et confirmons le prix", "Vous payez, nous vous envoyons le bon"],
     wa_rooms_note: "Prix et disponibilité confirmés par notre équipe sur WhatsApp.",
+    wa_from: "À partir de", wa_price_note: "Prix indicatif, confirmé sur WhatsApp selon vos dates.",
     wa_msg: (h, c, ci, co, g, r) => `Bonjour Nzzor, je souhaite réserver ${h} (${c})${r ? ` — ${r}` : ""}, du ${ci} au ${co}, pour ${g} personne(s).`,
   },
   en: {
@@ -66,6 +67,7 @@ const TX = {
     wa_cta: "Book via WhatsApp", wa_room: "Ask for this room",
     wa_steps: ["Send us your dates", "We check and confirm the price", "You pay, we send your voucher"],
     wa_rooms_note: "Price and availability confirmed by our team on WhatsApp.",
+    wa_from: "From", wa_price_note: "Indicative price, confirmed on WhatsApp for your dates.",
     wa_msg: (h, c, ci, co, g, r) => `Hello Nzzor, I'd like to book ${h} (${c})${r ? ` — ${r}` : ""}, from ${ci} to ${co}, for ${g} guest(s).`,
   },
   ar: {
@@ -87,6 +89,7 @@ const TX = {
     wa_cta: "احجز عبر واتساب", wa_room: "اطلب هذه الغرفة",
     wa_steps: ["أرسل لنا تواريخك", "نتحقق ونؤكد السعر", "تدفع ونرسل لك القسيمة"],
     wa_rooms_note: "السعر والتوفر يؤكدهما فريقنا عبر واتساب.",
+    wa_from: "ابتداءً من", wa_price_note: "سعر تقريبي، يُؤكَّد عبر واتساب حسب تواريخك.",
     wa_msg: (h, c, ci, co, g, r) => `مرحبا Nzzor، أريد حجز ${h} (${c})${r ? ` — ${r}` : ""} من ${ci} إلى ${co} لـ ${g} شخص.`,
   },
 };
@@ -108,6 +111,12 @@ export default function HotelDetail({ hotel }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rooms = hotel.rooms || [];
+  // Lowest room price that is actually set (> 0). WhatsApp-only hotels show it
+  // as "from" — an indicative price — and are still booked over WhatsApp.
+  const waFrom = (() => {
+    const p = rooms.map((r) => Number(r.price)).filter((n) => n > 0);
+    return p.length ? Math.min(...p) : null;
+  })();
   // How many units the guest is booking, carried from the search picker via
   // ?rooms=N. Named roomsQty to avoid clashing with `rooms` (the hotel's room
   // list above). Clamped 1..10. Drives the widget total so the preview here
@@ -718,6 +727,13 @@ export default function HotelDetail({ hotel }) {
                           </div>
                           {waOnly ? (
                             <div className="nz-room-action">
+                              {Number(r.price) > 0 && (
+                                <div className="nz-room-price">
+                                  <span className="from">{L("wa_from")}</span>
+                                  <span className="amt display">{formatPriceShort(r.price)}</span>
+                                  <span className="unit">{t("detail.per_night")}</span>
+                                </div>
+                              )}
                               <a className="nz-room-wa" href={waHref(r.type)} target="_blank" rel="noopener noreferrer">
                                 <Icon name="whatsapp" size={15} strokeWidth={0} /> {L("wa_room")}
                               </a>
@@ -798,7 +814,14 @@ export default function HotelDetail({ hotel }) {
               <Icon name="whatsapp" size={15} strokeWidth={0} /> {L("wa_head")}
             </div>
             <div className="nz-widget-body">
-              <p className="nz-wa-body">{L("wa_body")}</p>
+              {waFrom && (
+                <div className="nz-widget-price wa">
+                  <span className="from">{L("wa_from")}</span>
+                  <span className="amt display">{formatPriceShort(waFrom)}</span>
+                  <span className="unit">{t("detail.per_night")}</span>
+                </div>
+              )}
+              <p className="nz-wa-body">{waFrom ? L("wa_price_note") : L("wa_body")}</p>
               <div className="nz-widget-dates">
                 <div className="wf">
                   <label>{L("check_in")}</label>
@@ -961,6 +984,13 @@ export default function HotelDetail({ hotel }) {
       {/* sticky mobile reserve bar */}
       {waOnly ? (
         <div className="nz-mobile-reserve">
+          {waFrom && (
+            <div className="nz-mr-price">
+              <span className="from">{L("mr_from")}</span>
+              <span className="amt display">{formatPriceShort(waFrom)}</span>
+              <span className="unit">{t("detail.per_night")}</span>
+            </div>
+          )}
           <a className="nz-mr-btn wa" href={waHref("")} target="_blank" rel="noopener noreferrer">
             <Icon name="whatsapp" size={17} strokeWidth={0} /> {L("wa_cta")}
           </a>
@@ -1095,6 +1125,9 @@ function DetailStyles() {
         font-size: 13px; font-weight: 700; transition: background .2s;
       }
       .nz-room-wa:hover, .nz-wa-inline:hover { background: #1DA851; }
+      .nz-room-price .from, .nz-widget-price.wa .from { font-size: 11px; font-weight: 700; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.04em; }
+      .nz-room-price .from { display: block; }
+      .nz-widget-price.wa { margin-bottom: 10px; flex-wrap: wrap; }
       .nz-widget-head.wa { background: #E7F4EC; color: #1B8A5A; }
       .nz-wa-body { font-size: 14px; line-height: 1.6; color: var(--ink-2); margin: 0 0 18px; }
       .nz-wa-steps { list-style: none; padding: 0; margin: 4px 0 18px; display: flex; flex-direction: column; gap: 10px; }

@@ -343,9 +343,20 @@ export default function HotelCard({ hotel, priority = false }) {
             price down and the row stops lining up — which is exactly what a
             four-across grid makes obvious. */}
         <div className="nz-hcard-name display">{hotel.name}</div>
+        {/* A hotel with no room price set yet showed "0 DZD / nuit". It now
+            says the price is given on request (over WhatsApp). Hotels with a
+            price show it, contract or not. */}
         <div className="nz-hcard-price">
-          <span className="amt display">{formatPriceShort(hotel.priceFrom)}</span>
-          <span className="unit">{t("card.per_night")}</span>
+          {Number(hotel.priceFrom) > 0 ? (
+            <>
+              <span className="amt display">{formatPriceShort(hotel.priceFrom)}</span>
+              <span className="unit">{t("card.per_night")}</span>
+            </>
+          ) : (
+            <span className="nz-hcard-ask">
+              {{ fr: "Prix sur demande", en: "Price on request", ar: "السعر عند الطلب" }[lang] || "Prix sur demande"}
+            </span>
+          )}
         </div>
         {/* No contract with Nzzor: listed, but booked over WhatsApp. Said on
             the card so nobody expects a checkout. Inline copy rather than a
@@ -365,6 +376,7 @@ export default function HotelCard({ hotel, priority = false }) {
         /* The <a> itself carries no styling — see the note in the JSX above.
            Everything visual lives on .nz-hcard-inner. */
         .nz-hcard-inner { display: block; background: transparent; }
+        .nz-hcard-ask { font-size: 14px; font-weight: 700; color: var(--ink-2); }
         .nz-hcard-wa {
           display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;
           font-size: 12px; font-weight: 600; color: #1B8A5A;
